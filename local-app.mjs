@@ -1,0 +1,1093 @@
+import { tailscaleAccessFromEnv, validateBookflipRequest } from './tailscale-access.mjs';
+import { tradingRoute } from './trading-api.mjs';
+import { listScanProfiles, putScanProfile, deleteScanProfile } from './scan-profiles-api.mjs';
+import { createSqliteVintedDetailCache } from './vinted-detail-sqlite-cache.mjs';
+import { publicAssetPath } from './static-asset-path.mjs';
+import { retryIdentificationJobs } from './identification-retry.mjs';
+import { historyBookLabels } from './history-brief.mjs';
+import { scanCancelled, awaitScan } from './scan-cancellation.mjs';
+import { createVintedDetailCache } from './vinted-detail-cache.mjs';
+import { listOfferWorkspace, setOfferWorkspace, importOfferWorkspace } from './offer-workspace-api.mjs';
+import { listWorkSeries, updateWorkSeries } from './work-series-api.mjs';
+import { createScanDiagnostics, addScanEvent, scanProgress, scanTelemetry } from './scan-diagnostics.mjs';
+import { listOfferSets, markOfferAsSet, updateSetEdition, unmarkOfferSet } from './offer-sets.mjs';
+import { defaultCatalogPath } from './catalog-data-location.mjs';
+import { normalizeISBN } from './isbn-normalization.mjs';
+import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
+import { readFile, appendFile, writeFile, mkdir, rename, stat, rm, realpath } from 'node:fs/promises';
+import { extname, join, dirname, sep } from 'node:path';
+import { spawn } from 'node:child_process';
+import { setTimeout as wait } from 'node:timers/promises';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { scanMarketplace } from './marketplaces.mjs';
+import { localSourceHosts } from './local-scan.mjs';
+import { readVintedLanguage } from './vinted-detail.mjs';
+import { createProductionCatalog, productionCatalogEnabled } from './catalog-production.mjs';
+import {
+  decideIdentificationJob,
+  getCatalogEdition,
+  getCatalogOffer,
+  getCatalogWork,
+  listCatalogOffers,
+  listCatalogWorks,
+  listIdentificationJobs,
+  matchIdentificationJobByIsbn,
+} from './catalog-api.mjs';
+import { analyzedOffers, bookHistory, allBookStatistics } from './price-analysis.mjs';
+import { sqliteHistoryModel } from './sqlite-history-read.mjs';
+import {
+  storageMode,
+  createSqliteBook,
+  linkSqliteOffer,
+  persistSqliteScan,
+} from './sqlite-single-store.mjs';
+import { createIdentificationScheduler } from './identification-scheduler.mjs';
+
+const appDirectory = fileURLToPath(new URL('./app/', import.meta.url));
+const contentTypes = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.svg': 'image/svg+xml',
+};
+
+export function validateSearchInput(input) {
+  const queries = [
+    ...new Set(
+      (Array.isArray(input?.queries) ? input.queries : [])
+        .map((value) => String(value).trim())
+        .filter(Boolean),
+    ),
+  ];
+  const sources = [...new Set((Array.isArray(input?.sources) ? input.sources : []).map(String))];
+  if (!queries.length || queries.length > 10 || queries.some((query) => query.length > 120))
+    throw Object.assign(Error('INVALID_QUERIES'), { statusCode: 400 });
+  if (
+    !sources.length ||
+    sources.length > Object.keys(localSourceHosts).length ||
+    sources.some((source) => !localSourceHosts[source])
+  )
+    throw Object.assign(Error('INVALID_SOURCES'), { statusCode: 400 });
+  if (input?.tasks !== undefined) {
+    if (!Array.isArray(input.tasks) || !input.tasks.length || input.tasks.length>70 ||
+        input.tasks.some(task=>!queries.includes(task?.query)||!sources.includes(task?.source)))
+      throw Object.assign(Error('INVALID_SCAN_TASKS'),{statusCode:400});
+    const tasks=[...new Map(input.tasks.map(task=>[JSON.stringify([task.source,task.query]),{source:task.source,query:task.query}])).values()];
+    return {queries,sources,tasks};
+  }
+  return { queries, sources };
+}
+
+const retryLimit = 3;
+function safeCode(error) {
+  return /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'SOURCE_REQUEST_FAILED';
+}
+function errorDiagnostic(error) {
+  return {
+    code: safeCode(error),
+    httpStatus: Number.isInteger(error?.status) ? error.status : null,
+    blocked: error?.blocked === true,
+    retryable: isRetryable(error),
+  };
+}
+function isRetryable(error) {
+  if (error?.blocked === true) return false;
+  if (error?.retryable === true) return true;
+  if ([408, 425, 429].includes(error?.status) || error?.status >= 500) return true;
+  if (['AbortError', 'TimeoutError'].includes(error?.name)) return true;
+  return /(?:SOURCE_REQUEST_FAILED|fetch failed|socket|timeout|timed out|ECONNRESET|ETIMEDOUT)/i.test(
+    String(error?.message || ''),
+  );
+}
+export function retryDelay(error, attempt) {
+  const retryAfter = error?.retryAfter;
+  const suggested = retryAfter === null || retryAfter === undefined ? NaN : Number(retryAfter) * 1000;
+  if (Number.isFinite(suggested) && suggested >= 0)
+    return Math.min(24 * 60 * 60 * 1000, Math.max(1000, suggested));
+  return Math.min(30000, Math.max(1000, 1000 * 2 ** (attempt - 1)));
+}
+async function retryRead(read, { onProgress = () => {}, waiter = wait, context = {}, signal = null } = {}) {
+  for (let attempt = 1; attempt <= retryLimit; attempt++)
+    try {
+      return { value: await awaitScan(read(), signal), error: null };
+    } catch (error) {
+      scanCancelled(signal);
+      if (attempt === retryLimit || !isRetryable(error)) return { value: null, error };
+      const delayMs = retryDelay(error, attempt);
+      onProgress({
+        type: 'retry',
+        ...context,
+        attempt: attempt + 1,
+        maxAttempts: retryLimit,
+        delayMs,
+        code: safeCode(error),
+      });
+      await awaitScan(waiter(delayMs), signal);
+    }
+  return { value: null, error: Error('SOURCE_REQUEST_FAILED') };
+}
+
+export async function searchOffers(
+  input,
+  {
+    scanner = scanMarketplace,
+    languageReader = readVintedLanguage,
+    now = () => new Date(),
+    onProgress = () => {},
+    detailCache = new Map(),
+    retryWait = wait,
+    signal = null,
+  } = {},
+) {
+  const { queries, sources, tasks } = validateSearchInput(input),
+    results = [],
+    languageCache = detailCache;
+  await Promise.all(
+    sources.map(async (source) => {
+      for (const query of queries) {
+        if(tasks && !tasks.some(task=>task.source===source && task.query===query)) continue;
+        scanCancelled(signal);
+        const task = {
+          source,
+          host: localSourceHosts[source],
+          mode: 'discovery',
+          title: query,
+          category: query,
+          language: 'pl',
+          searchQuery: query,
+          page: 1,
+          paginationVersion: 1,
+        };
+        onProgress({ type: 'source-start', source, query });
+        try {
+          const scan = await scanAllPages(
+            task,
+            scanner,
+            (event) => onProgress({ ...event, source, query }),
+            retryWait,
+            signal,
+          );
+          let offers = scan.offers,
+            diagnostic = scan.diagnostic;
+          if (source === 'Vinted' && task.language === 'pl' && offers.length) {
+            onProgress({ type: 'language-start', source, query, count: offers.length });
+            const filtered = await filterVintedPolishOffers(
+              offers,
+              languageReader,
+              (event) => onProgress({ ...event, source, query }),
+              languageCache,
+              retryWait,
+              signal,
+            );
+            offers = filtered.offers;
+            diagnostic = diagnostic || filtered.diagnostic;
+          }
+          const status = diagnostic ? (offers.length ? 'partial' : 'unavailable') : 'ok';
+          if (diagnostic)
+            onProgress({
+              type: 'source-error',
+              source,
+              query,
+              code: diagnostic.code,
+              partial: offers.length,
+            });
+          results.push({
+            source,
+            query,
+            status,
+            offers,
+            pagination: scan.pagination,
+            pages: scan.pages,
+            ...(diagnostic ? { diagnostic } : {}),
+          });
+          onProgress({
+            type: 'source-done',
+            source,
+            query,
+            offers: offers.length,
+            pages: scan.pages.length,
+            status,
+          });
+        } catch (error) {
+          scanCancelled(signal);
+          const diagnostic = errorDiagnostic(error);
+          onProgress({ type: 'source-error', source, query, code: diagnostic.code, partial: 0 });
+          results.push({ source, query, status: 'unavailable', offers: [], diagnostic });
+          onProgress({type:'source-done',source,query,offers:0,pages:0,status:'unavailable'});
+        }
+      }
+    }),
+  );
+  scanCancelled(signal);
+  const offersByUrl = new Map();
+  for (const row of results) {
+    for (const offer of row.offers) {
+      const existing = offersByUrl.get(offer.url);
+      if (existing) {
+        if (!existing.matchedQueries.includes(row.query)) existing.matchedQueries.push(row.query);
+        continue;
+      }
+      offersByUrl.set(offer.url, { ...offer, source: row.source, matchedQueries: [row.query] });
+    }
+  }
+  const offers = [...offersByUrl.values()].sort(
+    (a, b) => a.price - b.price || a.title.localeCompare(b.title, 'pl'),
+  );
+  return {
+    searchedAt: now().toISOString(),
+    category: 'books',
+    language: 'pl',
+    queries,
+    sources,
+    summary: {
+      offers: offers.length,
+      successful: results.filter((row) => row.status === 'ok').length,
+      partial: results.filter((row) => row.status === 'partial').length,
+      unavailable: results.filter((row) => row.status === 'unavailable').length,
+    },
+    offers,
+    results: results.map(({ offers, ...row }) => ({ ...row, count: offers.length })),
+  };
+}
+async function scanAllPages(task, scanner, onProgress = () => {}, waiter = wait, signal = null) {
+  const offers = [],
+    seenPages = new Set(),
+    pages = [];
+  let current = { ...task },
+    diagnostic = null;
+  for (let pageIndex = 0; pageIndex < 50; pageIndex++) {
+    scanCancelled(signal);
+    if (seenPages.has(current.page)) {
+      diagnostic = errorDiagnostic(Error('PAGINATION_LOOP'));
+      break;
+    }
+    seenPages.add(current.page);
+    onProgress({ type: 'page-start', page: current.page });
+    const read = await retryRead(() => scanner(current, {signal}), {
+      onProgress,
+      waiter,
+      signal,
+      context: { scope: 'page', page: current.page },
+    });
+    if (read.error) {
+      diagnostic = errorDiagnostic(read.error);
+      break;
+    }
+    const scan = read.value;
+    offers.push(...scan.offers);
+    pages.push({
+      page: current.page,
+      count: scan.offers.length,
+      state: scan.pagination?.state || 'unknown',
+    });
+    onProgress({
+      type: 'page-done',
+      page: current.page,
+      count: scan.offers.length,
+      state: scan.pagination?.state || 'unknown',
+      total: offers.length,
+    });
+    const next = scan.pagination?.nextPage;
+    if (scan.pagination?.state !== 'more' || !Number.isInteger(next) || next <= current.page) break;
+    current = { ...current, page: next };
+  }
+  return {
+    offers,
+    pagination: diagnostic
+      ? { state: 'partial', nextPage: current.page }
+      : pages.at(-1)?.state === 'more'
+        ? { state: 'limit', nextPage: current.page }
+        : pages.at(-1),
+    pages,
+    diagnostic,
+  };
+}
+async function filterVintedPolishOffers(
+  offers,
+  languageReader,
+  onProgress = () => {},
+  cache = new Map(),
+  waiter = wait,
+  signal = null,
+) {
+  offers = [...new Map(offers.map((offer) => [offer.url, offer])).values()];
+  // At most two requests in flight, with one new Vinted request per second.
+  // Cache hits require no network request and do not consume rate-limit slots.
+  const accepted = new Array(offers.length);
+  let next = 0, checked = 0, unknown = 0, cached = 0;
+  let diagnostic = null, stopped = false, lastRequestAt = 0;
+  let startGate = Promise.resolve();
+
+  async function startDetailRead(url, index) {
+    let release;
+    const previous = startGate;
+    startGate = new Promise(resolve => { release = resolve; });
+    await previous;
+    try {
+      if (stopped) return { stopped: true };
+      scanCancelled(signal);
+      const delay = Math.max(0, lastRequestAt + 1000 - Date.now());
+      if (delay) await awaitScan(waiter(delay), signal);
+      if (stopped) return { stopped: true };
+      scanCancelled(signal);
+      lastRequestAt = Date.now();
+      // Release start gate before waiting for the network response.
+    } finally {
+      release();
+    }
+    const read = await retryRead(() => languageReader(url, {signal}), {
+      onProgress,
+      waiter,
+      signal,
+      context: { scope: 'vinted-language', item: index + 1, total: offers.length },
+    });
+    return read;
+  }
+
+  async function worker() {
+    while (!stopped) {
+      scanCancelled(signal);
+      const index = next++;
+      if (index >= offers.length) return;
+      const offer = offers[index];
+      let detail = cache.get(offer.url);
+      if (detail) cached++;
+      else {
+        const read = await startDetailRead(offer.url, index);
+        if (read.stopped) return;
+        if (read.error) {
+          diagnostic ||= errorDiagnostic(read.error);
+          stopped = true;
+          return;
+        }
+        scanCancelled(signal);
+        detail = read.value;
+        cache.set(offer.url, detail);
+      }
+      checked++;
+      if (/^(?:pl|pol|polish|polski|język polski)$/i.test(String(detail.language || '')))
+        accepted[index] = {
+          ...offer,
+          language: 'Polski',
+          ...(detail.isbn ? { isbn: detail.isbn, isbnEvidence: 'Vinted — szczegóły oferty' } : {}),
+        };
+      else if (!detail.language) unknown++;
+      onProgress({
+        type: 'language-progress',
+        checked,
+        total: offers.length,
+        accepted: accepted.filter(Boolean).length,
+        unknown,
+        cached,
+      });
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(2, offers.length) }, () => worker()));
+  scanCancelled(signal);
+  return { offers: accepted.filter(Boolean), diagnostic };
+}
+
+export async function readJson(request) {
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > 32768) throw Object.assign(Error('REQUEST_TOO_LARGE'), { statusCode: 413 });
+    chunks.push(buffer);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+  } catch {
+    throw Object.assign(Error('INVALID_JSON'), { statusCode: 400 });
+  }
+}
+function send(response, status, body, type = 'application/json; charset=utf-8') {
+  response.writeHead(status, {
+    'Content-Type': type,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy':
+      "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: https://covers.openlibrary.org; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+  });
+  response.end(body);
+}
+const runtimeDataDirectory = dirname(defaultCatalogPath());
+const logPath = join(runtimeDataDirectory, 'local-app.log');
+const scanStatusPath = join(runtimeDataDirectory, 'scan-status.json');
+async function persistScanStatus(status) {
+  await mkdir(runtimeDataDirectory, { recursive: true });
+  const tempPath = scanStatusPath + '.' + process.pid + '.' + randomUUID() + '.tmp';
+  try {
+    await writeFile(tempPath, JSON.stringify(status));
+    await rename(tempPath, scanStatusPath);
+  } finally {
+    await rm(tempPath, { force: true });
+  }
+}
+async function readScanStatus() {
+  try {
+    const value = JSON.parse(await readFile(scanStatusPath, 'utf8'));
+    return value.status === 'running' ? { ...value, status: 'interrupted' } : value;
+  } catch (error) {
+    if (error.code === 'ENOENT') return { status: 'idle' };
+    return { status: 'unknown' };
+  }
+}
+let productionCatalog = null;
+function getProductionCatalog() {
+  if (!productionCatalogEnabled()) return null;
+  if (!productionCatalog) productionCatalog = createProductionCatalog();
+  return productionCatalog;
+}
+// Incremental compatibility bridge: manual JSON operations must not replay the
+// entire historical snapshot into a live SQLite catalog.
+let logWriteQueue = Promise.resolve();
+const maxLogBytes = 5 * 1024 * 1024;
+function recordProgress(event) {
+  const safe = { at: new Date().toISOString(), ...event };
+  logWriteQueue = logWriteQueue.then(async () => {
+    await mkdir(runtimeDataDirectory, { recursive: true });
+    const bytes = Buffer.byteLength(JSON.stringify(safe) + '\n');
+    const size = await stat(logPath).then(file => file.size).catch(error => {
+      if (error.code === 'ENOENT') return 0;
+      throw error;
+    });
+    if (size + bytes > maxLogBytes) {
+      await rm(logPath + '.1', { force: true });
+      if (size) await rename(logPath, logPath + '.1');
+    }
+    await appendFile(logPath, JSON.stringify(safe) + '\n');
+  }).catch(() => {});
+  return safe;
+}
+function streamHeaders(response, type = 'application/x-ndjson; charset=utf-8') {
+  response.writeHead(200, {
+    'Content-Type': type,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy':
+      "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: https://covers.openlibrary.org; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+  });
+}
+export async function readHistoryForUi({ catalog = getProductionCatalog() } = {}) {
+  if (!catalog) throw Error('SQLITE_HISTORY_REQUIRES_CATALOG');
+  return sqliteHistoryModel(catalog.repository);
+}
+function historySnapshot(history) {
+  return {
+    updatedAt: history.updatedAt,
+    lastScan: history.lastScan,
+    books: allBookStatistics(history)
+      .sort((a, b) => String(b.book.lastSeenAt).localeCompare(String(a.book.lastSeenAt))),
+    offers: analyzedOffers(history).sort((a, b) =>
+      String(b.lastSeenAt).localeCompare(String(a.lastSeenAt)),
+    ),
+  };
+}
+
+// Keep the legacy full-snapshot response without loading every historical
+// price observation. SQL reduces history to one minimum per offer first.
+export function catalogHistorySnapshot(repository) {
+  const history = sqliteHistoryModel(repository, { includePriceHistory: false });
+  const snapshot = historySnapshot(history);
+  const books = new Map(snapshot.books.map(row => [row.book.id, row]));
+  for (const point of repository.database.prepare(
+    'SELECT offer_id, min(price) AS price FROM offer_price_history GROUP BY offer_id',
+  ).all()) {
+    const book = books.get(history.offers[point.offer_id]?.bookId);
+    if (book) book.historicalMinimum = book.historicalMinimum === null
+      ? point.price : Math.min(book.historicalMinimum, point.price);
+  }
+  return snapshot;
+}
+let historyWriteTail = Promise.resolve();
+export async function withHistoryWriteLock(work) {
+  let release;
+  const previous = historyWriteTail;
+  historyWriteTail = new Promise((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await work();
+  } finally {
+    release();
+  }
+}
+
+let runningCatalogResolution = null;
+function scheduleCatalogResolution(catalogStore) {
+  if (runningCatalogResolution) return runningCatalogResolution;
+  const startedAt = performance.now();
+  runningCatalogResolution = new Promise((resolve) => setImmediate(resolve))
+    .then(() => catalogStore.processQueued())
+    .then((result) => {
+      recordProgress({
+        type: 'catalog_resolution',
+        processed: result.processed,
+        failed: result.failed || 0,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+      return result;
+    })
+    .catch((error) => {
+      recordProgress({
+        type: 'catalog_resolution_error',
+        code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'CATALOG_INTEGRATION_ERROR',
+      });
+      return null;
+    })
+    .finally(() => {
+      runningCatalogResolution = null;
+    });
+  return runningCatalogResolution;
+}
+
+const sharedVintedDetailCache = createVintedDetailCache();
+async function searchAndStore(
+  input,
+  onProgress = () => {},
+  { catalogProvider = getProductionCatalog, search = searchOffers, signal = null, shouldAutoResolve = () => true } = {},
+) {
+  storageMode();
+  const catalog = catalogProvider();
+  if (!catalog) throw Error('SQLITE_STORAGE_REQUIRES_CATALOG');
+  scanCancelled(signal);
+  const detailCache = catalog.repository?.database
+    ? createSqliteVintedDetailCache(catalog.repository)
+    : sharedVintedDetailCache;
+  const result = await awaitScan(search(input, { onProgress, detailCache, signal }), signal);
+  scanCancelled(signal);
+  const errors = result.results
+    .filter((row) => row.status !== 'ok')
+    .map((row) => ({
+      source: row.source,
+      query: row.query,
+      code: row.diagnostic?.code || 'SOURCE_REQUEST_FAILED',
+    }));
+  const saved = await withHistoryWriteLock(async () => {
+    scanCancelled(signal);
+    return persistSqliteScan(catalog, { offers: result.offers, searchedAt: result.searchedAt, errors,
+      scanContext: { queries: input.queries, sources: input.sources, results: result.results } });
+  });
+  if (String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0' && shouldAutoResolve())
+    scheduleCatalogResolution(catalog);
+  return {
+    ...result,
+    offers: saved.offers,
+    summary: { ...result.summary, ...saved.summary },
+    history: saved.history,
+    lastScan: saved.lastScan,
+    catalog: { ingest: saved.ingest, resolution: { status: 'queued' } },
+  };
+}
+
+export function createLocalAppServer({
+  catalogProvider = getProductionCatalog,
+  search = searchOffers,
+  tailscaleAccess = tailscaleAccessFromEnv(),
+  identificationControl = null,
+} = {}) {
+  storageMode();
+  const getProductionCatalog = catalogProvider;
+  let scanInFlight = false;
+  let scanAbortController = null;
+  let currentScan = null;
+  const server = createServer(async (request, response) => {
+    try {
+      const rejected = validateBookflipRequest(request, tailscaleAccess);
+      if (rejected)
+        return send(response, rejected.status, JSON.stringify({ error: rejected.error }));
+      const url = new URL(request.url || '/', 'http://127.0.0.1');
+      if (/^\/api\/(?:trading-defaults|trading-summary|scan-runs|source-health|review-decisions|offer-scenarios|data\/|set-details|set-items|set-unknown)/.test(url.pathname) ||
+          (request.method === 'PUT' && /^\/api\/catalog\/(?:works|editions)\//.test(url.pathname)) || url.pathname === '/api/catalog/merge-works') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+        const data = await tradingRoute({repo:catalog.repository,method:request.method,path:url.pathname,
+          input:['PUT','POST'].includes(request.method) ? await readJson(request) : null});
+        if(data!==undefined) return send(response,200,JSON.stringify(data));
+        return send(response,405,JSON.stringify({error:'METHOD_NOT_ALLOWED'}));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/scan/diagnostics') {
+        const scan = currentScan || await readScanStatus();
+        return send(response, 200, JSON.stringify({ ...scan, progress: scanProgress(scan.diagnostics), telemetry: scanTelemetry(scan.diagnostics, { running: scan.status === 'running' }) }));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/scan/status')
+        return send(response, 200, JSON.stringify(currentScan || await readScanStatus()));
+      if (request.method === 'GET' && url.pathname === '/api/catalog/summary') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(response, 200, JSON.stringify(catalog.repository.counts()));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/scan-profiles') {
+        const catalog=getProductionCatalog();
+        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+        return send(response,200,JSON.stringify({items:listScanProfiles(catalog.repository)}));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/scan-profiles/import') {
+        const catalog=getProductionCatalog();
+        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+        const input=await readJson(request);
+        return send(response,200,JSON.stringify(putScanProfile(catalog.repository,input?.name,input,{onlyIfAbsent:true})));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/scan-profiles') {
+        const catalog=getProductionCatalog();
+        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+        const input=await readJson(request);
+        const result=putScanProfile(catalog.repository,input?.name,input,{onlyIfAbsent:true});
+        return send(response,result.created?201:409,JSON.stringify(result.created?result:{error:'PROFILE_ALREADY_EXISTS'}));
+      }
+      if ((request.method === 'PUT' || request.method === 'DELETE') &&
+          url.pathname.startsWith('/api/scan-profiles/')) {
+        const catalog=getProductionCatalog();
+        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+        const name=decodeURIComponent(url.pathname.slice('/api/scan-profiles/'.length));
+        if (request.method === 'DELETE')
+          return send(response,200,JSON.stringify(deleteScanProfile(catalog.repository,name)));
+        const input=await readJson(request);
+        return send(response,200,JSON.stringify(putScanProfile(catalog.repository,name,input)));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/sources')
+        return send(response, 200, JSON.stringify({ sources: Object.keys(localSourceHosts) }));
+      if (request.method === 'GET' && url.pathname === '/api/history/brief') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(response, 200, JSON.stringify(historyBookLabels(catalog.repository)));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/history') {
+        const catalog = getProductionCatalog();
+        if (!catalog) throw Error('SQLITE_HISTORY_REQUIRES_CATALOG');
+        return send(response, 200, JSON.stringify(catalogHistorySnapshot(catalog.repository)));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/book') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const bookId = url.searchParams.get('id');
+        if (!bookId || bookId.length > 200)
+          return send(response, 404, JSON.stringify({ error: 'BOOK_NOT_FOUND' }));
+        const history = sqliteHistoryModel(catalog.repository, { bookId });
+        const data = bookHistory(history, bookId);
+        return data
+          ? send(response, 200, JSON.stringify(data))
+          : send(response, 404, JSON.stringify({ error: 'BOOK_NOT_FOUND' }));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/catalog') {
+        storageMode();
+        const input = await readJson(request);
+        const catalog = getProductionCatalog();
+        if (!catalog) throw Error('SQLITE_STORAGE_REQUIRES_CATALOG');
+        const created = await withHistoryWriteLock(async () => createSqliteBook(catalog, input));
+        return send(
+          response,
+          created.created ? 201 : 200,
+          JSON.stringify({
+            book: created.book,
+            editionId: created.editionId,
+            catalog: url.searchParams.get('compact') === '1'
+              ? historyBookLabels(catalog.repository)
+              : catalogHistorySnapshot(catalog.repository),
+            catalogSync: { mode: 'sqlite' },
+          }),
+        );
+      }
+      if (request.method === 'POST' && url.pathname === '/api/identification/control') {
+        const catalog = getProductionCatalog();
+        if (!catalog || !identificationControl) return send(response, 503, JSON.stringify({ error: 'IDENTIFICATION_UNAVAILABLE' }));
+        const { action, retryUnresolved = false } = await readJson(request);
+        let retried = null;
+        if (action === 'start') {
+          if (retryUnresolved)
+            retried = retryIdentificationJobs(catalog.repository, 'unresolved');
+          const startedAt = new Date().toISOString();
+          catalog.beginIdentificationRun(startedAt);
+          identificationControl.start({ newRun: true, startedAt });
+          void identificationControl.tick();
+        }
+        else if (action === 'stop') identificationControl.pause();
+        else return send(response, 400, JSON.stringify({ error: 'INVALID_IDENTIFICATION_ACTION' }));
+        return send(response, 200, JSON.stringify({ ...identificationControl.status(), retried }));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/catalog/status') {
+        const catalog = getProductionCatalog();
+        const scheduler = identificationControl?.status() ?? { available: false };
+        return send(response, 200, JSON.stringify(catalog ? { ...catalog.status({ runStartedAt: scheduler.runStartedAt }), scheduler } : { enabled: false }));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/catalog/series') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(response, 200, JSON.stringify({ items: listWorkSeries(catalog.repository) }));
+      }
+      if (request.method === 'PUT' && url.pathname.startsWith('/api/catalog/series/')) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const id = decodeURIComponent(url.pathname.slice('/api/catalog/series/'.length));
+        const data = await readJson(request);
+        return send(response, 200, JSON.stringify(updateWorkSeries(catalog.repository, id, data)));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/catalog/works') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(
+          response,
+          200,
+          JSON.stringify(
+            listCatalogWorks(catalog.repository, Object.fromEntries(url.searchParams)),
+          ),
+        );
+      }
+      if (request.method === 'GET' && url.pathname.startsWith('/api/catalog/works/')) {
+        const catalog = getProductionCatalog(),
+          id = decodeURIComponent(url.pathname.slice('/api/catalog/works/'.length));
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const data = getCatalogWork(catalog.repository, id);
+        return data
+          ? send(response, 200, JSON.stringify(data))
+          : send(response, 404, JSON.stringify({ error: 'WORK_NOT_FOUND' }));
+      }
+      if (request.method === 'GET' && url.pathname.startsWith('/api/catalog/editions/')) {
+        const catalog = getProductionCatalog(),
+          id = decodeURIComponent(url.pathname.slice('/api/catalog/editions/'.length));
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const data = getCatalogEdition(catalog.repository, id);
+        return data
+          ? send(response, 200, JSON.stringify(data))
+          : send(response, 404, JSON.stringify({ error: 'EDITION_NOT_FOUND' }));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/offer-workspace') {
+        const catalog=getProductionCatalog();
+        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+        return send(response,200,JSON.stringify({items:listOfferWorkspace(catalog.repository)}));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/offer-workspace/import') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error:'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        return send(response, 200, JSON.stringify(importOfferWorkspace(catalog.repository, input?.entries)));
+      }
+      if (request.method === 'PUT' && url.pathname.startsWith('/api/offer-workspace/')) {
+        const catalog=getProductionCatalog();
+        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+        const id=decodeURIComponent(url.pathname.slice('/api/offer-workspace/'.length));
+        const input=await readJson(request);
+        return send(response,200,JSON.stringify(setOfferWorkspace(catalog.repository,id,input)));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/offers') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(
+          response,
+          200,
+          JSON.stringify(
+            listCatalogOffers(catalog.repository, Object.fromEntries(url.searchParams)),
+          ),
+        );
+      }
+      if (request.method === 'GET' && url.pathname.startsWith('/api/offers/')) {
+        const catalog = getProductionCatalog(),
+          id = decodeURIComponent(url.pathname.slice('/api/offers/'.length));
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const data = getCatalogOffer(catalog.repository, id);
+        return data
+          ? send(response, 200, JSON.stringify(data))
+          : send(response, 404, JSON.stringify({ error: 'OFFER_NOT_FOUND' }));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/identification/retry') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        const result = retryIdentificationJobs(catalog.repository, input?.mode);
+        if (result.queued > 0 && identificationControl) {
+          identificationControl.start();
+          void identificationControl.tick();
+        }
+        return send(response, 200, JSON.stringify(result));
+      }
+      if (url.pathname === '/api/sets' && request.method === 'GET') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(response, 200, JSON.stringify({ items: listOfferSets(catalog.repository) }));
+      }
+      if (url.pathname === '/api/sets' && request.method === 'POST') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        if (typeof input?.offerId !== 'string' || !input.offerId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_OFFER_ID' }));
+        return send(response, 200, JSON.stringify(markOfferAsSet(catalog.repository, input.offerId)));
+      }
+      if (url.pathname.startsWith('/api/sets/') && ['POST','DELETE'].includes(request.method)) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const parts = url.pathname.split('/').map(decodeURIComponent);
+        if (parts.length === 4 && parts[3] === 'editions' && request.method === 'POST') {
+          const input = await readJson(request);
+          if (typeof input?.editionId !== 'string' || !input.editionId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_EDITION_ID' }));
+          return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, parts[2], input.editionId, true)));
+        }
+        if (parts.length === 5 && parts[3] === 'editions' && request.method === 'DELETE')
+          return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, parts[2], parts[4], false)));
+        if (parts.length === 3 && request.method === 'DELETE')
+          return send(response, 200, JSON.stringify(unmarkOfferSet(catalog.repository, parts[2])));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/identification-jobs') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(
+          response,
+          200,
+          JSON.stringify(
+            listIdentificationJobs(catalog.repository, Object.fromEntries(url.searchParams)),
+          ),
+        );
+      }
+      if (
+        request.method === 'POST' &&
+        /^\/api\/identification-jobs\/[^/]+\/decision$/.test(url.pathname)
+      ) {
+        const catalog = getProductionCatalog(),
+          id = decodeURIComponent(url.pathname.split('/')[3]);
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        const result = decideIdentificationJob(catalog.repository, id, input);
+        if (input.action === 'requeued' && identificationControl) {
+          identificationControl.start();
+          void identificationControl.tick();
+        }
+        return send(
+          response,
+          200,
+          JSON.stringify(result),
+        );
+      }
+      if (
+        request.method === 'POST' &&
+        /^\/api\/identification-jobs\/[^/]+\/find-isbn$/.test(url.pathname)
+      ) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const id = decodeURIComponent(url.pathname.split('/')[3]);
+        const job = catalog.repository.database.prepare(
+          "SELECT j.id,o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=? AND j.status='review_required'",
+        ).get(id);
+        if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
+        const input = await readJson(request);
+        return send(response, 200, JSON.stringify(
+          await catalog.findIsbnsByTitle(input?.title || job.original_title),
+        ));
+      }
+      if (
+        request.method === 'POST' &&
+        /^\/api\/identification-jobs\/[^/]+\/match-isbn$/.test(url.pathname)
+      ) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const id = decodeURIComponent(url.pathname.split('/')[3]);
+        const input = await readJson(request);
+        return send(
+          response,
+          200,
+          JSON.stringify(await matchIdentificationJobByIsbn(catalog, id, input)),
+        );
+      }
+      if (request.method === 'POST' && url.pathname === '/api/catalog/isbn-check') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const raw = (await readJson(request)).isbn;
+        const isbn = normalizeISBN(raw);
+        if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
+        const edition = catalog.repository.findEditionByISBN(isbn);
+        return send(response, 200, JSON.stringify({
+          isbn, found: Boolean(edition),
+          edition: edition ? { id: edition.id, title: edition.title, workId: edition.work_id, workTitle: edition.work_title } : null,
+        }));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/catalog/lookup-preview') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const isbn = normalizeISBN((await readJson(request))?.isbn);
+        if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
+        return send(
+          response,
+          200,
+          JSON.stringify(await catalog.lookupIsbn(isbn)),
+        );
+      }
+      if (request.method === 'POST' && url.pathname === '/api/catalog/lookup-confirm') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const isbn = normalizeISBN((await readJson(request))?.isbn);
+        if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
+        const result = await catalog.resolveIsbn(isbn);
+        return send(
+          response,
+          ['created_edition', 'created_work_and_edition', 'matched_existing'].includes(
+            result.decision,
+          )
+            ? 200
+            : 409,
+          JSON.stringify(result),
+        );
+      }
+      if (request.method === 'POST' && url.pathname === '/api/catalog/link') {
+        storageMode();
+        const input = await readJson(request);
+        const catalog = getProductionCatalog();
+        if (!catalog) throw Error('SQLITE_STORAGE_REQUIRES_CATALOG');
+        await withHistoryWriteLock(async () => linkSqliteOffer(catalog, input, { returnHistory: false }));
+        return send(response, 200, JSON.stringify(catalogHistorySnapshot(catalog.repository)));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/search/cancel') {
+        if (!scanInFlight || !scanAbortController || scanAbortController.signal.aborted)
+          return send(response, 409, JSON.stringify({ error: 'NO_ACTIVE_SCAN' }));
+        scanAbortController.abort();
+        return send(response, 202, JSON.stringify({ status: 'cancelling' }));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/search') {
+        if (scanInFlight)
+          return send(response, 409, JSON.stringify({ error: 'SCAN_ALREADY_RUNNING' }));
+        scanInFlight = true;
+        let scanStarted = false;
+        try {
+          const scanInput = validateSearchInput(await readJson(request));
+          scanStarted = true;
+          scanAbortController = new AbortController();
+          currentScan = { status: 'running', startedAt: new Date().toISOString(),
+            diagnostics: createScanDiagnostics({ queries: scanInput.queries || [], sources: scanInput.sources || [], tasks: scanInput.tasks || null }) };
+          await persistScanStatus(currentScan);
+          if (url.searchParams.get('stream') === '1') {
+            streamHeaders(response);
+            const emit = (event) => {
+              const safe = recordProgress(event);
+              addScanEvent(currentScan.diagnostics, safe);
+              if (!response.destroyed) response.write(JSON.stringify({ type: 'progress', event: safe }) + '\n');
+            };
+            try {
+              const result = await searchAndStore(scanInput, emit, {
+                catalogProvider,
+                search,
+                signal: scanAbortController.signal,
+                shouldAutoResolve: () => identificationControl?.status().running ?? true,
+              });
+              currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: result.summary };
+              await persistScanStatus(currentScan);
+              if (!response.destroyed) response.write(JSON.stringify({ type: 'result', result }) + '\n');
+              if (!response.destroyed) response.end();
+            } catch (error) {
+              currentScan = { ...currentScan, status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed', finishedAt: new Date().toISOString() };
+              await persistScanStatus(currentScan);
+              if (!response.destroyed) response.write(
+                JSON.stringify({
+                  type: 'error',
+                  error: /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'LOCAL_APP_ERROR',
+                }) + '\n',
+              );
+              if (!response.destroyed) response.end();
+            }
+            return;
+          }
+          const result = await searchAndStore(scanInput, (event) => addScanEvent(currentScan.diagnostics, recordProgress(event)), {
+            catalogProvider,
+            search,
+            signal: scanAbortController.signal,
+            shouldAutoResolve: () => identificationControl?.status().running ?? true,
+          });
+          currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: result.summary };
+          await persistScanStatus(currentScan);
+          return send(response, 200, JSON.stringify(result));
+        } catch (error) {
+          if (scanStarted) {
+            currentScan = { ...currentScan, status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed', finishedAt: new Date().toISOString() };
+            await persistScanStatus(currentScan);
+          }
+          throw error;
+        } finally {
+          scanAbortController = null;
+          scanInFlight = false;
+        }
+      }
+      if (request.method !== 'GET')
+        return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
+      const file = publicAssetPath(url.pathname);
+      if (!file) return send(response, 404, 'Nie znaleziono', 'text/plain; charset=utf-8');
+      const root = await realpath(appDirectory);
+      let requested;
+      try {
+        requested = await realpath(join(root, file));
+      } catch (error) {
+        if (error.code === 'ENOENT') return send(response, 404, 'Nie znaleziono', 'text/plain; charset=utf-8');
+        throw error;
+      }
+      if (!requested.startsWith(root + sep))
+        return send(response, 404, 'Nie znaleziono', 'text/plain; charset=utf-8');
+      const body = await readFile(requested);
+      return send(response, 200, body, contentTypes[extname(file)] || 'application/octet-stream');
+    } catch (error) {
+      send(
+        response,
+        error.statusCode || 500,
+        JSON.stringify({
+          error: /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'LOCAL_APP_ERROR',
+        }),
+      );
+    }
+  });
+  server.on('close', () => {
+    if (productionCatalog) {
+      productionCatalog.close();
+      productionCatalog = null;
+    }
+  });
+  return server;
+}
+
+function openLocalApp(url) {
+  if (process.platform === 'win32' && !process.argv.includes('--no-open'))
+    spawn('cmd.exe', ['/c', 'start', '', url], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    }).unref();
+}
+async function main() {
+  const port = Number(process.env.BOOKFLIP_LOCAL_PORT || 4317);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw Error('INVALID_PORT');
+  const url = `http://127.0.0.1:${port}`;
+  const enabled = String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0';
+  const intervalMs = Number(process.env.BOOKFLIP_IDENTIFICATION_POLL_MS ?? 5_000);
+  const scheduler = createIdentificationScheduler({
+    runBatch: () => {
+      const catalog = getProductionCatalog();
+      return catalog ? scheduleCatalogResolution(catalog) : null;
+    },
+    intervalMs,
+    onError: (error) => recordProgress({
+      type: 'catalog_scheduler_error',
+      code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'CATALOG_INTEGRATION_ERROR',
+    }),
+  });
+  const server = createLocalAppServer({ identificationControl: scheduler });
+  server.on('close', () => { void scheduler.stop(); });
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.log(`BookFlip Scanner już działa pod adresem ${url}`);
+      openLocalApp(url);
+      process.exitCode = 0;
+      return;
+    }
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+  server.listen(port, '127.0.0.1', () => {
+    if (enabled) scheduler.start();
+    console.log(`BookFlip Scanner działa: ${url}`);
+    openLocalApp(url);
+  });
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });

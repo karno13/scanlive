@@ -1,0 +1,20 @@
+name: BookFlip buyback connectivity — read only
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  connectivity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check storefront homepage without modifying a shopping cart
+        run: |
+          python - <<'PY'
+          import urllib.request
+          request=urllib.request.Request('https://skupksiazek.pl/',headers={'User-Agent':'BookFlip/1.0 (manual connectivity check)'},method='GET')
+          with urllib.request.urlopen(request,timeout=15) as response:
+              print('Homepage status:',response.status)
+              if response.status != 200:
+                  raise SystemExit(1)
+          PY

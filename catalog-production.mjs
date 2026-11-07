@@ -1,0 +1,272 @@
+import { defaultCatalogPath } from './catalog-data-location.mjs';
+import { createHash } from 'node:crypto';
+
+import { CatalogResolver } from './catalog-resolver.mjs';
+import { IdentificationWorker } from './identification-worker.mjs';
+import { createBnAdapter } from './metadata-sources/bn.mjs';
+import { createOpenLibraryAdapter } from './metadata-sources/open-library.mjs';
+import { SourceRateLimiter, createJsonRequester } from './metadata-http.mjs';
+import { findTitleIsbnCandidates } from './catalog-title-isbn.mjs';
+import { lookupISBN, SqliteMetadataCache } from './metadata-lookup.mjs';
+import { extractOfferISBN } from './isbn.mjs';
+import { identifyOffer } from './offer-identity.mjs';
+import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
+
+function stableId(prefix, ...values) {
+  return `${prefix}_${createHash('sha256').update(JSON.stringify(values)).digest('hex').slice(0, 32)}`;
+}
+
+function integerPrice(value) {
+  const price = Number(value);
+  return Number.isFinite(price) && price > 0 ? Math.round(price) : null;
+}
+
+export function productionCatalogEnabled(environment = process.env) {
+  return !['0', 'false', 'off', 'no'].includes(
+    String(environment.BOOKFLIP_CATALOG_ENABLED ?? '1').toLowerCase(),
+  );
+}
+
+export function createProductionCatalog({
+  databasePath = defaultCatalogPath(),
+  fetcher = globalThis.fetch,
+  contact = process.env.BOOKFLIP_OPEN_LIBRARY_CONTACT ?? 'bookflip-local@localhost',
+  now = () => new Date(),
+  busyTimeout = 10_000,
+} = {}) {
+  const repository = new SqliteCatalogRepository(databasePath, { busyTimeout, now });
+  const bnLimiter=new SourceRateLimiter({minIntervalMs:1_000});
+  const openLibraryLimiter=new SourceRateLimiter({minIntervalMs:1_000});
+  const bnAdapter = createBnAdapter({
+    fetcher,
+    limiter: bnLimiter,
+    timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
+  });
+  const openLibraryAdapter = createOpenLibraryAdapter({
+    fetcher,
+    limiter: openLibraryLimiter,
+    timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
+    userAgent: `BookFlip/2.0 (catalog resolver; ${contact})`,
+  });
+  const titleBnRequest = createJsonRequester({
+    fetcher, limiter: bnLimiter,
+    timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
+    retries: 1,
+  });
+  const titleOlRequest = createJsonRequester({
+    fetcher, limiter: openLibraryLimiter,
+    timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
+    retries: 1,
+    headers: { 'User-Agent': `BookFlip/2.0 (title lookup; ${contact})` },
+  });
+  const cache = new SqliteMetadataCache(repository, { now });
+  const resolver = new CatalogResolver({
+    repository,
+    now,
+    lookupMetadata: (isbn) =>
+      lookupISBN(isbn, {
+        bnAdapter,
+        openLibraryAdapter,
+        cache,
+      }),
+  });
+  const worker = new IdentificationWorker({
+    repository,
+    resolver,
+    now,
+    leaseMs: Number(process.env.BOOKFLIP_CATALOG_LEASE_MS ?? 60_000),
+    retryDelayMs: Number(process.env.BOOKFLIP_CATALOG_RETRY_MS ?? 300_000),
+  });
+
+  return {
+    repository,
+    resolver,
+    worker,
+    findIsbnsByTitle(title) {
+      return findTitleIsbnCandidates(title, {
+        requestBn: titleBnRequest,
+        requestOpenLibrary: titleOlRequest,
+      });
+    },
+    lookupIsbn(isbn) {
+      return lookupISBN(isbn, { bnAdapter, openLibraryAdapter, cache });
+    },
+    resolveIsbn(isbn, { dryRun = false } = {}) {
+      return resolver.resolve({
+        evidence: {
+          status: 'valid',
+          values: [isbn],
+          isbn,
+          candidateIsbn: isbn,
+          classification: 'structured',
+          autoAssignable: true,
+          reviewRequired: false,
+          observations: [],
+        },
+        dryRun,
+      });
+    },
+    ingestOffers(offers, observedAt = now(), { scanSummary = null } = {}) {
+      const report = { offers: 0, evidence: 0, jobs: 0, skipped: 0 };
+      const at = observedAt instanceof Date ? observedAt.toISOString() : String(observedAt);
+      repository.transaction(() => {
+        for (const offer of offers ?? []) {
+          let identity;
+          try {
+            identity = identifyOffer(offer);
+          } catch {
+            report.skipped += 1;
+            continue;
+          }
+          const price = integerPrice(offer.price ?? offer.currentPrice);
+          const stored = repository.upsertOffer({
+            id: identity.id,
+            source: identity.source,
+            externalOfferId: identity.externalId,
+            normalizedUrl: identity.url,
+            originalTitle: offer.title ?? offer.originalTitle ?? '',
+            currentPrice: price,
+            currency: offer.currency ?? 'PLN',
+            availability: offer.availability ?? 'unconfirmed',
+            language: offer.language ?? null,
+            observedIsbn: offer.isbn ?? null,
+            matchedQueries: offer.matchedQueries ?? [],
+            firstSeenAt: offer.firstSeenAt ?? at,
+            lastSeenAt: offer.lastSeenAt ?? at,
+            seenCount:
+              Number.isSafeInteger(offer.seenCount) && offer.seenCount > 0
+                ? offer.seenCount
+                : undefined,
+            at: observedAt,
+          });
+          if (price != null) repository.appendPriceObservation(stored.id, price, observedAt);
+          report.offers += 1;
+
+          const evidence = extractOfferISBN(offer);
+          for (const observation of evidence.observations.filter((row) => row.valid)) {
+            const value = observation.value;
+            const evidenceId = stableId('scan_isbn', stored.id, value, observation.classification);
+            const saved = repository.putMetadataEvidence({
+              id: evidenceId,
+              offerId: stored.id,
+              fieldName: 'isbn',
+              value,
+              classification: observation.classification,
+              sourceType: `scanner:${identity.source}`,
+              verificationStatus: 'unverified',
+              observedAt,
+              at: observedAt,
+            });
+            if (saved.created) report.evidence += 1;
+          }
+          const job = repository.putIdentificationJob({
+            offerId: stored.id,
+            status: 'queued',
+            at: observedAt,
+          });
+          if (job.created) report.jobs += 1;
+        }
+        if (scanSummary) {
+          if (scanSummary.at !== at) throw Error('INVALID_SCAN_SUMMARY_TIME');
+          repository.database
+            .prepare(
+              'INSERT OR REPLACE INTO scan_runs(scanned_at,summary_json,created_at) VALUES(?,?,?)',
+            )
+            .run(at, JSON.stringify(scanSummary), at);
+        }
+      });
+      return report;
+    },
+    async processQueued(limit = Number(process.env.BOOKFLIP_CATALOG_BATCH ?? 25)) {
+      return worker.processBatch(limit);
+    },
+    beginIdentificationRun(startedAt = new Date().toISOString()) {
+      const db = repository.database;
+      db.exec(`CREATE TEMP TABLE IF NOT EXISTS identification_run_items (
+        job_id TEXT PRIMARY KEY, status TEXT NOT NULL, decision TEXT
+      );
+      CREATE TEMP TRIGGER IF NOT EXISTS identification_run_result
+      AFTER UPDATE OF status ON main.identification_jobs
+      WHEN EXISTS(SELECT 1 FROM identification_run_items WHERE job_id=NEW.id AND status IN ('queued','running','retry_wait'))
+      BEGIN
+        UPDATE identification_run_items SET status=NEW.status,
+          decision=CASE WHEN json_valid(NEW.result_json) THEN COALESCE(json_extract(NEW.result_json,'$.decision'),json_extract(NEW.result_json,'$.manualDecision')) ELSE NULL END
+        WHERE job_id=NEW.id;
+      END;`);
+      db.exec('DELETE FROM temp.identification_run_items');
+      db.prepare("INSERT INTO temp.identification_run_items(job_id,status) SELECT id,status FROM identification_jobs WHERE status IN ('queued','running','retry_wait')").run();
+      this.identificationRunStartedAt = startedAt;
+    },
+    status({ runStartedAt = null } = {}) {
+      const counts = repository.counts();
+      const cache = Number(
+        repository.database.prepare('SELECT count(*) AS count FROM metadata_lookup_cache').get()
+          .count,
+      );
+      const pending = Number(
+        repository.database
+          .prepare("SELECT count(*) AS count FROM identification_jobs WHERE status<>'completed'")
+          .get().count,
+      );
+      const identification = Object.fromEntries(
+        repository.database.prepare(
+          "SELECT status, count(*) AS count FROM identification_jobs GROUP BY status",
+        ).all().map((row) => [row.status, Number(row.count)]),
+      );
+      const decisions = Object.fromEntries(
+        repository.database.prepare(
+          "SELECT json_extract(result_json, '$.decision') AS decision, count(*) AS count FROM identification_jobs WHERE status='completed' AND json_valid(result_json) GROUP BY decision",
+        ).all().filter((row) => row.decision).map((row) => [row.decision, Number(row.count)]),
+      );
+      const manualDecisions = Object.fromEntries(repository.database.prepare(
+        "SELECT action, count(*) AS count FROM review_decisions GROUP BY action",
+      ).all().map((row) => [row.action, Number(row.count)]));
+      const nowIso = new Date().toISOString();
+      const runnable = Number(repository.database.prepare(
+        "SELECT count(*) AS count FROM identification_jobs WHERE (status='queued' OR status='retry_wait') AND (run_after IS NULL OR run_after<=?)",
+      ).get(nowIso).count);
+      const waiting = Number(repository.database.prepare(
+        "SELECT count(*) AS count FROM identification_jobs WHERE status='retry_wait' AND run_after>?",
+      ).get(nowIso).count);
+      const failureReasons = repository.database.prepare(
+        "SELECT last_error AS code, count(*) AS count FROM identification_jobs WHERE status='failed' GROUP BY last_error ORDER BY count DESC LIMIT 5",
+      ).all().map((row) => ({
+        // Never expose arbitrary exception messages in the diagnostics UI.
+        code: /^[A-Z][A-Z0-9_]{1,63}$/.test(String(row.code || ''))
+          ? row.code : 'OTHER_ERROR',
+        count: Number(row.count),
+      }));
+      const reviewReasons = repository.database.prepare(
+        "SELECT je.value AS code, count(*) AS count FROM identification_jobs j, json_each(CASE WHEN json_valid(j.result_json) THEN j.result_json ELSE '{}' END, '$.reason') je WHERE j.status='review_required' AND json_valid(j.result_json) AND je.type='text' GROUP BY je.value ORDER BY count DESC LIMIT 10",
+      ).all().map((row) => ({
+        code: /^[a-z][a-z0-9_]{1,63}$/.test(String(row.code || '')) ? row.code : 'other_reason',
+        count: Number(row.count),
+      }));
+      let run = null;
+      if (this.identificationRunStartedAt && this.identificationRunStartedAt === runStartedAt) {
+        const runStatuses = Object.fromEntries(repository.database.prepare(
+          'SELECT status,count(*) AS count FROM temp.identification_run_items GROUP BY status',
+        ).all().map((row) => [row.status, Number(row.count)]));
+        const runDecisions = Object.fromEntries(repository.database.prepare(
+          'SELECT decision,count(*) AS count FROM temp.identification_run_items WHERE decision IS NOT NULL GROUP BY decision',
+        ).all().map((row) => [row.decision, Number(row.count)]));
+        run = {
+          startedAt: runStartedAt,
+          statuses: runStatuses,
+          decisions: runDecisions,
+          assigned: Number(runDecisions.matched_existing || 0) + Number(runDecisions.created_edition || 0) + Number(runDecisions.created_work_and_edition || 0),
+        };
+      }
+      return {
+        enabled: true,
+        counts: { ...counts, identification_pending: pending, metadata_lookup_cache: cache },
+        identification: { statuses: identification, decisions, manualDecisions, runnable, waiting, failureReasons, reviewReasons,
+          assigned: Number(repository.database.prepare("SELECT count(DISTINCT offer_id) AS count FROM offer_matches WHERE status='active'").get().count),
+          batch:worker.lastBatch || null,automaticPending:runnable+waiting+Number(identification.running||0),manualReview:Number(identification.review_required||0),run },
+      };
+    },
+    close() {
+      repository.close();
+    },
+  };
+}

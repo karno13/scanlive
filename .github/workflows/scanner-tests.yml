@@ -1,0 +1,53 @@
+name: BookFlip local tests
+on:
+  push:
+    branches: [main, release/bookflip-integrated-candidate]
+    paths:
+      - '**/*.mjs'
+      - '**/*.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.prettierrc.json'
+      - 'eslint.config.mjs'
+      - 'app/**'
+      - 'migrations/**'
+      - '.github/workflows/scanner-tests.yml'
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.prettierrc.json'
+      - 'eslint.config.mjs'
+      - '**/*.mjs'
+      - '**/*.js'
+      - 'app/**'
+      - 'migrations/**'
+      - '.github/workflows/scanner-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22.16.0', '24']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install pinned quality tools
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: ESLint correctness rules
+        run: npm run lint
+      - name: Check tooling formatting
+        run: npm run format:check
+      - name: Parse-check all JavaScript before tests
+        run: npm run check:syntax
+      - name: Offline tests (no marketplace scanning or external API calls)
+        run: npm test
