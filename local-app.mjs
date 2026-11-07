@@ -7,6 +7,7 @@ import { retryIdentificationJobs } from './identification-retry.mjs';
 import { enrichOffers } from './offer-enrichment.mjs';
 import { checkOfferLifecycle } from './offer-lifecycle.mjs';
 import { blockedSources } from './source-blocks.mjs';
+import { reassignOffer, unassignOffer } from './offer-assignment.mjs';
 import { createAutoBackupScheduler } from './auto-backup.mjs';
 import { createScanScheduler, localScanRunner } from './scan-schedule.mjs';
 import { computeProposal, loadProposal, refreshProposals } from './title-proposals.mjs';
@@ -966,6 +967,18 @@ export function createLocalAppServer({
             listCatalogOffers(catalog.repository, Object.fromEntries(url.searchParams)),
           ),
         );
+      }
+      // Operator changes or removes an offer's edition (catalogue and offer panel).
+      const assignment = url.pathname.match(/^\/api\/offers\/([^/]+)\/assignment$/);
+      if (assignment && ['PUT', 'DELETE'].includes(request.method)) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const offerId = decodeURIComponent(assignment[1]);
+        const input = await readJson(request);
+        const result = request.method === 'PUT'
+          ? reassignOffer(catalog.repository, offerId, input?.editionId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null })
+          : unassignOffer(catalog.repository, offerId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null });
+        return send(response, 200, JSON.stringify(result));
       }
       if (request.method === 'GET' && url.pathname.startsWith('/api/offers/')) {
         const catalog = getProductionCatalog(),

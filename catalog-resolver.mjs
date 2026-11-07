@@ -7,6 +7,7 @@ import { persistMetadataResults } from './metadata-lookup.mjs';
 import { findWorkByKey } from './work-grouping.mjs';
 import { enrichEdition } from './catalog-bibliography.mjs';
 import { looksLikeBundle } from './bundle-detection.mjs';
+import { operatorRejectedEditions } from './offer-assignment.mjs';
 import { titleConflict } from './title-consistency.mjs';
 const TRUSTED = new Set(['structured', 'labelled_description']);
 const REVIEW_ONLY = new Set(['unlabelled_description', 'ocr', 'uncertain', 'legacy']);
@@ -410,6 +411,9 @@ export class CatalogResolver {
         { workId: edition.work_id, editionId: edition.id, offerMatchId: current.id },
         { context, dryRun },
       );
+    // The operator removed this edition from this offer: never put it back automatically.
+    if (offerId && !operatorEvidence(isbnEvidence) && operatorRejectedEditions(this.repository, offerId).has(edition.id))
+      return decision('review_required', ['operator_rejected_edition'], proof, { workId: edition.work_id });
     if (offerId && !operatorEvidence(isbnEvidence)) {
       const work = this.repository.database
         .prepare('SELECT title, authors_json FROM works WHERE id=?')

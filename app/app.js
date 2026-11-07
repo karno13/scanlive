@@ -915,7 +915,8 @@ mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData });
 mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogData });
 mountCatalogSeeds({ $, json, escapeHtml, toast, loadCatalogData });
 const onFiltersChange = () => void changeOfferPage(state.offerPage);
-const offersView = createOffersView({ state, $, $$, json, money, date, escapeHtml, allOffers, bookFor, showView, priceStats, onFiltersChange });
+const onAssignmentChanged = () => loadCatalogData();
+const offersView = createOffersView({ state, $, $$, json, money, date, escapeHtml, allOffers, bookFor, showView, priceStats, onFiltersChange, toast, onAssignmentChanged });
 
 async function changeOfferPage(page) {
   if(page<1 || page>Math.max(1,Math.ceil(state.catalogPages.offers.total/state.pageSize))) return;

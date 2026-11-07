@@ -1,3 +1,4 @@
+import { mountOfferAssignment } from './offer-assignment.js';
 import {statusLabel,markDirty,hasUnsavedChanges,confirmDiscard,watchForm} from '../core/ux.js';
 import { safeOfferHref , availabilityLabel } from '../core/formatters.js';
 import { groszeToZloty, moneyFromZloty } from '../core/formatters.js';
@@ -6,7 +7,7 @@ import { confirmDialog, noticeDialog } from '../core/dialogs.js';
 import { coverMarkup, tidyOfferTitle } from '../core/bibliography.js';
 const tradingMode = () => document.body.classList.contains('trading-mode');
 // offers workspace, preserving existing behavior while isolating its implementation.
-export function createOffersView({ state, $, $$, json, money, date, escapeHtml, allOffers, bookFor, showView, priceStats, onFiltersChange }) {
+export function createOffersView({ state, $, $$, json, money, date, escapeHtml, allOffers, bookFor, showView, priceStats, onFiltersChange, toast, onAssignmentChanged }) {
 let drawerSerial=0;
 let drawerTrigger=null;
 let workspaceLoading = null;
@@ -189,6 +190,8 @@ $('#offerDrawer')?.addEventListener('keydown',event=>{
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
   }
 });
+// Re-render after an assignment change without the unsaved-changes prompt.
+async function openOfferDrawerAgain(id) { drawerSerial++; return openOfferDrawer(id); }
 async function openOfferDrawer(id) {
   if(!await confirmDiscard()) return;
   const serial=++drawerSerial;
@@ -254,6 +257,12 @@ async function openOfferDrawer(id) {
         comparison.replaceWith(panel);
       });scenario.after(comparison);
     }
+    // Change or remove the edition this offer is assigned to (sets are edited in Zestawy).
+    const assignmentSection=document.createElement('section');assignmentSection.className='detail-section';
+    const assignmentTitle=document.createElement('h4');assignmentTitle.textContent=active?'Przypisanie: '+(active.editionTitle||'wydanie'):'Przypisanie do wydania';
+    assignmentSection.append(assignmentTitle);
+    $('#offerDrawerContent .detail-grid').after(assignmentSection);
+    mountOfferAssignment({container:assignmentSection,offer,currentEditionId:active?.editionId??null,initialQuery:active?.editionTitle||'',json,escapeHtml,toast,onChanged:async()=>{await onAssignmentChanged();if(serial===drawerSerial)await openOfferDrawerAgain(offer.id);}});
     ['scenarioPurchase', 'scenarioShipping', 'scenarioOther', 'scenarioResale'].forEach((id) =>
       $('#' + id)?.addEventListener('input', calculateScenario),
     );

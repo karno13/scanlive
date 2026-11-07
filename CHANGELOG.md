@@ -2,6 +2,13 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-07 (12) — Zmiana i odłączanie przypisań ofert
+
+- **W karcie wydania** każda powiązana oferta ma „Zmień lub odłącz”: wyszukiwarka wydań z katalogu (tytuł, autor, tłumacz, ISBN) albo odłączenie, oba z potwierdzeniem. To samo w panelu oferty (sekcja „Przypisanie”), także „Przypisz do wydania” dla ofert bez przypisania.
+- Zmiana to ręczna decyzja w historii przypisań i decyzji weryfikacji. Odłączona oferta wraca do „Do weryfikacji”, a odłączone wydanie jest dla niej zapamiętane jako odrzucone: automatyczna identyfikacja nie przypisze jej tam ponownie (`operator_rejected_edition`). Zestawy edytuje się nadal w zakładce Zestawy.
+- Endpointy `PUT /api/offers/:id/assignment` (`{editionId}`) i `DELETE /api/offers/:id/assignment`.
+- Poprawka: panel oferty nie miał dostępu do komunikatów (`toast`), więc błąd porównania cen kończył się wyjątkiem.
+
 ## 2026-11-07 (11) — Budowa bazy: dane z MARC, osoby, zasilanie z BN, cykl życia ofert
 
 - **Rekord MARC zamiast sklejonych pól BN:** czysty tytuł (z podtytułem i numerem części), autor i tłumacz osobno, wydawca bez powtórzeń, oprawa (`020 $q`), liczba stron i format, miejsce wydania, gatunek, tytuł i język oryginału. Istniejące wydania są uzupełniane jednorazowo z zapisanych rekordów, bez internetu; wydania i dzieła poprawione ręcznie nie są nadpisywane. Migracja 112.

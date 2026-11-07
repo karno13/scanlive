@@ -17,6 +17,8 @@ export function createScanInsights({ $, json, escapeHtml }) {
     offer_is_set: 'Oferta oznaczona jako zestaw',
     isbn_title_mismatch: 'ISBN innej książki niż w tytule',
     possible_bundle: 'Możliwy zestaw kilku książek',
+    manual_unassigned: 'Odłączono ręcznie',
+    operator_rejected_edition: 'Wydanie odrzucone ręcznie',
   };
   function refreshIsbn(data) {
     if (!data.enabled) {

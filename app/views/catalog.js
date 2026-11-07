@@ -1,3 +1,4 @@
+import { mountOfferAssignment } from './offer-assignment.js';
 import { mountEditionHistory } from './edition-history.js';
 import { mountEditionBuyback, annotateEditionLines } from './buyback.js';
 import { openDetailView } from '../core/detail-navigation.js';
@@ -495,9 +496,20 @@ async function openEditionDetail(id) {
         .filter((item) => item.scheme.startsWith('isbn'))
         .map((item) => item.value)
         .join(', ') || 'brak',
-    )}</small></span><span><b>Wydawca</b><small>${escapeHtml(row.publisher || '-')}</small></span><span><b>Rok</b><small>${escapeHtml(row.publicationYear || '-')}</small></span><span><b>Język / oprawa</b><small>${escapeHtml([row.language, row.binding].filter(Boolean).join(' / ') || '-')}</small></span></div>${bibliographyMarkup(row)}</section><section class="detail-section"><h4>Ceny zapisanych ofert</h4>${offerPriceSummaryMarkup(row.offers)}</section><section class="detail-section"><h4>Powiązane oferty</h4><div class="price-list">${row.offers.map((item) => `<button class="link-button" type="button" data-edition-offer="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}<small>${escapeHtml(item.source)} · wykryto ${escapeHtml(item.lastSeenAt || 'brak daty')} · ${escapeHtml(availabilityLabel(item))}</small></span><b>${money(item.currentPrice)}</b></button>`).join('') || '<p>Brak ofert.</p>'}</div></section>`;
+    )}</small></span><span><b>Wydawca</b><small>${escapeHtml(row.publisher || '-')}</small></span><span><b>Rok</b><small>${escapeHtml(row.publicationYear || '-')}</small></span><span><b>Język / oprawa</b><small>${escapeHtml([row.language, row.binding].filter(Boolean).join(' / ') || '-')}</small></span></div>${bibliographyMarkup(row)}</section><section class="detail-section"><h4>Ceny zapisanych ofert</h4>${offerPriceSummaryMarkup(row.offers)}</section><section class="detail-section"><h4>Powiązane oferty</h4><div class="price-list">${row.offers.map((item) => `<div class="edition-offer-row"><button class="link-button" type="button" data-edition-offer="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}<small>${escapeHtml(item.source)} · wykryto ${escapeHtml(item.lastSeenAt || 'brak daty')} · ${escapeHtml(availabilityLabel(item))}</small></span><b>${money(item.currentPrice)}</b></button><button type="button" class="link-button edition-offer-manage" data-manage-offer="${escapeHtml(item.id)}" aria-expanded="false">Zmień lub odłącz</button><div data-offer-assign="${escapeHtml(item.id)}"></div></div>`).join('') || '<p>Brak ofert.</p>'}</div></section>`;
     detail.querySelectorAll('[data-edition-offer]').forEach(button=>button.addEventListener('click',()=>openOfferDrawer(button.dataset.editionOffer)));
     mountPersonSearch(detail);
+    // Per offer: change the edition or remove the assignment (mounted on first use).
+    detail.querySelectorAll('[data-manage-offer]').forEach((button) =>
+      button.addEventListener('click', () => {
+        const slot = detail.querySelector(`[data-offer-assign="${CSS.escape(button.dataset.manageOffer)}"]`);
+        const open = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!open));
+        if (open) { slot.replaceChildren(); return; }
+        const item = row.offers.find((entry) => entry.id === button.dataset.manageOffer);
+        mountOfferAssignment({ container: slot, offer: item, currentEditionId: row.id, initialQuery: row.title, json, escapeHtml, toast, onChanged: async () => { await loadCatalogData(); await openEditionDetail(row.id); } });
+      }),
+    );
     const history = mountEditionHistory({ row, target: detail, json, money, openOfferDrawer });
     detail.querySelectorAll('.detail-section')[2].before(history);
     mountEditionBuyback({ row, target: detail, toast });
