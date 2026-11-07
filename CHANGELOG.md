@@ -2,6 +2,21 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-07 (11) — Budowa bazy: dane z MARC, osoby, zasilanie z BN, cykl życia ofert
+
+- **Rekord MARC zamiast sklejonych pól BN:** czysty tytuł (z podtytułem i numerem części), autor i tłumacz osobno, wydawca bez powtórzeń, oprawa (`020 $q`), liczba stron i format, miejsce wydania, gatunek, tytuł i język oryginału. Istniejące wydania są uzupełniane jednorazowo z zapisanych rekordów, bez internetu; wydania i dzieła poprawione ręcznie nie są nadpisywane. Migracja 112.
+- **Osoby z rolami:** tabela osób i ról w wydaniach (autor, tłumaczenie, ilustracje, redakcja). Wyszukiwarka katalogu znajduje tłumaczy i tytuły oryginalne, a kliknięcie osoby w karcie wydania pokazuje jej książki. Endpointy `GET /api/catalog/persons`, `GET /api/catalog/persons/:id`.
+- **Serie z rekordu:** pola 490/8XX z numerem tomu, z podziałem na świat, serię wydawniczą i cykl. Widok Serie korzysta z nich w pierwszej kolejności, więc braki w cyklach (np. Herezja Horusa, Gotrek i Felix) są widoczne.
+- **Grupowanie dzieł:** po oczyszczeniu tytułów dodruki tego samego tytułu i autora łączą się automatycznie (bez dzieł edytowanych ręcznie). Drugi klucz to tytuł oryginału z autorem, więc przekłady wydane pod różnymi polskimi tytułami trafiają do jednego dzieła.
+- **Zestawy w ogłoszeniach:** gdy tytuł wskazuje kilka książek („zestaw”, „6 tomów”, „tom 1-3”, „+”), a ogłoszenie ma jeden ISBN, oferta trafia do weryfikacji (`possible_bundle`) zamiast do jednego wydania. Wcześniejsze automatyczne przypisania takich ofert zostały jednorazowo cofnięte do weryfikacji.
+- **Zasilanie katalogu z BN:** panel w Katalogu przyjmuje autora, wydawcę albo tytuł serii. W tle, stronami po 50 rekordów i w tempie limitu BN, dodawane są wszystkie książki z ISBN jako wydania wzorcowe, bez przypisywania ofert. Odrzucane są audiobooki i, opcjonalnie, wydania obcojęzyczne. Awaria BN wstrzymuje zasilanie na 30 minut. Migracja 113.
+- **Allegro Lokalnie: ISBN ze strony oferty:** odczytywana jest tylko tabela parametrów sprzedawcy, nigdy opis ani zdjęcia. Empik ładuje szczegóły osobnym API, więc nie jest odczytywany.
+- **Cykl życia ofert:** oferty, których skan nie widział od dwóch dni, są sprawdzane na stronie ogłoszenia (najwyżej 8 co 10 minut, każda nie częściej niż co 3 dni). Vinted rozróżnia sprzedane, zarezerwowane i aktywne, a strona 404/410 oznacza ofertę usuniętą. Zapisywana jest data zmiany, a ostatnia cena zostaje. Karta wydania pokazuje liczbę i medianę cen sprzedanych ogłoszeń. Migracja 114; `BOOKFLIP_OFFER_LIFECYCLE=0` wyłącza sprawdzanie.
+- **Google Books jako trzecie źródło:** pytane tylko wtedy, gdy BN nie zna numeru lub jest niedostępna, a Open Library nie ma rekordu. Wymaga własnego klucza w `BOOKFLIP_GOOGLE_BOOKS_KEY`, bo limit anonimowy jest wspólny i wyczerpany. Klucz nie trafia do zapisanych wyników.
+- **Profile startowe i rotacja:** przy pierwszym uruchomieniu bez profili tworzone są profile „Uniwersa” i „Autorzy i cykle” (bez Allegro i OLX) oraz harmonogram „Wszystkie profile po kolei” co 12 godzin. Harmonogram może teraz skanować kolejne profile na zmianę.
+- **Zablokowane źródła:** portal, który odrzucał wszystkie trzy ostatnie skany (CAPTCHA lub HTTP 403), jest oznaczony w skanerze i domyślnie odznaczony. Blokady nie są obchodzone.
+- **Automatyczna kopia zapasowa:** codzienna, ze sprawdzeniem integralności, w folderze `backups` (zostaje 7 najnowszych). `BOOKFLIP_BACKUP_DIR` dodaje drugą kopię, np. na innym dysku. Kopie nie zostawiają już plików `.tmp-wal`/`.tmp-shm`. `BOOKFLIP_AUTO_BACKUP=0` wyłącza kopię.
+
 ## 2026-11-07 (10) — Automatyczna wycena skupu
 
 - **Tryb automatyczny (domyślnie włączony):** serwer co 10 minut sprawdza, czy w katalogu są ISBN bez wyceny lub z wyceną starszą niż 7 dni, i wycenia je w tle w tym samym wolnym tempie. Nowe wydania dostają cenę skupu same, bez klikania.

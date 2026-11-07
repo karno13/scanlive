@@ -49,3 +49,18 @@ test('Product nodes without any book markup are ignored', () => {
   assert.equal(parseProductDetail(ld({ '@type': 'Product', name: 'Zakładka' })).isbn, null);
   assert.equal(parseProductDetail('').isbn, null);
 });
+
+test('Allegro Lokalnie: the ISBN comes from the seller parameter table, never from images or text', () => {
+  const row = (name, value) =>
+    `<tr data-mlc-param itemprop="additionalProperty" itemscope itemtype="http://schema.org/PropertyValue" class="mlc-params__parameter"> <td class="mlc-params__parameter-name" itemprop="name" class="ml-text-color-secondary">${name}</td> <td class="mlc-params__parameter-value" itemprop="value">${value} </td> </tr>`;
+  const page = `<html><img alt="Inna książka ISBN 9788380798779"><table class="mlc-params__list"><tbody>${row('Stan', 'Nowy')}${row('Wydawnictwo', 'Insignis')}${row('Tytuł', 'Warcraft. Oficjalna powieść filmu')}${row('Autor', 'Christie Golden')}${row('Okładka', 'miękka')}${row('ISBN', '978-83-65315-52-6')}</tbody></table><p>Polecam też ISBN 9788380798779</p></html>`;
+  const detail = parseProductDetail(page);
+  assert.equal(detail.isbn, '9788365315526');
+  assert.equal(detail.isbnSource, 'attribute');
+  assert.equal(detail.title, 'Warcraft. Oficjalna powieść filmu');
+  assert.deepEqual(detail.authors, ['Christie Golden']);
+  assert.equal(detail.publisher, 'Insignis');
+  assert.equal(detail.binding, 'miękka');
+  assert.ok(DETAIL_SOURCES.has('Allegro Lokalnie'));
+  assert.equal(parseProductDetail(`<img alt="ISBN 9788380798779"><p>ISBN 9788380798779</p>`).isbn, null);
+});

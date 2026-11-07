@@ -172,7 +172,7 @@ test('manual refresh never announces success after SQLite load or status failure
 
 test('price evidence shares one numeric validator with edition summary', () => {
   const compact=script.replace(/\s+/g,'');
-  for(const expression of ["returnpriceStats(offers.filter(item=>item.availability!=='unavailable'&&(!item.currency||item.currency==='PLN')).map((item)=>item.currentPrice))",'conststats=priceStats(observations.map((item)=>item.price))','Number.isFinite(value)&&value>=0'])assert.ok(compact.includes(expression),expression);
+  for(const expression of ["returnpriceStats(offers.filter(item=>isPurchasable(item)&&(!item.currency||item.currency==='PLN')).map((item)=>item.currentPrice))",'conststats=priceStats(observations.map((item)=>item.price))','Number.isFinite(value)&&value>=0'])assert.ok(compact.includes(expression),expression);
   assert.doesNotMatch(script,/const first = prices\.length/);
 });
 

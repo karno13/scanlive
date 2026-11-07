@@ -41,6 +41,8 @@ export class SqliteMetadataCache {
 
   set(source, isbn, result) {
     if (!['found', 'not_found'].includes(result?.status)) return false;
+    // The cache table admits only the two original sources; others are simply not cached.
+    if (!['bn', 'open_library'].includes(source)) return false;
     const lookupKey = canonicalLookupKey(isbn);
     if (!lookupKey) return false;
     const fetchedAt = this.now();
@@ -123,6 +125,8 @@ export function compareMetadataResults(bnResult, openLibraryResult) {
   return { status, conflicts };
 }
 
+const NATIVE_PROVIDERS = new Set(['bn', 'open_library', 'legacy']);
+
 function externalRecordInput(record, target = {}) {
   const databaseId = deterministicId(
     'external',
@@ -132,8 +136,9 @@ function externalRecordInput(record, target = {}) {
   );
   return {
     id: databaseId,
-    provider: record.source,
-    externalId: record.externalRecordId,
+    // Providers without their own CHECK value are stored as 'other' with a prefixed id.
+    provider: NATIVE_PROVIDERS.has(record.source) ? record.source : 'other',
+    externalId: NATIVE_PROVIDERS.has(record.source) ? record.externalRecordId : `${record.source}:${record.externalRecordId}`,
     recordType: 'edition',
     workId: target.workId ?? null,
     editionId: target.editionId ?? null,
@@ -251,7 +256,7 @@ async function lookupWithCache(adapter, isbn, cache) {
 
 export async function lookupISBN(
   isbn,
-  { bnAdapter, openLibraryAdapter, cache = null, repository = null, target = {} } = {},
+  { bnAdapter, openLibraryAdapter, googleBooksAdapter = null, cache = null, repository = null, target = {} } = {},
 ) {
   if (!canonicalLookupKey(isbn)) throw new Error('INVALID_ISBN');
   if (!bnAdapter || !openLibraryAdapter) throw new TypeError('Both metadata adapters are required');
@@ -260,14 +265,24 @@ export async function lookupISBN(
   const openLibrary = ['not_found', 'temporary_error'].includes(bn.status)
     ? await lookupWithCache(openLibraryAdapter, isbn, cache)
     : { source: 'open_library', status: 'skipped', records: [], reason: 'bn_has_priority' };
-  const selected = bn.status === 'not_found' || (bn.status === 'temporary_error' && openLibrary.status === 'found') ? openLibrary : bn;
+  // Google Books (with the operator's key) when neither the national nor the open catalogue has it.
+  const googleBooks =
+    googleBooksAdapter?.enabled && ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status === 'not_found'
+      ? await lookupWithCache(googleBooksAdapter, isbn, cache)
+      : { source: 'google_books', status: 'skipped', records: [], reason: googleBooksAdapter?.enabled ? 'not_needed' : 'not_configured' };
+  const selected =
+    ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status !== 'found' && googleBooks.status === 'found'
+      ? googleBooks
+      : bn.status === 'not_found' || (bn.status === 'temporary_error' && openLibrary.status === 'found')
+        ? openLibrary
+        : bn;
   const comparison = {
     status: selected.status === 'found' ? 'single_source'
       : selected.status === 'not_found' ? 'not_found' : 'incomplete',
     conflicts: [],
   };
   const persistence = repository
-    ? persistMetadataResults(repository, [bn, openLibrary], target)
+    ? persistMetadataResults(repository, [bn, openLibrary, googleBooks], target)
     : null;
-  return { isbn: canonicalLookupKey(isbn), bn, openLibrary, comparison, persistence };
+  return { isbn: canonicalLookupKey(isbn), bn, openLibrary, googleBooks, comparison, persistence };
 }

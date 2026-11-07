@@ -2,12 +2,14 @@ import { isbnKeys, normalizeISBN } from '../isbn-normalization.mjs';
 import { createJsonRequester } from '../metadata-http.mjs';
 import {
   buildNormalizedRecord,
+  isbnCandidates,
   matchingISBNs,
   normalizedStringList,
   normalizedText,
   payloadHash,
   singleValue,
 } from '../metadata-record.mjs';
+import { catalogTitle, parseBnMarc } from '../bn-marc.mjs';
 
 export const BN_API_URL = 'https://data.bn.org.pl/api/institutions/bibs.json';
 
@@ -31,6 +33,49 @@ function recordLanguage(record) {
 
 function recordId(record) {
   return normalizedText(String(record.id ?? record.recordId ?? record.mmsId ?? ''));
+}
+
+/**
+ * One BN bibliographic record as a catalogue metadata record for `requestedISBN` (one of its ISBNs).
+ * Returns { record } or { issue }. Shared by the ISBN lookup and catalogue seeding.
+ */
+export function normalizeBnRecord(rawRecord, requestedISBN, { sourceUrl = null, fetchedAt = new Date().toISOString() } = {}) {
+  const matched = matchingISBNs(recordIdentifiers(rawRecord), requestedISBN);
+  if (matched.length === 0) return { issue: { reason: 'isbn_mismatch', externalRecordId: recordId(rawRecord) } };
+  const externalRecordId = recordId(rawRecord);
+  // MARC keeps title, people and publisher apart; the flattened fields are the fallback.
+  const marc = parseBnMarc(rawRecord);
+  const title = normalizedText(catalogTitle(marc) ?? rawRecord.title ?? rawRecord.name);
+  if (!externalRecordId || !title) return { issue: { reason: 'missing_required_fields', externalRecordId } };
+  const isbn10 = matched.find((value) => value.length === 10) ?? null;
+  const isbn13 = matched.find((value) => value.length === 13) ?? null;
+  const record = buildNormalizedRecord({
+    source: 'bn',
+    externalRecordId,
+    workExternalId: null,
+    isbn10,
+    isbn13,
+    title,
+    authors: marc ? marc.authors : recordAuthors(rawRecord),
+    publisher: marc?.publisher ?? singleValue(rawRecord.publisher ?? rawRecord.publishers),
+    publicationYear: rawRecord.publicationYear ?? rawRecord.publishYear ?? rawRecord.date ?? marc?.publicationYear,
+    language: recordLanguage(rawRecord),
+    binding: marc?.binding ?? singleValue(rawRecord.binding ?? rawRecord.physicalFormat),
+    materialType: singleValue(rawRecord.materialType ?? rawRecord.kind ?? rawRecord.type),
+    sourceUrl,
+    fetchedAt,
+    payloadHash: payloadHash(rawRecord),
+  });
+  return {
+    record: marc?.originalTitle
+      ? { ...record, originalTitle: marc.originalTitle, payload: rawRecord }
+      : { ...record, payload: rawRecord },
+  };
+}
+
+/** ISBNs a BN record lists (any form). */
+export function bnRecordIsbns(rawRecord) {
+  return isbnCandidates(recordIdentifiers(rawRecord));
 }
 
 export function createBnAdapter({
@@ -81,37 +126,12 @@ export function createBnAdapter({
       const records = [];
       const issues = [];
       for (const rawRecord of rawRecords) {
-        const matched = matchingISBNs(recordIdentifiers(rawRecord), requestedISBN);
-        if (matched.length === 0) {
-          issues.push({ reason: 'isbn_mismatch', externalRecordId: recordId(rawRecord) });
+        const normalized = normalizeBnRecord(rawRecord, requestedISBN, { sourceUrl: response.url ?? url.href, fetchedAt });
+        if (normalized.issue) {
+          issues.push(normalized.issue);
           continue;
         }
-        const externalRecordId = recordId(rawRecord);
-        const title = normalizedText(rawRecord.title ?? rawRecord.name);
-        if (!externalRecordId || !title) {
-          issues.push({ reason: 'missing_required_fields', externalRecordId });
-          continue;
-        }
-        const isbn10 = matched.find((value) => value.length === 10) ?? null;
-        const isbn13 = matched.find((value) => value.length === 13) ?? null;
-        const record = buildNormalizedRecord({
-          source: 'bn',
-          externalRecordId,
-          workExternalId: null,
-          isbn10,
-          isbn13,
-          title,
-          authors: recordAuthors(rawRecord),
-          publisher: singleValue(rawRecord.publisher ?? rawRecord.publishers),
-          publicationYear: rawRecord.publicationYear ?? rawRecord.publishYear ?? rawRecord.date,
-          language: recordLanguage(rawRecord),
-          binding: singleValue(rawRecord.binding ?? rawRecord.physicalFormat),
-          materialType: singleValue(rawRecord.materialType ?? rawRecord.kind ?? rawRecord.type),
-          sourceUrl: response.url ?? url.href,
-          fetchedAt,
-          payloadHash: payloadHash(rawRecord),
-        });
-        records.push({ ...record, payload: rawRecord });
+        records.push(normalized.record);
       }
 
       if (records.length === 0) {

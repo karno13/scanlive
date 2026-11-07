@@ -5,6 +5,8 @@ import { request as httpRequest } from 'node:http';
 import { listScanProfiles } from './scan-profiles-api.mjs';
 
 const KEY = 'scan_schedule';
+// Schedule value meaning "every saved profile in turn": one profile per run, alphabetical.
+export const ALL_PROFILES = '__all__';
 const MIN_HOURS = 1;
 const MAX_HOURS = 168;
 
@@ -21,6 +23,7 @@ export function getScanSchedule(repository) {
     everyHours: Number.isFinite(saved.everyHours) ? saved.everyHours : 24,
     lastRunAt: saved.lastRunAt ?? null,
     lastResult: saved.lastResult ?? null,
+    lastProfile: typeof saved.lastProfile === 'string' ? saved.lastProfile : null,
   };
 }
 
@@ -37,10 +40,18 @@ export function saveScanSchedule(repository, input, now = Date.now()) {
   const profile = typeof input?.profile === 'string' ? input.profile : '';
   const everyHours = Number(input?.everyHours);
   if (!Number.isInteger(everyHours) || everyHours < MIN_HOURS || everyHours > MAX_HOURS) fail('INVALID_SCHEDULE_INTERVAL');
-  if (enabled && !listScanProfiles(repository).some((item) => item.name === profile)) fail('SCHEDULE_PROFILE_NOT_FOUND');
+  const profiles = listScanProfiles(repository);
+  if (enabled && !(profile === ALL_PROFILES ? profiles.length : profiles.some((item) => item.name === profile))) fail('SCHEDULE_PROFILE_NOT_FOUND');
   const current = getScanSchedule(repository);
-  store(repository, { enabled, profile, everyHours, lastRunAt: current.lastRunAt, lastResult: current.lastResult }, now);
+  store(repository, { enabled, profile, everyHours, lastRunAt: current.lastRunAt, lastResult: current.lastResult, lastProfile: current.lastProfile }, now);
   return getScanSchedule(repository);
+}
+
+/** The profile after `last` in name order (wrapping), for the rotating schedule. */
+export function nextProfile(profiles, last) {
+  if (!profiles.length) return null;
+  const index = profiles.findIndex((item) => item.name === last);
+  return profiles[(index + 1) % profiles.length];
 }
 
 /** When the next scan is due, or null when the schedule is off. */
@@ -70,7 +81,8 @@ export function createScanScheduler({
     const due = nextRunAt(schedule);
     if (due === null) return { skipped: 'off' };
     if (now() < due) return { skipped: 'not-due' };
-    const profile = listScanProfiles(repository).find((item) => item.name === schedule.profile);
+    const profiles = listScanProfiles(repository);
+    const profile = schedule.profile === ALL_PROFILES ? nextProfile(profiles, schedule.lastProfile) : profiles.find((item) => item.name === schedule.profile);
     running = true;
     let result;
     try {
@@ -88,8 +100,8 @@ export function createScanScheduler({
     }
     // Record the attempt even on failure so that a broken profile cannot be retried every minute.
     const fresh = getScanSchedule(repository);
-    store(repository, { ...fresh, lastRunAt: new Date(now()).toISOString(), lastResult: result }, now());
-    onEvent({ type: 'scheduled_scan', profile: schedule.profile, result });
+    store(repository, { ...fresh, lastRunAt: new Date(now()).toISOString(), lastResult: result, lastProfile: profile?.name ?? fresh.lastProfile }, now());
+    onEvent({ type: 'scheduled_scan', profile: profile?.name ?? schedule.profile, result });
     return { ran: true, result };
   }
 

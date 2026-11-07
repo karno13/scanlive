@@ -59,6 +59,7 @@ function offer(row) {
       currentPrice: row.current_price,
       currency: row.currency,
       availability: row.availability,
+      availabilityChangedAt: row.availability_changed_at ?? null,
       language: row.language,
       observedIsbn: row.observed_isbn,
       matchedQueries: json(row.matched_queries_json, []),
@@ -86,6 +87,33 @@ function editionCovers(database, editionIds) {
   return result;
 }
 
+// Bibliographic details from migration 112 (BN MARC): people with roles, series, original title.
+function hasBibliography(database) {
+  return Boolean(database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='edition_series'").get());
+}
+function editionBibliography(database, row) {
+  if (!hasBibliography(database)) return {};
+  return {
+    subtitle: row.subtitle ?? null,
+    originalTitle: row.original_title ?? null,
+    originalLanguage: row.original_language ?? null,
+    pageCount: row.page_count ?? null,
+    heightCm: row.height_cm ?? null,
+    placeOfPublication: row.place_of_publication ?? null,
+    genres: json(row.genres_json, []),
+    contributors: database
+      .prepare(
+        'SELECT p.id, p.name, c.role FROM edition_contributors c JOIN persons p ON p.id=c.person_id WHERE c.edition_id=? ORDER BY c.position, p.name',
+      )
+      .all(row.id)
+      .map((item) => ({ id: item.id, name: item.name, role: item.role })),
+    series: database
+      .prepare('SELECT name, kind, volume FROM edition_series WHERE edition_id=? ORDER BY position, name')
+      .all(row.id)
+      .map((item) => ({ name: item.name, kind: item.kind, volume: item.volume })),
+  };
+}
+
 export function listCatalogWorks(repository, options = {}) {
   const { database } = repository,
     { limit, offset, query } = page(options),
@@ -93,8 +121,17 @@ export function listCatalogWorks(repository, options = {}) {
   const conditions = ["NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id)"];
   const params = [];
   if (query) {
-    conditions.push("(bookflip_fold(w.title) LIKE ? ESCAPE '!' OR bookflip_fold(w.authors_json) LIKE ? ESCAPE '!' OR EXISTS (SELECT 1 FROM editions se JOIN edition_identifiers si ON si.edition_id=se.id WHERE se.work_id=w.id AND bookflip_fold(si.normalized_value) LIKE ? ESCAPE '!'))");
+    // Also finds translators and original titles ("Cholewa", "Light fantastic").
+    const extra = hasBibliography(database)
+      ? " OR EXISTS (SELECT 1 FROM editions pe JOIN edition_contributors pc ON pc.edition_id=pe.id JOIN persons pp ON pp.id=pc.person_id WHERE pe.work_id=w.id AND bookflip_fold(pp.name) LIKE ? ESCAPE '!') OR EXISTS (SELECT 1 FROM editions oe WHERE oe.work_id=w.id AND bookflip_fold(oe.original_title) LIKE ? ESCAPE '!')"
+      : '';
+    conditions.push("(bookflip_fold(w.title) LIKE ? ESCAPE '!' OR bookflip_fold(w.authors_json) LIKE ? ESCAPE '!' OR EXISTS (SELECT 1 FROM editions se JOIN edition_identifiers si ON si.edition_id=se.id WHERE se.work_id=w.id AND bookflip_fold(si.normalized_value) LIKE ? ESCAPE '!')" + extra + ')');
     params.push(like,like,like);
+    if (extra) params.push(like, like);
+  }
+  if (options.person && hasBibliography(database)) {
+    conditions.push('EXISTS (SELECT 1 FROM editions xe JOIN edition_contributors xc ON xc.edition_id=xe.id WHERE xe.work_id=w.id AND xc.person_id=?)');
+    params.push(String(options.person));
   }
   const editionFilters=[];
   for(const [key,column] of [['language','language'],['publisher','publisher'],['binding','binding']]) {
@@ -141,6 +178,7 @@ export function listCatalogWorks(repository, options = {}) {
         verificationStatus: row.verification_status,
         identifiers: identifiers.get(row.id) ?? [],
         cover: covers.get(row.id) ?? null,
+        ...editionBibliography(database, row),
       });
   }
   return {
@@ -198,6 +236,7 @@ export function getCatalogWork(repository, workId) {
       verificationStatus: item.verification_status,
       identifiers: identifiers.get(item.id) ?? [],
       cover: covers.get(item.id) ?? null,
+      ...editionBibliography(database, item),
       activeOfferCount: Number(
         database
           .prepare(
@@ -249,6 +288,7 @@ export function getCatalogEdition(repository, editionId) {
     verificationStatus: row.verification_status,
     identifiers: identifierMap(database, [row.id]).get(row.id) ?? [],
     cover: editionCovers(database, [row.id]).get(row.id) ?? null,
+    ...editionBibliography(database, row),
     offers: offers.map((item) => ({
       ...offer(item),
       method: item.method,

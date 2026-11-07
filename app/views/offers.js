@@ -1,5 +1,5 @@
 import {statusLabel,markDirty,hasUnsavedChanges,confirmDiscard,watchForm} from '../core/ux.js';
-import { safeOfferHref } from '../core/formatters.js';
+import { safeOfferHref , availabilityLabel } from '../core/formatters.js';
 import { groszeToZloty, moneyFromZloty } from '../core/formatters.js';
 import { isWatchedOffer, mountOfferWorkspace, loadOfferWorkspace, allSavedOfferNotes, readOfferNotes } from './offer-workspace.js';
 import { confirmDialog, noticeDialog } from '../core/dialogs.js';
@@ -212,7 +212,7 @@ async function openOfferDrawer(id) {
     $('#offerDrawerContent .detail-grid').after(workspace);
     const freshness=document.createElement('p');freshness.className='inline-note';
     const age=offer.lastSeenAt ? Math.floor((Date.now()-Date.parse(offer.lastSeenAt))/86400000) : null;
-    freshness.textContent='Dostępność: '+(offer.availability==='unavailable'?'oznaczona jako niedostępna':'niepotwierdzona — sprawdź ogłoszenie')+(age!==null?' · od ostatniego wykrycia: '+age+' dni':'');
+    freshness.textContent='Dostępność: '+availabilityLabel(offer)+(age!==null?' · od ostatniego wykrycia: '+age+' dni':'');
     $('#offerDrawerContent .detail-grid').after(freshness);
     const scenario=$('#offerDrawerContent .scenario-calculator');workspace.after(scenario);
     try {
@@ -249,7 +249,7 @@ async function openOfferDrawer(id) {
         const panel=document.createElement('section');panel.className='detail-section';
         const title=document.createElement('h4');title.textContent='Porównanie zapisanych ofert tego wydania';panel.append(title);
         for(const item of edition.offers) {
-          const row=document.createElement('p');row.textContent=item.source+' · '+money(item.currentPrice)+' · wykryto '+date(item.lastSeenAt)+' · '+(item.availability==='unavailable'?'niedostępna':'dostępność niepotwierdzona');panel.append(row);
+          const row=document.createElement('p');row.textContent=item.source+' · '+money(item.currentPrice)+' · wykryto '+date(item.lastSeenAt)+' · '+availabilityLabel(item);panel.append(row);
         }
         comparison.replaceWith(panel);
       });scenario.after(comparison);

@@ -57,6 +57,14 @@ function attributeRows(html) {
     const value = decode(match[2].replace(/<[^>]*>/g, ' ').replace(/»/g, ''));
     if (label && value && !(label in rows)) rows[label] = value;
   }
+  // Allegro Lokalnie: the seller's parameter table (schema.org PropertyValue rows of this offer).
+  for (const match of html.matchAll(
+    /<td class="mlc-params__parameter-name"[^>]*>([\s\S]*?)<\/td>\s*<td class="mlc-params__parameter-value"[^>]*>([\s\S]*?)<\/td>/gi,
+  )) {
+    const label = decode(match[1].replace(/<[^>]*>/g, ' ')).toLowerCase().replace(/:$/, '');
+    const value = decode(match[2].replace(/<[^>]*>/g, ' '));
+    if (label && value && !(label in rows)) rows[label] = value;
+  }
   return rows;
 }
 
@@ -67,21 +75,24 @@ export function parseProductDetail(html) {
   const isbn =
     bookIsbn(node?.isbn) ?? bookIsbn(node?.gtin13) ?? bookIsbn(node?.gtin) ?? bookIsbn(rows.isbn) ?? bookIsbn(rows.ean) ?? null;
   const publisher = names(node?.publisher)[0] ?? rows['wydawnictwo'] ?? null;
+  const rowAuthors = rows['autor'] ? [rows['autor']] : [];
   const year = String(node?.datePublished ?? rows['rok wydania'] ?? '').match(/\b(1[5-9]\d\d|20\d\d)\b/)?.[1] ?? null;
   const pages = Number(node?.numberOfPages ?? rows['ilość stron']) || null;
   return {
     isbn,
     isbnSource: isbn ? (node ? 'json-ld' : 'attribute') : null,
-    title: node?.name ? decode(node.name) : null,
-    authors: names(node?.author),
+    title: node?.name ? decode(node.name) : rows['tytuł'] ?? null,
+    authors: names(node?.author).length ? names(node?.author) : rowAuthors,
     publisher,
     year: year ? Number(year) : null,
     pages,
     language: rows['język wydania'] ?? null,
-    binding: rows['rodzaj okładki'] ?? null,
+    binding: rows['rodzaj okładki'] ?? rows['okładka'] ?? null,
     condition: rows['stan'] ?? null,
   };
 }
 
 // Sources whose detail page exposes the product's own structured data.
-export const DETAIL_SOURCES = new Set(['Tezeusz.pl']);
+// Allegro Lokalnie: only the seller's parameter table is read (never the description or images,
+// which carry other books' ISBNs). Empik renders its details through a separate API: not read.
+export const DETAIL_SOURCES = new Set(['Tezeusz.pl', 'Allegro Lokalnie']);

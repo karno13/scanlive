@@ -363,6 +363,7 @@ function renderReviewDetail() {
         metadata_invalid_or_incomplete: 'Metadane z zewnętrznych katalogów są niekompletne.',
         multiple_conflicting_isbn: 'Ogłoszenie ma sprzeczne numery ISBN.',
         isbn_title_mismatch: 'Tytuł ogłoszenia nie pasuje do książki o tym ISBN.',
+        possible_bundle: 'Ogłoszenie wygląda na zestaw kilku książek, a ISBN dotyczy jednej. Oznacz jako zestaw (Z) albo potwierdź ISBN ręcznie.',
       };
       output.textContent = response.reason?.map((code) => reasons[code] || code).join(' · ')
         || 'Nie można bezpiecznie dopasować. Wybierz wydanie ręcznie.';

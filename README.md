@@ -45,6 +45,13 @@ Migracja **104** dodaje dane procesu zakupowego. Nie zmieniaj starszych plików
 migracji. Przed aktualizacją istniejącego schematu działa mechanizm kopii
 zapasowej opisany poniżej. Szczegóły zmian: [Przebudowa UX/UI](docs/archive/ZMIANY-UX-UI.md).
 
+**Budowa bazy (migracje 112–114):** wydania mają dane z rekordu MARC Biblioteki Narodowej
+(osoby z rolami, serie z numerami tomów, tytuł oryginału, oprawa, strony). Katalog można zasilać
+z BN po autorze, wydawcy lub serii (Katalog → „Zasilanie katalogu z Biblioteki Narodowej”).
+Oferty znikające ze skanów są sprawdzane jako sprzedane lub usunięte. Kopia zapasowa robi się
+codziennie sama. Opcjonalne zmienne: `BOOKFLIP_GOOGLE_BOOKS_KEY` (trzecie źródło metadanych)
+i `BOOKFLIP_BACKUP_DIR` (druga kopia na innym dysku). Szczegóły w [CHANGELOG](CHANGELOG.md).
+
 | Zakładka | Funkcja |
 | --- | --- |
 | Skaner | Wybór źródeł, zapytania, przebieg skanu i oferty |

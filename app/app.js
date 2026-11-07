@@ -10,6 +10,7 @@ import { createSetsView } from './views/sets.js';
 import { createReviewView } from './views/review.js';
 import { createCatalogView } from './views/catalog.js';
 import { mountDuplicates } from './views/duplicates.js';
+import { mountCatalogSeeds } from './views/catalog-seeds.js';
 import { mountTitleConflicts } from './views/title-conflicts.js';
 import { mountScanSchedule } from './views/scan-schedule.js';
 import { createOffersView } from './views/offers.js';
@@ -248,16 +249,19 @@ window.addEventListener('popstate', () => {
 async function loadSources() {
   const data = await json('/api/sources');
   state.sources = data.sources || [];
-  const chosen = new Set(savedSearch?.sources || state.sources);
+  const blocked = data.blocked || {};
+  const blockLabel = (code) => (code === 'SOURCE_CAPTCHA' ? 'blokuje odczyt (CAPTCHA)' : 'blokuje odczyt (HTTP 403)');
+  // Sources that refused every recent scan start unchecked unless the operator saved them.
+  const chosen = new Set(savedSearch?.sources || state.sources.filter((source) => !blocked[source]));
   $('#sourceGrid').innerHTML =
     state.sources
       .map(
         (source) =>
-          `<label class="source-option"><input type="checkbox" value="${escapeHtml(source)}" ${chosen.has(source) ? 'checked' : ''}><span>${escapeHtml(source)}</span></label>`,
+          `<label class="source-option"${blocked[source] ? ' title="Ten portal odrzucał automatyczne zapytania w ostatnich skanach. BookFlip nie obchodzi takich blokad."' : ''}><input type="checkbox" value="${escapeHtml(source)}" ${chosen.has(source) ? 'checked' : ''}><span>${escapeHtml(source)}${blocked[source] ? ' <small class="source-blocked">' + escapeHtml(blockLabel(blocked[source])) + '</small>' : ''}</span></label>`,
       )
       .join('') || '<span class="loading-copy">Brak aktywnych adapterow.</span>';
   $('#settingsSources').innerHTML = state.sources
-    .map((source) => `<span><b>${escapeHtml(source)}</b><small>Dostępny w programie · brak potwierdzenia działania</small></span>`)
+    .map((source) => `<span><b>${escapeHtml(source)}</b><small>${blocked[source] ? escapeHtml(blockLabel(blocked[source])) + ' w ostatnich skanach' : 'Dostępny w programie · brak potwierdzenia działania'}</small></span>`)
     .join('');
   fillSourceFilters();
 }
@@ -909,6 +913,7 @@ const reviewView = createReviewView({ state, $, $$, json, toast, money, date, es
 const catalogView = createCatalogView({ state, $, $$, json, money, escapeHtml, visibleCatalogRows, openOfferDrawer, loadCatalogData, toast, showView });
 mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData });
 mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogData });
+mountCatalogSeeds({ $, json, escapeHtml, toast, loadCatalogData });
 const onFiltersChange = () => void changeOfferPage(state.offerPage);
 const offersView = createOffersView({ state, $, $$, json, money, date, escapeHtml, allOffers, bookFor, showView, priceStats, onFiltersChange });
 

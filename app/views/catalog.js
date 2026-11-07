@@ -2,7 +2,7 @@ import { mountEditionHistory } from './edition-history.js';
 import { mountEditionBuyback, annotateEditionLines } from './buyback.js';
 import { openDetailView } from '../core/detail-navigation.js';
 import {markDirty,statusLabel,confirmDiscard,watchForm} from '../core/ux.js';
-import { safeOfferHref } from '../core/formatters.js';
+import { safeOfferHref , availabilityLabel, isPurchasable } from '../core/formatters.js';
 import { mountSeriesEditor, readSeries, seriesSummary } from './series.js';
 import { confirmDialog } from '../core/dialogs.js';
 import { coverMarkup, isbnCover, tidyWorkTitle, parseBnPeople, splitBnTitle, cleanPublisher } from '../core/bibliography.js';
@@ -350,7 +350,7 @@ async function openCatalogDetail(id) {
     if (request !== detailRequest) return;
     renderEditionRail(row);
     detail.scrollTop = 0;
-    detail.innerHTML = `<section class="detail-section"><div class="book-detail-title work-hero">${coverMarkup(workCover(row), tidyWorkTitle(row.title), { size: 'lg', escapeHtml })}<div><span class="status-pill ${['manual', 'verified'].includes(row.verificationStatus) ? 'success' : 'warning'}">${escapeHtml(statusLabel(row.verificationStatus))}</span><h3 title="${escapeHtml(row.title)}">${escapeHtml(tidyWorkTitle(row.title))}</h3><p>${escapeHtml(workAuthors(row) || 'Autor nieznany')}</p></div><strong>${row.editions.length} wydań</strong></div></section><section class="detail-section"><h4>Wydania — wybierz, aby zobaczyć oferty i ceny</h4><div class="price-list">${row.editions.map((edition) => `<button type="button" class="link-button edition-line" data-edition-detail="${escapeHtml(edition.id)}">${coverMarkup(edition.cover || isbnCover(firstIsbn([edition])), edition.title, { size: 'xs', escapeHtml })}<span><strong>${escapeHtml(edition.title)}</strong><small>${escapeHtml([edition.publisher, edition.publicationYear, edition.language].filter(Boolean).join(' / ') || 'Brak szczegółów')}</small></span><b>${escapeHtml(edition.identifiers.find((item) => item.scheme.startsWith('isbn'))?.value || 'bez ISBN')}</b></button>`).join('') || '<p>Brak wydań.</p>'}</div></section><details class="detail-section"><summary>Pochodzenie danych bibliograficznych</summary><p class="inline-note">${row.externalRecords.length ? row.externalRecords.map((record) => `${escapeHtml(record.provider)}: ${escapeHtml(record.externalId)}`).join(', ') : 'Brak zewnętrznych rekordów bibliograficznych.'}</p></section>`;
+    detail.innerHTML = `<section class="detail-section"><div class="book-detail-title work-hero">${coverMarkup(workCover(row), tidyWorkTitle(row.title), { size: 'lg', escapeHtml })}<div><span class="status-pill ${['manual', 'verified'].includes(row.verificationStatus) ? 'success' : 'warning'}">${escapeHtml(statusLabel(row.verificationStatus))}</span><h3 title="${escapeHtml(row.title)}">${escapeHtml(tidyWorkTitle(row.title))}</h3><p>${escapeHtml(workAuthors(row) || 'Autor nieznany')}</p></div><strong>${row.editions.length} wydań</strong></div></section><section class="detail-section"><h4>Wydania — wybierz, aby zobaczyć oferty i ceny</h4><div class="price-list">${row.editions.map((edition) => `<button type="button" class="link-button edition-line" data-edition-detail="${escapeHtml(edition.id)}">${coverMarkup(edition.cover || isbnCover(firstIsbn([edition])), edition.title, { size: 'xs', escapeHtml })}<span><strong>${escapeHtml(edition.title)}</strong><small>${escapeHtml([edition.publisher, edition.publicationYear, edition.language, edition.binding, (edition.contributors || []).filter((person) => person.role === 'translator').map((person) => 'tł. ' + person.name).join(', '), edition.originalTitle ? 'oryg. ' + edition.originalTitle : ''].filter(Boolean).join(' / ') || 'Brak szczegółów')}</small></span><b>${escapeHtml(edition.identifiers.find((item) => item.scheme.startsWith('isbn'))?.value || 'bez ISBN')}</b></button>`).join('') || '<p>Brak wydań.</p>'}</div></section><details class="detail-section"><summary>Pochodzenie danych bibliograficznych</summary><p class="inline-note">${row.externalRecords.length ? row.externalRecords.map((record) => `${escapeHtml(record.provider)}: ${escapeHtml(record.externalId)}`).join(', ') : 'Brak zewnętrznych rekordów bibliograficznych.'}</p></section>`;
     try { await loadSeries(); } catch (error) { /* Edytor pokaże błąd zapisu, jeśli baza jest niedostępna. */ }
     if (request !== detailRequest) return;
     mountWorkActions(row,detail);
@@ -422,12 +422,46 @@ function priceStats(prices) {
   };
 }
 function offerPriceSummary(offers = []) {
-  return priceStats(offers.filter(item=>item.availability!=='unavailable' && (!item.currency || item.currency==='PLN')).map((item) => item.currentPrice));
+  return priceStats(offers.filter(item=>isPurchasable(item) && (!item.currency || item.currency==='PLN')).map((item) => item.currentPrice));
+}
+function soldSummaryMarkup(offers = []) {
+  const sold = offers.filter((item) => item.availability === 'sold' && item.currentPrice > 0 && (!item.currency || item.currency === 'PLN'));
+  if (!sold.length) return '';
+  const stats = priceStats(sold.map((item) => item.currentPrice));
+  return `<p class="inline-note">Sprzedane ogłoszenia: <strong>${sold.length}</strong>, mediana ostatniej ceny ${money(stats.median)} (cena z chwili ostatniego wykrycia — przybliżenie ceny sprzedaży).</p>`;
 }
 function offerPriceSummaryMarkup(offers = []) {
   const stats = offerPriceSummary(offers);
-  if (!stats) return '<p class="inline-note">Brak zapisanych cen ofertowych dla tego wydania.</p>';
-  return `<div class="edition-price-summary"><div><small>Mediana cen ofertowych</small><strong>${money(stats.median)}</strong></div><div><small>Najniższa oferta</small><strong>${money(stats.min)}</strong></div><div><small>Liczba cen</small><strong>${stats.count}</strong></div></div><p class="inline-note">Wartości na podstawie aktualnych cen zapisanych ofert. Nie są to ceny sprzedaży ani prognoza zysku; nie uwzględniają kosztów dostawy i stanu egzemplarza.</p>`;
+  if (!stats) return '<p class="inline-note">Brak zapisanych cen ofertowych dla tego wydania.</p>' + soldSummaryMarkup(offers);
+  return soldSummaryMarkup(offers) + `<div class="edition-price-summary"><div><small>Mediana cen ofertowych</small><strong>${money(stats.median)}</strong></div><div><small>Najniższa oferta</small><strong>${money(stats.min)}</strong></div><div><small>Liczba cen</small><strong>${stats.count}</strong></div></div><p class="inline-note">Wartości na podstawie aktualnych cen zapisanych ofert. Nie są to ceny sprzedaży ani prognoza zysku; nie uwzględniają kosztów dostawy i stanu egzemplarza.</p>`;
+}
+
+const ROLE_LABELS = { author: 'autor', translator: 'tłumaczenie', illustrator: 'ilustracje', editor: 'redakcja', other: 'współpraca' };
+const SERIES_KIND = { cycle: 'cykl', universe: 'świat', publisher_line: 'seria wydawnicza' };
+/** BN record details (original title, people, series, physical description) as detail-grid cells. */
+function bibliographyMarkup(row) {
+  const cells = [];
+  if (row.originalTitle) cells.push(['Tytuł oryginału', escapeHtml(row.originalTitle) + (row.originalLanguage ? ' <small>(' + escapeHtml(row.originalLanguage) + ')</small>' : '')]);
+  const people = (row.contributors || []).filter((person) => person.role !== 'author' || (row.contributors || []).filter((item) => item.role === 'author').length > 0);
+  if (people.length)
+    cells.push(['Osoby', people.map((person) => '<button type="button" class="link-button" data-person-search="' + escapeHtml(person.name) + '" title="Pokaż wszystkie książki tej osoby">' + escapeHtml(person.name) + '</button> <small>' + escapeHtml(ROLE_LABELS[person.role] || person.role) + '</small>').join('<br>')]);
+  if ((row.series || []).length)
+    cells.push(['Seria', row.series.map((entry) => escapeHtml(entry.name) + (entry.volume != null ? ' — t. ' + escapeHtml(entry.volume) : '') + ' <small>' + escapeHtml(SERIES_KIND[entry.kind] || '') + '</small>').join('<br>')]);
+  const physical = [row.pageCount ? row.pageCount + ' s.' : '', row.heightCm ? row.heightCm + ' cm' : '', row.placeOfPublication || ''].filter(Boolean).join(' · ');
+  if (physical) cells.push(['Opis fizyczny', escapeHtml(physical)]);
+  if ((row.genres || []).length) cells.push(['Gatunek', escapeHtml(row.genres.join(', '))]);
+  return cells.length ? '<div class="detail-grid bibliography-grid">' + cells.map(([label, value]) => '<span><b>' + label + '</b><small>' + value + '</small></span>').join('') + '</div>' : '';
+}
+function mountPersonSearch(detail) {
+  detail.querySelectorAll('[data-person-search]').forEach((button) =>
+    button.addEventListener('click', () => {
+      const input = $('#catalogSearch');
+      if (!input) return;
+      input.value = button.dataset.personSearch;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus();
+    }),
+  );
 }
 
 async function openEditionDetail(id) {
@@ -461,8 +495,9 @@ async function openEditionDetail(id) {
         .filter((item) => item.scheme.startsWith('isbn'))
         .map((item) => item.value)
         .join(', ') || 'brak',
-    )}</small></span><span><b>Wydawca</b><small>${escapeHtml(row.publisher || '-')}</small></span><span><b>Rok</b><small>${escapeHtml(row.publicationYear || '-')}</small></span><span><b>Język / oprawa</b><small>${escapeHtml([row.language, row.binding].filter(Boolean).join(' / ') || '-')}</small></span></div></section><section class="detail-section"><h4>Ceny zapisanych ofert</h4>${offerPriceSummaryMarkup(row.offers)}</section><section class="detail-section"><h4>Powiązane oferty</h4><div class="price-list">${row.offers.map((item) => `<button class="link-button" type="button" data-edition-offer="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}<small>${escapeHtml(item.source)} · wykryto ${escapeHtml(item.lastSeenAt || 'brak daty')} · ${escapeHtml(item.availability==='unavailable'?'niedostępna':'dostępność niepotwierdzona')}</small></span><b>${money(item.currentPrice)}</b></button>`).join('') || '<p>Brak ofert.</p>'}</div></section>`;
+    )}</small></span><span><b>Wydawca</b><small>${escapeHtml(row.publisher || '-')}</small></span><span><b>Rok</b><small>${escapeHtml(row.publicationYear || '-')}</small></span><span><b>Język / oprawa</b><small>${escapeHtml([row.language, row.binding].filter(Boolean).join(' / ') || '-')}</small></span></div>${bibliographyMarkup(row)}</section><section class="detail-section"><h4>Ceny zapisanych ofert</h4>${offerPriceSummaryMarkup(row.offers)}</section><section class="detail-section"><h4>Powiązane oferty</h4><div class="price-list">${row.offers.map((item) => `<button class="link-button" type="button" data-edition-offer="${escapeHtml(item.id)}"><span>${escapeHtml(item.title)}<small>${escapeHtml(item.source)} · wykryto ${escapeHtml(item.lastSeenAt || 'brak daty')} · ${escapeHtml(availabilityLabel(item))}</small></span><b>${money(item.currentPrice)}</b></button>`).join('') || '<p>Brak ofert.</p>'}</div></section>`;
     detail.querySelectorAll('[data-edition-offer]').forEach(button=>button.addEventListener('click',()=>openOfferDrawer(button.dataset.editionOffer)));
+    mountPersonSearch(detail);
     const history = mountEditionHistory({ row, target: detail, json, money, openOfferDrawer });
     detail.querySelectorAll('.detail-section')[2].before(history);
     mountEditionBuyback({ row, target: detail, toast });

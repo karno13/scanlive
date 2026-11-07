@@ -23,3 +23,11 @@ test('złoty inputs and grosze stored prices share an explicit money conversion'
   assert.match(moneyFromZloty(29.99), /29,99/);
   assert.match(moneyFromZloty(-12.5), /-12,50|−12,50/);
 });
+
+test('offer lifecycle labels and purchasable filter', async () => {
+  const { availabilityLabel, isPurchasable } = await import('./formatters.js');
+  assert.equal(availabilityLabel({ availability: 'sold', availabilityChangedAt: '2026-11-07T10:00:00Z' }), 'sprzedana 2026-11-07');
+  assert.equal(availabilityLabel({ availability: 'unconfirmed' }), 'dostępność niepotwierdzona');
+  assert.equal(isPurchasable({ availability: 'sold' }), false);
+  assert.equal(isPurchasable({ availability: 'not_seen' }), true);
+});

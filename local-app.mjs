@@ -5,6 +5,9 @@ import { createSqliteVintedDetailCache } from './vinted-detail-sqlite-cache.mjs'
 import { publicAssetPath } from './static-asset-path.mjs';
 import { retryIdentificationJobs } from './identification-retry.mjs';
 import { enrichOffers } from './offer-enrichment.mjs';
+import { checkOfferLifecycle } from './offer-lifecycle.mjs';
+import { blockedSources } from './source-blocks.mjs';
+import { createAutoBackupScheduler } from './auto-backup.mjs';
 import { createScanScheduler, localScanRunner } from './scan-schedule.mjs';
 import { computeProposal, loadProposal, refreshProposals } from './title-proposals.mjs';
 import { historyBookLabels } from './history-brief.mjs';
@@ -52,6 +55,7 @@ import { createSkupksiazekClient } from './buyback-skupksiazek.mjs';
 import { createImageBackfill, fetchCachedImage, offerImageUrl, proxiedImage } from './offer-images.mjs';
 import { catalogInsights } from './catalog-insights.mjs';
 import { catalogSeries, setWorkUniverse } from './catalog-series.mjs';
+import { catalogPersons, personWorks } from './catalog-bibliography.mjs';
 
 let imageBackfill = null;
 let buyback = null;
@@ -573,6 +577,26 @@ function scheduleProposalRefresh(catalogStore) {
     });
 }
 
+// Offers that scans stopped returning: their own page says sold / reserved / gone. A few per
+// ten minutes, through the shared per-source pacing gate.
+let runningLifecycle = null;
+let lifecycleNextAt = 0;
+function scheduleLifecycleCheck(catalogStore) {
+  if (runningLifecycle || Date.now() < lifecycleNextAt || String(process.env.BOOKFLIP_OFFER_LIFECYCLE ?? '1') === '0') return;
+  if (!catalogStore.repository?.database) return;
+  lifecycleNextAt = Date.now() + 10 * 60_000;
+  runningLifecycle = checkOfferLifecycle(catalogStore.repository, { limit: 8 })
+    .then((report) => {
+      if (report.checked || report.errors) recordProgress({ type: 'offer_lifecycle', ...report });
+    })
+    .catch((error) =>
+      recordProgress({ type: 'offer_lifecycle_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'LIFECYCLE_ERROR' }),
+    )
+    .finally(() => {
+      runningLifecycle = null;
+    });
+}
+
 let runningCatalogResolution = null;
 function scheduleCatalogResolution(catalogStore) {
   if (runningCatalogResolution) return runningCatalogResolution;
@@ -601,6 +625,7 @@ function scheduleCatalogResolution(catalogStore) {
     .finally(() => {
       runningCatalogResolution = null;
       scheduleProposalRefresh(catalogStore);
+      scheduleLifecycleCheck(catalogStore);
     });
   return runningCatalogResolution;
 }
@@ -743,6 +768,27 @@ export function createLocalAppServer({
         const id = decodeURIComponent(url.pathname.slice('/api/catalog/universe/'.length));
         return send(response, 200, JSON.stringify(setWorkUniverse(catalog.repository, id, await readJson(request))));
       }
+      if (url.pathname === '/api/catalog/seeds' || url.pathname.startsWith('/api/catalog/seeds/')) {
+        const catalog = getProductionCatalog();
+        if (!catalog?.seeds) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const id = decodeURIComponent(url.pathname.slice('/api/catalog/seeds/'.length));
+        if (request.method === 'GET' && url.pathname === '/api/catalog/seeds') return send(response, 200, JSON.stringify(catalog.seeds.list()));
+        if (request.method === 'POST' && url.pathname === '/api/catalog/seeds')
+          return send(response, 201, JSON.stringify(catalog.seeds.add(await readJson(request))));
+        if (request.method === 'PUT' && id) return send(response, 200, JSON.stringify(catalog.seeds.setStatus(id, (await readJson(request))?.status)));
+        if (request.method === 'DELETE' && id) return send(response, 200, JSON.stringify(catalog.seeds.remove(id)));
+        return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/catalog/persons') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(response, 200, JSON.stringify({ items: catalogPersons(catalog.repository, { query: url.searchParams.get('q') || '', limit: url.searchParams.get('limit') || 200 }) }));
+      }
+      if (request.method === 'GET' && url.pathname.startsWith('/api/catalog/persons/')) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(response, 200, JSON.stringify(personWorks(catalog.repository, decodeURIComponent(url.pathname.slice('/api/catalog/persons/'.length)))));
+      }
       if (request.method === 'GET' && url.pathname === '/api/catalog/series-tree') {
         const catalog = getProductionCatalog();
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
@@ -787,7 +833,7 @@ export function createLocalAppServer({
         return send(response,200,JSON.stringify(putScanProfile(catalog.repository,name,input)));
       }
       if (request.method === 'GET' && url.pathname === '/api/sources')
-        return send(response, 200, JSON.stringify({ sources: Object.keys(localSourceHosts) }));
+        return send(response, 200, JSON.stringify({ sources: Object.keys(localSourceHosts), blocked: (() => { try { const catalog = getProductionCatalog(); return catalog ? blockedSources(catalog.repository) : {}; } catch { return {}; } })() }));
       if (request.method === 'GET' && url.pathname === '/api/history/brief') {
         const catalog = getProductionCatalog();
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
@@ -1242,7 +1288,12 @@ async function main() {
     runScan: localScanRunner(port),
     onEvent: (event) => recordProgress(event),
   });
-  server.on('close', () => { void scheduler.stop(); scanScheduler.stop(); buyback?.stopAuto(); });
+  // Daily integrity-checked copy of the catalogue (newest seven kept; BOOKFLIP_BACKUP_DIR for a second disk).
+  const autoBackup = createAutoBackupScheduler({
+    getPath: () => getProductionCatalog()?.repository?.path ?? null,
+    onEvent: (event) => recordProgress(event),
+  });
+  server.on('close', () => { void scheduler.stop(); scanScheduler.stop(); buyback?.stopAuto(); productionCatalog?.seeds?.stop(); autoBackup.stop(); });
   server.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
       console.log(`BookFlip Scanner już działa pod adresem ${url}`);
@@ -1257,6 +1308,8 @@ async function main() {
     if (enabled) scheduler.start();
     if (String(process.env.BOOKFLIP_SCHEDULED_SCANS ?? '1') !== '0') scanScheduler.start();
     if (String(process.env.BOOKFLIP_BUYBACK_AUTO ?? '1') !== '0') getBuyback()?.startAuto();
+    if (String(process.env.BOOKFLIP_CATALOG_SEEDS ?? '1') !== '0') getProductionCatalog()?.seeds?.start();
+    if (String(process.env.BOOKFLIP_AUTO_BACKUP ?? '1') !== '0') autoBackup.start();
     console.log(`BookFlip Scanner działa: ${url}`);
     openLocalApp(url);
   });

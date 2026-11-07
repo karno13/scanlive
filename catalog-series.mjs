@@ -107,10 +107,24 @@ export function catalogSeries(repository) {
   const manual = new Map(
     db.prepare('SELECT work_id, series, volume FROM work_series_annotations').all().map((row) => [row.work_id, row]),
   );
+  // Series statements from the BN record (migration 112): the cycle and its volume number as printed.
+  const recordSeries = new Map();
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='edition_series'").get())
+    for (const row of db
+      .prepare('SELECT e.work_id, s.name, s.kind, s.volume FROM edition_series s JOIN editions e ON e.id=s.edition_id ORDER BY e.created_at, s.position')
+      .all()) {
+      if (!recordSeries.has(row.work_id)) recordSeries.set(row.work_id, []);
+      recordSeries.get(row.work_id).push(row);
+    }
 
   const universes = new Map();
   for (const work of works) {
-    const titles = [work.title, ...(editionTitles.get(work.id) || []).map((edition) => edition.title)];
+    const statements = recordSeries.get(work.id) || [];
+    const titles = [
+      work.title,
+      ...(editionTitles.get(work.id) || []).map((edition) => edition.title),
+      ...statements.filter((entry) => entry.kind === 'universe').map((entry) => entry.name),
+    ];
     const phrase = phrases.get(work.id) || '';
     const universe =
       universeOverride.get(work.id) ||
@@ -118,7 +132,18 @@ export function catalogSeries(repository) {
       universeOf(phrase) ||
       (phrase ? phraseLabel(phrase, authorsOf.get(work.id)) : 'Poza seriami');
     const annotation = manual.get(work.id);
-    const parsed = titles.map(cycleFromTitle).find((item) => item?.cycle) || titles.map(cycleFromTitle).find(Boolean) || null;
+    const recordCycle =
+      statements.find((entry) => entry.kind === 'cycle' && entry.volume != null) ||
+      statements.find((entry) => entry.kind === 'cycle') ||
+      null;
+    // "Świat Dysku t. 14": the universe itself is numbered when no cycle is named.
+    const universeVolume = statements.find((entry) => entry.kind === 'universe' && entry.volume != null)?.volume ?? null;
+    const parsed = recordCycle
+      ? { cycle: recordCycle.name, volume: recordCycle.volume ?? null }
+      : titles.map(cycleFromTitle).find((item) => item?.cycle) ||
+        (universeVolume != null ? { cycle: null, volume: universeVolume } : null) ||
+        titles.map(cycleFromTitle).find(Boolean) ||
+        null;
     const cycle = annotation ? annotation.series : parsed?.cycle || null;
     const volume = annotation ? annotation.volume : parsed?.volume ?? null;
     const years = (editionTitles.get(work.id) || []).map((edition) => edition.publication_year).filter(Boolean);

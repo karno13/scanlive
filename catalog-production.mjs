@@ -1,10 +1,34 @@
 import { defaultCatalogPath } from './catalog-data-location.mjs';
+import { upgradeCatalogBibliography } from './catalog-bibliography.mjs';
+import { mergeWorkGroup } from './trading-api.mjs';
+import { findDuplicateWorkGroups } from './work-grouping.mjs';
+import { reviewAutomaticBundleMatches } from './bundle-detection.mjs';
+import { createSeedService } from './catalog-seeding.mjs';
+import { ensureStarterProfiles } from './starter-profiles.mjs';
+
+function mergeAutomaticDuplicates(repository) {
+  const manual = new Set(
+    repository.database.prepare("SELECT id FROM works WHERE verification_status='manual'").all().map((row) => row.id),
+  );
+  let merged = 0;
+  for (const group of findDuplicateWorkGroups(repository)) {
+    if (group.works.some((work) => manual.has(work.id))) continue;
+    try {
+      const sources = group.works.map((work) => work.id).filter((id) => id !== group.targetId);
+      merged += mergeWorkGroup(repository, group.targetId, sources).merged.length;
+    } catch (error) {
+      console.error('AUTOMATIC_WORK_MERGE_SKIPPED', group.key, error?.message ?? error);
+    }
+  }
+  return merged;
+}
 import { createHash } from 'node:crypto';
 
 import { CatalogResolver } from './catalog-resolver.mjs';
 import { IdentificationWorker } from './identification-worker.mjs';
 import { createBnAdapter } from './metadata-sources/bn.mjs';
 import { createOpenLibraryAdapter } from './metadata-sources/open-library.mjs';
+import { createGoogleBooksAdapter } from './metadata-sources/google-books.mjs';
 import { SourceRateLimiter, createJsonRequester } from './metadata-http.mjs';
 import { findTitleIsbnCandidates } from './catalog-title-isbn.mjs';
 import { lookupISBN, SqliteMetadataCache } from './metadata-lookup.mjs';
@@ -38,11 +62,29 @@ export function createProductionCatalog({
   busyTimeout = 10_000,
 } = {}) {
   const repository = new SqliteCatalogRepository(databasePath, { busyTimeout, now });
+  // One-time upgrade of existing editions from their stored BN MARC records (no network).
+  try {
+    const upgrade = upgradeCatalogBibliography(repository, { now });
+    // Clean titles reveal reprints that the old glued BN titles hid; join them like new editions
+    // are joined (same strict key), never touching works the operator edited.
+    if (!upgrade.skipped) mergeAutomaticDuplicates(repository);
+    reviewAutomaticBundleMatches(repository, { now });
+    if (String(process.env.BOOKFLIP_STARTER_PROFILES ?? '1') !== '0') ensureStarterProfiles(repository);
+  } catch (error) {
+    console.error('BIBLIOGRAPHY_UPGRADE_FAILED', error?.message ?? error);
+  }
   const bnLimiter=new SourceRateLimiter({minIntervalMs:1_000});
   const openLibraryLimiter=new SourceRateLimiter({minIntervalMs:1_000});
   const bnAdapter = createBnAdapter({
     fetcher,
     limiter: bnLimiter,
+    timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
+  });
+  // Third source, only with the operator's own key (the anonymous quota is shared and exhausted).
+  const googleBooksAdapter = createGoogleBooksAdapter({
+    apiKey: process.env.BOOKFLIP_GOOGLE_BOOKS_KEY || null,
+    fetcher,
+    limiter: new SourceRateLimiter({ minIntervalMs: 1_000 }),
     timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
   });
   const openLibraryAdapter = createOpenLibraryAdapter({
@@ -70,6 +112,7 @@ export function createProductionCatalog({
       lookupISBN(isbn, {
         bnAdapter,
         openLibraryAdapter,
+        googleBooksAdapter,
         cache,
       }),
   });
@@ -81,10 +124,23 @@ export function createProductionCatalog({
     retryDelayMs: Number(process.env.BOOKFLIP_CATALOG_RETRY_MS ?? 300_000),
   });
 
+  // Catalogue seeding from BN shares the BN rate limiter with ISBN lookups.
+  const seeds = createSeedService(repository, {
+    requestBn: createJsonRequester({
+      fetcher,
+      limiter: bnLimiter,
+      timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 15_000),
+      retries: 1,
+    }),
+    now,
+    log: (...args) => console.error(...args),
+  });
+
   return {
     repository,
     resolver,
     worker,
+    seeds,
     findIsbnsByTitle(title) {
       return findTitleIsbnCandidates(title, {
         requestBn: titleBnRequest,
@@ -92,7 +148,7 @@ export function createProductionCatalog({
       });
     },
     lookupIsbn(isbn) {
-      return lookupISBN(isbn, { bnAdapter, openLibraryAdapter, cache });
+      return lookupISBN(isbn, { bnAdapter, openLibraryAdapter, googleBooksAdapter, cache });
     },
     resolveIsbn(isbn, { dryRun = false } = {}) {
       return resolver.resolve({

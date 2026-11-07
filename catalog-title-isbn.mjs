@@ -38,7 +38,7 @@ export async function findTitleIsbnCandidates(
     const books = bnResponse.payload?.bibs ?? bnResponse.payload?.records ?? [];
     for (const book of Array.isArray(books) ? books.slice(0, 8) : []) {
       // BN title search also returns articles and periodicals; only monographs are candidates.
-      if (book.kind && !/ksi[aą][zż]ka|book/i.test(String(book.kind))) continue;
+      if (book.kind && !/^(?:ksi[aą][zż]ka|book)$/i.test(String(book.kind).trim())) continue;
       for (const isbn of distinctEditions(isbnCandidates(book.isbnIssn ?? book.isbn ?? book.isbns ?? [])))
         candidates.push({
           isbn, source: 'bn',

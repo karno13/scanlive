@@ -57,40 +57,94 @@ function liveWorks(repository) {
     .all();
 }
 
-/** An existing work that is the same book as (title, authors), or null. */
-export function findWorkByKey(repository, title, authors) {
-  const key = workKey(title, authors);
-  if (!key) return null;
-  const matches = liveWorks(repository).filter((work) => workKey(work.title, parseAuthors(work.authors_json)) === key);
+const BRAND_ONLY_ORIGINAL = /^(?:world of warcraft|warcraft|warhammer(?: 40 ?000)?|discworld(?: series)?|dragonlance|forgotten realms)$/;
+
+/** Second key: the original title ("Light fantastic") names one work across translations and publishers. */
+export function originalKey(originalTitle, authors) {
+  // The whole title: "World of Warcraft : chronicle. Volume 2" must not join volume 1.
+  const name = fold(originalTitle);
+  const surname = firstSurname(authors);
+  if (name.length < 4 || surname.length < 2 || BRAND_ONLY_ORIGINAL.test(name)) return null;
+  return `orig:${name}|${surname}`;
+}
+
+function originalTitlesByWork(repository) {
+  const map = new Map();
+  const hasColumn = repository.database
+    .prepare("SELECT 1 FROM pragma_table_info('editions') WHERE name='original_title'")
+    .get();
+  if (!hasColumn) return map;
+  for (const row of repository.database
+    .prepare('SELECT work_id, original_title FROM editions WHERE original_title IS NOT NULL')
+    .all()) {
+    if (!map.has(row.work_id)) map.set(row.work_id, new Set());
+    map.get(row.work_id).add(row.original_title);
+  }
+  return map;
+}
+
+function keysOf(work, originals) {
+  const authors = parseAuthors(work.authors_json);
+  return [
+    workKey(work.title, authors),
+    ...[...(originals.get(work.id) ?? [])].map((title) => originalKey(title, authors)),
+  ].filter(Boolean);
+}
+
+/** An existing work that is the same book as (title, authors[, original title]), or null. */
+export function findWorkByKey(repository, title, authors, originalTitle = null) {
+  const wanted = new Set([workKey(title, authors), originalKey(originalTitle, authors)].filter(Boolean));
+  if (!wanted.size) return null;
+  const originals = originalTitlesByWork(repository);
+  const matches = liveWorks(repository).filter((work) => keysOf(work, originals).some((key) => wanted.has(key)));
   // Ambiguous (several works already share the key): leave the decision to the operator.
   return matches.length === 1 ? matches[0] : null;
 }
 
 /** Groups of works that look like the same book, largest first, with a suggested target. */
 export function findDuplicateWorkGroups(repository) {
+  const originals = originalTitlesByWork(repository);
+  const works = liveWorks(repository);
+  // Union of works sharing any key (same Polish title, or same original title, with the same author).
+  const parent = new Map(works.map((work) => [work.id, work.id]));
+  const root = (id) => {
+    while (parent.get(id) !== id) id = parent.get(id);
+    return id;
+  };
+  const byKey = new Map();
+  const workKeys = new Map();
+  for (const work of works) {
+    const keys = keysOf(work, originals);
+    workKeys.set(work.id, keys);
+    for (const key of keys) {
+      if (byKey.has(key)) parent.set(root(work.id), root(byKey.get(key)));
+      else byKey.set(key, work.id);
+    }
+  }
   const groups = new Map();
-  for (const work of liveWorks(repository)) {
-    const authors = parseAuthors(work.authors_json);
-    const key = workKey(work.title, authors);
-    if (!key) continue;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push({
+  for (const work of works) {
+    if (!workKeys.get(work.id).length) continue;
+    const id = root(work.id);
+    if (!groups.has(id)) groups.set(id, []);
+    groups.get(id).push({
       id: work.id,
       title: work.title,
-      authors,
+      authors: parseAuthors(work.authors_json),
       editions: Number(work.editions),
       offers: Number(work.offers),
       createdAt: work.created_at,
+      keys: workKeys.get(work.id),
     });
   }
-  return [...groups.entries()]
-    .filter(([, works]) => works.length > 1)
-    .map(([key, works]) => {
+  return [...groups.values()]
+    .filter((list) => list.length > 1)
+    .map((list) => {
       // Keep the work that already carries the most offers, then editions, then the oldest.
-      const ranked = [...works].sort(
+      const ranked = [...list].sort(
         (a, b) => b.offers - a.offers || b.editions - a.editions || String(a.createdAt).localeCompare(String(b.createdAt)),
       );
-      return { key, targetId: ranked[0].id, works: ranked };
+      const key = ranked[0].keys.find((entry) => !entry.startsWith('orig:')) ?? ranked[0].keys[0];
+      return { key, targetId: ranked[0].id, works: ranked.map(({ keys: _keys, ...work }) => work) };
     })
     .sort((a, b) => b.works.length - a.works.length || a.key.localeCompare(b.key));
 }

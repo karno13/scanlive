@@ -42,3 +42,25 @@ export function safeOfferHref(value) {
       !url.password && !url.port ? url.href : '#';
   } catch { return '#'; }
 }
+
+/** Offer lifecycle as shown next to a listing: sold / reserved / gone / unconfirmed. */
+export function availabilityLabel(offer = {}) {
+  const when = offer.availabilityChangedAt ? ' ' + String(offer.availabilityChangedAt).slice(0, 10) : '';
+  switch (offer.availability) {
+    case 'sold':
+      return 'sprzedana' + when;
+    case 'reserved':
+      return 'zarezerwowana' + when;
+    case 'unavailable':
+      return 'niedostępna' + when;
+    case 'available':
+      return 'aktywna (sprawdzono)';
+    case 'not_seen':
+      return 'nie było jej w ostatnim skanie';
+    default:
+      return 'dostępność niepotwierdzona';
+  }
+}
+
+/** Offers that can still be bought: sold, reserved and removed listings are out of current prices. */
+export const isPurchasable = (offer = {}) => !['unavailable', 'sold', 'reserved'].includes(offer.availability);

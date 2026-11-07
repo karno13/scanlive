@@ -30,8 +30,10 @@ export async function backupCatalog({
   const db = new DatabaseSync(input, { readOnly: true });
   try {
     await backup(db, temp);
-    const check = new DatabaseSync(temp, { readOnly: true });
+    // A standalone file: the copy inherits WAL mode, which would leave -wal/-shm files beside it.
+    const check = new DatabaseSync(temp);
     try {
+      check.exec('PRAGMA journal_mode=DELETE');
       if (check.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok')
         throw Error('BACKUP_INTEGRITY_CHECK_FAILED');
     } finally {
@@ -41,9 +43,10 @@ export async function backupCatalog({
     return output;
   } finally {
     db.close();
-    await unlink(temp).catch((error) => {
-      if (error.code !== 'ENOENT') throw error;
-    });
+    for (const leftover of [temp, temp + '-wal', temp + '-shm'])
+      await unlink(leftover).catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
   }
 }
 

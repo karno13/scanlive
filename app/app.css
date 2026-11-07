@@ -3309,3 +3309,7 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
 .insight-board .buyback-batch .inline-note { margin: 0; }
 .insight-board .buyback-batch .button { justify-self: start; min-height: 40px; }
 .insight-board .buyback-batch .buyback-auto { justify-self: start; }
+
+.seed-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}.seed-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}.seed-row strong,.seed-row small{display:block}.seed-row small{color:var(--muted);font-size:12px}.seed-actions{display:flex;gap:6px;flex-wrap:wrap}.seed-form{align-items:end}.bibliography-grid{margin-top:4px}.bibliography-grid small .link-button{padding:0;font-size:13px}
+.source-blocked{display:block;font-size:11px;color:var(--muted);font-weight:400}
+.seed-form .field{display:grid;gap:4px;align-content:end}.seed-form .field select,.seed-form .field input{height:40px;min-height:40px;max-height:44px}.seed-form .toggle-chip,.seed-form .button{align-self:end}

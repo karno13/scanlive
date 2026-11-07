@@ -5,6 +5,8 @@ import { isbnKeys, normalizeISBN } from './isbn-normalization.mjs';
 import { persistMetadataResults } from './metadata-lookup.mjs';
 
 import { findWorkByKey } from './work-grouping.mjs';
+import { enrichEdition } from './catalog-bibliography.mjs';
+import { looksLikeBundle } from './bundle-detection.mjs';
 import { titleConflict } from './title-consistency.mjs';
 const TRUSTED = new Set(['structured', 'labelled_description']);
 const REVIEW_ONLY = new Set(['unlabelled_description', 'ocr', 'uncertain', 'legacy']);
@@ -203,8 +205,11 @@ function externalWork(repository, record) {
 
 /** BN first; Open Library when BN does not know the ISBN or is unreachable and OL has it. */
 function primarySource(result) {
-  if (result.bn?.status === 'not_found') return result.openLibrary;
+  // Google Books stands in only when BN and Open Library both have nothing.
+  const google = result.googleBooks?.status === 'found' && result.openLibrary?.status !== 'found' ? result.googleBooks : null;
+  if (result.bn?.status === 'not_found') return google ?? result.openLibrary;
   if (result.bn?.status === 'temporary_error' && result.openLibrary?.status === 'found') return result.openLibrary;
+  if (result.bn?.status === 'temporary_error' && google) return google;
   return result.bn;
 }
 
@@ -220,7 +225,7 @@ function operatorEvidence(evidence) {
 }
 
 function allRecords(metadata) {
-  return [metadata?.bn, metadata?.openLibrary].flatMap((entry) => (entry?.status === 'found' ? entry.records ?? [] : []));
+  return [metadata?.bn, metadata?.openLibrary, metadata?.googleBooks].flatMap((entry) => (entry?.status === 'found' ? entry.records ?? [] : []));
 }
 
 function offerTitleOf(offer) {
@@ -312,6 +317,9 @@ export class CatalogResolver {
       );
 
     const isbn = normalizeISBN(isbnEvidence.isbn ?? isbnEvidence.candidateIsbn);
+    // Several books in one listing, one ISBN shown: the operator decides (usually "mark as set").
+    if (offerId && !manualProtected && !operatorEvidence(isbnEvidence) && looksLikeBundle(offerTitleOf(currentOffer)))
+      return decision('review_required', ['possible_bundle'], proof, {}, { candidate: { isbn } });
     const existing = this.repository.findEditionByISBN(isbn);
     if (manualProtected && existing && manual.edition_id !== existing.id)
       return decision('review_required', ['manual_assignment_conflicts_with_isbn'], proof, {
@@ -329,7 +337,7 @@ export class CatalogResolver {
       return this.#matchExisting(existing, currentOffer, offerId, isbnEvidence, proof, dryRun);
 
     const metadata = await this.lookupMetadata(isbn);
-    proof.metadataRecords = [metadata.bn, metadata.openLibrary]
+    proof.metadataRecords = [metadata.bn, metadata.openLibrary, metadata.googleBooks]
       .flatMap((entry) => entry?.records ?? [])
       .map((record) => ({
         source: record.source,
@@ -474,7 +482,7 @@ export class CatalogResolver {
     // the existing work instead of creating a new one.
     const sameBook = existingWork
       ? null
-      : findWorkByKey(this.repository, selected.record.title, selected.record.authors);
+      : findWorkByKey(this.repository, selected.record.title, selected.record.authors, selected.record.originalTitle);
     const reuseWork = existingWork ?? sameBook;
     const workId =
       reuseWork?.id ?? stableId('resolver_work', selected.record.workExternalId ?? isbn);
@@ -549,7 +557,7 @@ export class CatalogResolver {
             at: this.now(),
           });
       }
-      persistMetadataResults(this.repository, [metadata.bn, metadata.openLibrary], {
+      persistMetadataResults(this.repository, [metadata.bn, metadata.openLibrary, metadata.googleBooks].filter(Boolean), {
         workId: work.id,
         editionId: edition.id,
       });
@@ -578,6 +586,8 @@ export class CatalogResolver {
             )
             .run(row.id, work.id, this.now().toISOString());
       }
+      // People, series and physical details from the BN MARC record just stored.
+      enrichEdition(this.repository, edition.id, { now: this.now });
       const matchId = offerId ? stableId('resolver_match', offerId, edition.id) : null;
       if (offerId)
         this.repository.assignOfferToEdition(offerId, edition.id, {

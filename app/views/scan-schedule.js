@@ -20,8 +20,9 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
     const last = schedule.lastRunAt
       ? `Ostatni: ${new Date(schedule.lastRunAt).toLocaleString('pl-PL')} (${schedule.lastResult === 'ok' ? 'udany' : schedule.lastResult || 'brak wyniku'}).`
       : 'Jeszcze się nie odbył.';
+    const rotation = schedule.profile === '__all__' && schedule.lastProfile ? ` Ostatni profil: ${schedule.lastProfile}.` : '';
     const next = schedule.nextRunAt ? ` Następny: ${new Date(Math.max(schedule.nextRunAt, Date.now())).toLocaleString('pl-PL')}.` : '';
-    return last + next;
+    return last + rotation + next;
   };
 
   async function load() {
@@ -30,6 +31,7 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
       const items = Array.isArray(profiles) ? profiles : profiles.items || [];
       $('#scheduleProfile').innerHTML =
         '<option value="">Wybierz profil</option>' +
+        (items.length > 1 ? '<option value="__all__">Wszystkie profile po kolei</option>' : '') +
         items.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join('');
       $('#scheduleProfile').value = schedule.profile || '';
       $('#scheduleHours').value = schedule.everyHours;
