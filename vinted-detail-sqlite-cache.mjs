@@ -1,7 +1,11 @@
+import { identifyOffer } from './offer-identity.mjs';
+
 // TTL-backed, bounded cache in the same SQLite catalog as scanned offers.
 // Store only stable language/ISBN evidence, never HTML or failed responses.
+// A listing's language does not change, so decisions are kept for 90 days. Offers already in the
+// catalogue passed the Polish check when they were first saved: they need no detail read at all.
 export function createSqliteVintedDetailCache(repository, {
-  now = Date.now, ttlMs = 6 * 60 * 60 * 1000, maxEntries = 3000,
+  now = Date.now, ttlMs = 90 * 24 * 60 * 60 * 1000, maxEntries = 20000,
 } = {}) {
   const db = repository.database;
   const get = db.prepare('SELECT language,isbn,expires_at FROM vinted_detail_cache WHERE offer_url=?');
@@ -14,12 +18,20 @@ export function createSqliteVintedDetailCache(repository, {
   const trim = db.prepare(`DELETE FROM vinted_detail_cache WHERE offer_url IN
     (SELECT offer_url FROM vinted_detail_cache ORDER BY fetched_at DESC,offer_url DESC
     LIMIT -1 OFFSET ?)`);
+  const known = db.prepare("SELECT language, observed_isbn FROM offers WHERE id=? AND source='Vinted'");
   let insertions = 0;
   return {
     get(url) {
       const row = get.get(url);
-      if (!row || row.expires_at <= now()) return undefined;
-      return { language: row.language, ...(row.isbn ? {isbn: row.isbn} : {}) };
+      if (row && row.expires_at > now()) return { language: row.language, ...(row.isbn ? {isbn: row.isbn} : {}) };
+      let stored = null;
+      try {
+        stored = known.get(identifyOffer({ source: 'Vinted', url }).id);
+      } catch {
+        return undefined;
+      }
+      if (!stored?.language) return undefined;
+      return { language: stored.language, ...(stored.observed_isbn ? { isbn: stored.observed_isbn } : {}) };
     },
     set(url, detail) {
       const language = typeof detail?.language === 'string' ? detail.language.trim() : '';

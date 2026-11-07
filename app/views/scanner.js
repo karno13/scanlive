@@ -55,8 +55,29 @@ function renderSourceRows() {
     : '<tr><td colspan="6" class="empty-cell">Uruchom skan, aby zobaczyć statusy źródeł.</td></tr>';
 }
 
+// Offers saved during the scan: refresh the lists at most every few seconds.
+let liveRefreshTimer = null;
+function scheduleLiveRefresh() {
+  if (liveRefreshTimer) return;
+  liveRefreshTimer = setTimeout(async () => {
+    liveRefreshTimer = null;
+    try {
+      await Promise.all([loadHistory(), loadCatalogData()]);
+    } catch {
+      // The final refresh after the scan will retry.
+    }
+  }, 3000);
+}
+
 function updateProgress(event) {
   const row = state.scan.rows.get(event.source);
+  if (event.type === 'offers-saved') {
+    state.scan.liveNew = (state.scan.liveNew || 0) + Number(event.newOffers || 0);
+    $('#statNew').textContent = state.scan.liveNew;
+    $('#progressDetail').textContent = `Zapisano ${event.saved} ofert z: ${event.source} · ${event.query}`;
+    $('#goToOffers').disabled = false;
+    scheduleLiveRefresh();
+  }
   if (event.type === 'source-start' && row) {
     row.status = 'Skanowanie';
     $('#progressMessage').textContent = `${event.source}: ${event.query}`;
@@ -126,6 +147,7 @@ async function startSearch(options = {}) {
     // Storage may be unavailable; scanning should still work.
   }
   resetScanUi(queries, sources, tasks);
+  state.scan.liveNew = 0;
   $('#startSearch').disabled = true;
   $('#cancelSearch').hidden = false;
   $('#cancelSearch').disabled = false;
@@ -168,7 +190,8 @@ async function startSearch(options = {}) {
   } catch (error) {
     if (error.message === 'SCAN_CANCELLED') {
       $('#progressMessage').textContent = 'Skan anulowany';
-      $('#progressDetail').textContent = 'Nowe wyniki z anulowanego skanu nie zostały zapisane.';
+      $('#progressDetail').textContent = 'Oferty z zadań ukończonych przed anulowaniem zostały zapisane.';
+      void Promise.all([loadHistory(), loadCatalogData()]).catch(() => {});
       $('#scanStateBadge').textContent = 'Anulowany';
       $('#scanStateBadge').className = 'state-badge neutral';
       toast('Skan został anulowany.');

@@ -49,6 +49,8 @@ import {
   createSqliteBook,
   linkSqliteOffer,
   persistSqliteScan,
+  createScanState,
+  persistSqliteScanBatch,
 } from './sqlite-single-store.mjs';
 import { createIdentificationScheduler } from './identification-scheduler.mjs';
 import { createBuybackService } from './buyback-quotes.mjs';
@@ -161,6 +163,8 @@ export async function searchOffers(
     detailCache = new Map(),
     retryWait = wait,
     signal = null,
+    // Called after each source+query with its accepted offers, so they can be saved during the scan.
+    onOffers = null,
   } = {},
 ) {
   const { queries, sources, tasks } = validateSearchInput(input),
@@ -224,6 +228,10 @@ export async function searchOffers(
             pages: scan.pages,
             ...(diagnostic ? { diagnostic } : {}),
           });
+          if (onOffers && offers.length) {
+            scanCancelled(signal);
+            await onOffers({ source, query, offers: offers.map((offer) => ({ ...offer, source, matchedQueries: [query] })) });
+          }
           onProgress({
             type: 'source-done',
             source,
@@ -644,7 +652,20 @@ async function searchAndStore(
   const detailCache = catalog.repository?.database
     ? createSqliteVintedDetailCache(catalog.repository)
     : sharedVintedDetailCache;
-  const result = await awaitScan(search(input, { onProgress, detailCache, signal }), signal);
+  // Offers of each finished source+query are saved at once and identification starts, so results
+  // appear while the scan continues. The final save adds the scan summary and statistics.
+  const scanAt = new Date();
+  const scanState = createScanState();
+  let savedDuringScan = 0;
+  const onOffers = async ({ source, query, offers }) => {
+    const report = await withHistoryWriteLock(async () =>
+      persistSqliteScanBatch(catalog, { offers, scanAt: scanAt.toISOString(), state: scanState }),
+    );
+    savedDuringScan += report.saved;
+    onProgress({ type: 'offers-saved', source, query, saved: report.saved, newOffers: report.newOffers, total: savedDuringScan });
+    if (String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0' && shouldAutoResolve()) scheduleCatalogResolution(catalog);
+  };
+  const result = await awaitScan(search(input, { onProgress, detailCache, signal, onOffers, now: () => scanAt }), signal);
   scanCancelled(signal);
   const errors = result.results
     .filter((row) => row.status !== 'ok')
@@ -655,7 +676,7 @@ async function searchAndStore(
     }));
   const saved = await withHistoryWriteLock(async () => {
     scanCancelled(signal);
-    return persistSqliteScan(catalog, { offers: result.offers, searchedAt: result.searchedAt, errors,
+    return persistSqliteScan(catalog, { offers: result.offers, searchedAt: result.searchedAt, errors, scanState,
       scanContext: { queries: input.queries, sources: input.sources, results: result.results } });
   });
   if (String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0' && shouldAutoResolve())

@@ -95,13 +95,60 @@ export function linkSqliteOffer(catalog, { offerId, bookId } = {}, { returnHisto
   return returnHistory ? sqliteHistoryModel(repo) : { offerId: offer.id, bookId };
 }
 
-export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], scanContext = null }) {
+/**
+ * State of one running scan: what each offer looked like before the scan (for "new" and "price
+ * changed") and every phrase that found it. Shared by the per-task saves and the final save, so an
+ * offer saved during the scan is not counted twice and keeps all its phrases.
+ */
+export function createScanState() {
+  return { baseline: new Map(), queries: new Map() };
+}
+
+function prepareScanOffers(db, offers, state) {
+  if (!state) return offers;
+  const read = db.prepare('SELECT current_price, seen_count FROM offers WHERE id=?');
+  return offers.map((offer) => {
+    let id;
+    try {
+      id = sourceOfferId(offer.source, offer.url, offerExternalId(offer));
+    } catch {
+      return offer;
+    }
+    if (!state.baseline.has(id)) {
+      const row = read.get(id);
+      state.baseline.set(id, row ? { current_price: row.current_price, seen_count: Number(row.seen_count || 0) } : null);
+    }
+    if (!state.queries.has(id)) state.queries.set(id, new Set());
+    for (const query of offer.matchedQueries ?? []) state.queries.get(id).add(query);
+    return { ...offer, matchedQueries: [...state.queries.get(id)], seenCount: (state.baseline.get(id)?.seen_count ?? 0) + 1 };
+  });
+}
+
+/** Saves the offers of one finished source+query while the scan continues. */
+export function persistSqliteScanBatch(catalog, { offers, scanAt, state }) {
+  const db = catalog.repository.database;
+  const valid = offers.filter((offer) => offer?.source && offer?.url && Number.isSafeInteger(offer.price) && offer.price > 0);
+  const prepared = prepareScanOffers(db, valid, state);
+  const report = catalog.ingestOffers(prepared, String(scanAt));
+  let newOffers = 0;
+  for (const offer of prepared) {
+    try {
+      if (state?.baseline.get(sourceOfferId(offer.source, offer.url, offerExternalId(offer))) === null) newOffers++;
+    } catch {}
+  }
+  return { saved: report.offers, newOffers };
+}
+
+export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], scanContext = null, scanState = null }) {
   const at = String(searchedAt);
   const db = catalog.repository.database;
-  const previous = db.prepare('SELECT current_price FROM offers WHERE id=?');
-  const scanOffers = offers.filter(
+  // During the scan offers are already saved: compare with the state from before the scan.
+  const previous = scanState
+    ? { get: (id) => (scanState.baseline.has(id) ? scanState.baseline.get(id) : db.prepare('SELECT current_price FROM offers WHERE id=?').get(id)) }
+    : db.prepare('SELECT current_price FROM offers WHERE id=?');
+  const scanOffers = prepareScanOffers(db, offers.filter(
     offer => offer?.source && offer?.url && Number.isSafeInteger(offer.price) && offer.price > 0,
-  );
+  ), scanState);
   const ids = [];
   let newOffers = 0, priceChanges = 0;
   const seen = new Set();

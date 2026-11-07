@@ -2,6 +2,11 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-07 (13) — Oferty w trakcie skanu, bez ponownego sprawdzania języka
+
+- **Wyniki na bieżąco:** oferty każdej ukończonej pary źródło + fraza są zapisywane od razu i od razu trafiają do kolejki identyfikacji. Wcześniej wszystko czekało na koniec całego skanu. Skaner pokazuje „Zapisano N ofert z: …” i co kilka sekund odświeża listy. Końcowy zapis dodaje podsumowanie skanu; liczniki nowych ofert i zmian cen, liczba wykryć i lista fraz nie są liczone podwójnie. Anulowany skan zachowuje oferty z ukończonych zadań.
+- **Język Vinted sprawdzany raz:** oferty już zapisane w katalogu przeszły kontrolę języka przy pierwszym zapisie, więc nie są ponownie otwierane. Pozostałe decyzje (np. ogłoszenia obcojęzyczne) są pamiętane 90 dni zamiast 6 godzin. Powtórny skan frazy z 17 ofertami: 3 s zamiast 61 s.
+
 ## 2026-11-07 (12) — Zmiana i odłączanie przypisań ofert
 
 - **W karcie wydania** każda powiązana oferta ma „Zmień lub odłącz”: wyszukiwarka wydań z katalogu (tytuł, autor, tłumacz, ISBN) albo odłączenie, oba z potwierdzeniem. To samo w panelu oferty (sekcja „Przypisanie”), także „Przypisz do wydania” dla ofert bez przypisania.
