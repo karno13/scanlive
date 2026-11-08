@@ -60,7 +60,7 @@ export function stripOriginalTitle(name) {
   return name;
 }
 
-function cycleKey(name) {
+export function cycleKey(name) {
   return fold(name).replace(/\b(?:cykl|saga|seria|series|trylogia|trilogy)\b/g, '').replace(/\s+/g, ' ').trim();
 }
 
@@ -117,6 +117,7 @@ export function catalogSeries(repository) {
       recordSeries.get(row.work_id).push(row);
     }
 
+  const definitions = loadSeriesDefinitions(db);
   const universes = new Map();
   for (const work of works) {
     const statements = recordSeries.get(work.id) || [];
@@ -174,6 +175,7 @@ export function catalogSeries(repository) {
         if (!cycles.has(key)) cycles.set(key, { name: key ? work.cycle : null, works: [] });
         cycles.get(key).works.push(work);
       }
+      applyDefinitions(cycles, definitions);
       const cycleList = [...cycles.values()]
         .map((cycle) => {
           cycle.works.sort(
@@ -183,10 +185,15 @@ export function catalogSeries(repository) {
               String(a.title).localeCompare(String(b.title), 'pl'),
           );
           const volumes = [...new Set(cycle.works.map((work) => work.volume).filter(Number.isInteger))].sort((a, b) => a - b);
+          // With the operator's list the cycle has a known length; without it only inner gaps count.
+          const definition = cycle.name ? definitions.get(cycleKey(cycle.name)) : null;
+          const last = Math.max(volumes.at(-1) || 0, definition?.entries.at(-1)?.number || 0);
           const missing = [];
-          for (let number = 1; volumes.length && number < volumes.at(-1) && missing.length < 60; number++)
-            if (!volumes.includes(number)) missing.push(number);
-          return { ...cycle, volumes, missing };
+          for (let number = 1; number <= last && missing.length < 60; number++)
+            if (!volumes.includes(number) && (definition || number < last)) missing.push(number);
+          const listed = new Map((definition?.entries || []).map((entry) => [entry.number, entry.title]));
+          const missingTitles = Object.fromEntries(missing.filter((number) => listed.has(number)).map((number) => [number, listed.get(number)]));
+          return { ...cycle, volumes, missing, missingTitles, defined: listed.size };
         })
         // Named cycles first (by size), the loose works of the universe last.
         .sort((a, b) => (a.name === null) - (b.name === null) || b.works.length - a.works.length || String(a.name).localeCompare(String(b.name), 'pl'));
@@ -264,4 +271,91 @@ export function setWorkUniverse(repository, workId, input = {}) {
 
 function capitalize(text) {
   return text.charAt(0).toLocaleUpperCase('pl') + text.slice(1);
+}
+
+// ---- Series definitions: the operator's list of a cycle's volumes (migration 118) ----
+
+/** Comparable key of a title: its main part, without the BN subtitle, original title or volume. */
+export function volumeTitleKey(title) {
+  const main = String(title ?? '').split(' / ')[0].split(/\s*:\s/)[0];
+  return fold(main).replace(/^(?:tom|t|cz|czesc)\s*\d+\s*/, '').trim();
+}
+
+/** "1. Czas Horusa" lines → [{number, title}]; unnumbered lines continue from the previous one. */
+export function parseVolumeList(text) {
+  const entries = [];
+  let next = 1;
+  for (const raw of String(text ?? '').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const numbered = line.match(/^(?:tom\s*)?(\d{1,3})\s*[.):\-–]?\s+(.+)$/i);
+    const number = numbered ? Number(numbered[1]) : next;
+    const title = (numbered ? numbered[2] : line).trim().slice(0, 200);
+    if (!title || number < 1 || number > 500 || entries.some((entry) => entry.number === number)) continue;
+    entries.push({ number, title });
+    next = number + 1;
+  }
+  return entries.sort((a, b) => a.number - b.number).slice(0, 300);
+}
+
+function loadSeriesDefinitions(db) {
+  const map = new Map();
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='series_definitions'").get()) return map;
+  for (const row of db.prepare('SELECT cycle_key, name, titles_json FROM series_definitions').all()) {
+    let entries = [];
+    try {
+      entries = JSON.parse(row.titles_json);
+    } catch {}
+    if (Array.isArray(entries) && entries.length) map.set(row.cycle_key, { name: row.name, entries });
+  }
+  return map;
+}
+
+/** Numbers works without a volume (or with one guessed from listings) by their cycle's list. */
+function applyDefinitions(cycles, definitions) {
+  const loose = cycles.get('');
+  for (const [key, cycle] of cycles) {
+    const definition = key ? definitions.get(key) : null;
+    if (!definition) continue;
+    const byTitle = new Map(definition.entries.map((entry) => [volumeTitleKey(entry.title), entry.number]));
+    const listed = (work) => byTitle.get(volumeTitleKey(work.title));
+    for (const work of cycle.works)
+      if ((work.volume == null || work.guessed) && listed(work) != null) {
+        work.volume = listed(work);
+        work.guessed = false;
+        work.fromList = true;
+      }
+    // Loose works of the universe that are on this cycle's list belong to it.
+    if (loose)
+      for (const work of [...loose.works])
+        if (!work.manual && listed(work) != null) {
+          loose.works.splice(loose.works.indexOf(work), 1);
+          cycle.works.push({ ...work, cycle: cycle.name, volume: listed(work), guessed: false, fromList: true });
+        }
+  }
+  if (loose && !loose.works.length) cycles.delete('');
+}
+
+export function getSeriesDefinition(repository, name) {
+  const row = repository.database.prepare('SELECT name, titles_json FROM series_definitions WHERE cycle_key=?').get(cycleKey(name));
+  return { name: row?.name || String(name ?? ''), entries: row ? JSON.parse(row.titles_json) : [] };
+}
+
+/** Saves a cycle's volume list; an empty list removes it. */
+export function saveSeriesDefinition(repository, input = {}, now = () => new Date()) {
+  const name = String(input.name ?? '').trim();
+  const key = cycleKey(name);
+  if (!name || name.length > 200 || !key) throw Object.assign(Error('INVALID_SERIES_NAME'), { statusCode: 400 });
+  const entries = parseVolumeList(input.text ?? '');
+  if (!entries.length) {
+    repository.database.prepare('DELETE FROM series_definitions WHERE cycle_key=?').run(key);
+    return { name, entries: [] };
+  }
+  repository.database
+    .prepare(
+      `INSERT INTO series_definitions(cycle_key,name,titles_json,updated_at) VALUES(?,?,?,?)
+       ON CONFLICT(cycle_key) DO UPDATE SET name=excluded.name, titles_json=excluded.titles_json, updated_at=excluded.updated_at`,
+    )
+    .run(key, name, JSON.stringify(entries), now().toISOString());
+  return { name, entries };
 }

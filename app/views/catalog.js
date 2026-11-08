@@ -156,12 +156,15 @@ let missingTargets = [];
 const MAX_SCAN_QUERIES = 10;
 
 function missingQueries(target) {
-  return target.missing.slice(0, MAX_SCAN_QUERIES).map((number) => `${target.name} tom ${number}`);
+  // A known title finds the book; "Cycle tom N" is only a fallback.
+  return target.missing
+    .slice(0, MAX_SCAN_QUERIES)
+    .map((number) => (target.titles?.[number] ? `${target.titles[number]} ${target.name}` : `${target.name} tom ${number}`));
 }
 
 function missingListText(targets) {
   return targets
-    .map((target) => `${target.universe === target.name ? target.name : `${target.universe} — ${target.name}`}: tomy ${target.missing.join(', ')}`)
+    .map((target) => `${target.universe === target.name ? target.name : `${target.universe} — ${target.name}`}: ${target.missing.map((number) => (target.titles?.[number] ? `${number}. ${target.titles[number]}` : number)).join(', ')}`)
     .join('\n');
 }
 
@@ -180,39 +183,129 @@ function findMissing(target) {
   );
 }
 
-function shelfBookMarkup(work) {
+function shelfBookMarkup(work, cycleName = null) {
   const title = tidyWorkTitle(work.title);
-  return `<button type="button" class="shelf-book${work.id === state.selectedCatalogId ? ' active' : ''}" data-series-work="${escapeHtml(work.id)}" title="${escapeHtml(work.title)}">${coverMarkup(work.cover, title, { size: 'lg', escapeHtml })}${work.volume ? `<span class="shelf-vol${work.guessed ? ' is-guess' : ''}"${work.guessed ? ' title="Numer tomu z tytułów ogłoszeń — sprawdź; poprawisz go w karcie dzieła"' : ''}>${work.volume}</span>` : ''}<b>${escapeHtml(title)}</b><small>${escapeHtml([work.firstYear, offersLabel(work.offers)].filter(Boolean).join(' · '))}</small></button>`;
+  const volumeNote = work.guessed
+    ? ' title="Numer tomu z tytułów ogłoszeń — sprawdź; poprawisz go przyciskiem pod okładką"'
+    : work.fromList
+      ? ' title="Numer z listy tomów tej serii"'
+      : '';
+  const book = `<button type="button" class="shelf-book${work.id === state.selectedCatalogId ? ' active' : ''}" data-series-work="${escapeHtml(work.id)}" title="${escapeHtml(work.title)}">${coverMarkup(work.cover, title, { size: 'lg', escapeHtml })}${work.volume ? `<span class="shelf-vol${work.guessed ? ' is-guess' : ''}"${volumeNote}>${work.volume}</span>` : ''}<b>${escapeHtml(title)}</b><small>${escapeHtml([work.firstYear, offersLabel(work.offers)].filter(Boolean).join(' · '))}</small></button>`;
+  // Named cycles: the volume number can be set or corrected right on the shelf.
+  if (!cycleName) return book;
+  const label = work.volume && !work.guessed ? 'Zmień nr' : 'Nr tomu';
+  return `<div class="shelf-slot">${book}<button type="button" class="shelf-setvol" data-set-volume="${escapeHtml(work.id)}" data-cycle="${escapeHtml(cycleName)}" data-volume="${work.volume ?? ''}">${label}</button></div>`;
 }
 
 function cycleMarkup(cycle, universe, onlyCycle) {
-  // Placeholders only where the gap is readable; long gaps (Świat Dysku 1…41) get a summary line.
-  const showGhosts = cycle.missing.length && cycle.missing.length <= 12;
+  // Placeholders only where the gap is readable; long gaps (Świat Dysku 1…41) get a summary line,
+  // unless the operator listed the cycle's volumes: then every missing title is worth showing.
+  const titles = cycle.missingTitles || {};
+  const showGhosts = cycle.missing.length && (cycle.missing.length <= 12 || cycle.defined);
+  const shelf = (work) => shelfBookMarkup(work, cycle.name);
+  const last = Math.max(cycle.volumes.at(-1) || 0, cycle.missing.at(-1) || 0);
   const items = [];
   if (showGhosts) {
     const missing = new Set(cycle.missing);
     const byVolume = cycle.works.filter((work) => Number.isInteger(work.volume));
-    const last = cycle.volumes.at(-1) || 0;
     for (let number = 1; number <= last; number++) {
-      if (missing.has(number)) items.push(`<span class="shelf-book is-missing" aria-label="Brak tomu ${number}"><span class="shelf-ghost">${number}</span><small>brak w katalogu</small></span>`);
-      else for (const work of byVolume.filter((item) => item.volume === number)) items.push(shelfBookMarkup(work));
+      if (missing.has(number))
+        items.push(`<span class="shelf-book is-missing" aria-label="Brak tomu ${number}"><span class="shelf-ghost">${number}</span>${titles[number] ? `<b>${escapeHtml(titles[number])}</b>` : ''}<small>brak w katalogu</small></span>`);
+      else for (const work of byVolume.filter((item) => item.volume === number)) items.push(shelf(work));
     }
-    for (const work of cycle.works.filter((item) => !Number.isInteger(item.volume))) items.push(shelfBookMarkup(work));
-  } else items.push(...cycle.works.map(shelfBookMarkup));
+    for (const work of cycle.works.filter((item) => !Number.isInteger(item.volume))) items.push(shelf(work));
+  } else items.push(...cycle.works.map(shelf));
   const facts = [
     cycle.volumes.length ? `tomy ${cycle.volumes.join(', ')}` : '',
-    cycle.missing.length ? (showGhosts ? `brakuje ${cycle.missing.length}` : `brakuje ${cycle.missing.length} tomów do ${cycle.volumes.at(-1)}`) : '',
+    cycle.missing.length ? (showGhosts ? `brakuje ${cycle.missing.length}` : `brakuje ${cycle.missing.length} tomów do ${last}`) : '',
     `${cycle.works.length} ${cycle.works.length === 1 ? 'dzieło' : pluralForm(cycle.works.length) === 'few' ? 'dzieła' : 'dzieł'}`,
+    cycle.defined ? `lista: ${cycle.defined} tomów` : '',
   ].filter(Boolean);
   const name = cycle.name || (onlyCycle ? universe : 'Pozostałe');
   // Unnamed cycles carry the universe's own numbering ("Discworld series t. 14").
   const searchName = cycle.name || universe;
   let finder = '';
   if (cycle.missing.length) {
-    missingTargets.push({ name: searchName, universe, missing: cycle.missing });
-    finder = `<button class="button ghost compact series-find" type="button" data-find-missing="${missingTargets.length - 1}" title="Wpisz do skanera frazy „${escapeHtml(searchName)} tom N” dla brakujących tomów">Szukaj brakujących</button>`;
+    missingTargets.push({ name: searchName, universe, missing: cycle.missing, titles });
+    finder = `<button class="button ghost compact series-find" type="button" data-find-missing="${missingTargets.length - 1}" title="Wpisz do skanera frazy dla brakujących tomów (tytuł z listy tomów albo „${escapeHtml(searchName)} tom N”)">Szukaj brakujących</button>`;
   }
-  return `<div class="series-cycle${cycle.name ? '' : ' is-loose'}"><div class="series-cycle-head"><h4>${escapeHtml(name)}</h4><small>${escapeHtml(facts.join(' · '))}</small>${finder}</div><div class="series-shelf">${items.join('')}</div></div>`;
+  const listButton = cycle.name
+    ? `<button class="button ghost compact" type="button" data-edit-volumes="${escapeHtml(cycle.name)}" title="Wklej tytuły tomów w kolejności — numery przypiszą się same">${cycle.defined ? 'Lista tomów' : 'Dodaj listę tomów'}</button>`
+    : '';
+  return `<div class="series-cycle${cycle.name ? '' : ' is-loose'}"><div class="series-cycle-head"><h4>${escapeHtml(name)}</h4><small>${escapeHtml(facts.join(' · '))}</small>${finder}${listButton}</div><div class="series-volume-editor" hidden></div><div class="series-shelf">${items.join('')}</div></div>`;
+}
+
+async function editVolumeList(button) {
+  const editor = button.closest('.series-cycle').querySelector('.series-volume-editor');
+  if (!editor.hidden) {
+    editor.hidden = true;
+    return;
+  }
+  const name = button.dataset.editVolumes;
+  editor.hidden = false;
+  editor.innerHTML = '<p class="inline-note">Wczytywanie listy…</p>';
+  let current;
+  try {
+    current = await json('/api/catalog/series-definition?' + new URLSearchParams({ name }));
+  } catch (error) {
+    editor.innerHTML = `<p class="inline-note">Nie udało się wczytać listy: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  editor.innerHTML = `<label class="field"><span>Tomy cyklu „${escapeHtml(name)}” — jeden tytuł w wierszu, w kolejności (można poprzedzić numerem: „15. Prospero w płomieniach”)</span><textarea rows="8" spellcheck="false"></textarea></label><div class="series-volume-actions"><button class="button primary compact" type="button" data-save>Zapisz listę</button><button class="button secondary compact" type="button" data-cancel>Anuluj</button><small>Pusta lista usuwa definicję. Dzieła o pasujących tytułach dostaną numery automatycznie; ręcznie ustawione numery mają pierwszeństwo.</small></div>`;
+  const area = editor.querySelector('textarea');
+  area.value = current.entries.map((entry) => `${entry.number}. ${entry.title}`).join('\n');
+  area.focus();
+  editor.querySelector('[data-cancel]').addEventListener('click', () => (editor.hidden = true));
+  editor.querySelector('[data-save]').addEventListener('click', async (event) => {
+    const save = event.currentTarget;
+    save.disabled = true;
+    try {
+      const saved = await json('/api/catalog/series-definition', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, text: area.value }) });
+      toast(saved.entries.length ? `Zapisano listę: ${saved.entries.length} tomów.` : 'Usunięto listę tomów.');
+      await loadSeriesTree(true);
+      renderSeriesTree();
+    } catch (error) {
+      toast('Nie zapisano listy: ' + error.message);
+      save.disabled = false;
+    }
+  });
+}
+
+function editVolumeNumber(button) {
+  const input = document.createElement('input');
+  Object.assign(input, { type: 'number', min: '1', max: '10000', value: button.dataset.volume || '', className: 'shelf-volume-input' });
+  input.setAttribute('aria-label', 'Numer tomu w cyklu ' + button.dataset.cycle);
+  button.replaceWith(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const save = async () => {
+    if (done) return;
+    done = true;
+    const volume = Number(input.value);
+    if (!input.value || !Number.isSafeInteger(volume) || volume < 1) {
+      renderSeriesTree();
+      return;
+    }
+    try {
+      await json('/api/catalog/series/' + encodeURIComponent(button.dataset.setVolume), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ series: button.dataset.cycle, volume }),
+      });
+      toast(`Ustawiono tom ${volume}.`);
+      await loadSeriesTree(true);
+    } catch (error) {
+      toast('Nie zapisano numeru: ' + error.message);
+    }
+    renderSeriesTree();
+  };
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') save();
+    if (event.key === 'Escape') {
+      done = true;
+      renderSeriesTree();
+    }
+  });
+  input.addEventListener('blur', save);
 }
 
 async function renderSeriesTree() {
@@ -268,6 +361,8 @@ async function renderSeriesTree() {
   list.querySelectorAll('[data-series-work]').forEach((button) =>
     button.addEventListener('click', () => openCatalogDetail(button.dataset.seriesWork)),
   );
+  list.querySelectorAll('[data-edit-volumes]').forEach((button) => button.addEventListener('click', () => editVolumeList(button)));
+  list.querySelectorAll('[data-set-volume]').forEach((button) => button.addEventListener('click', () => editVolumeNumber(button)));
   list.querySelectorAll('details.series-universe').forEach((details) =>
     details.addEventListener('toggle', () => {
       if (details.open) collapsedUniverses.delete(details.dataset.universe);

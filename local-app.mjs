@@ -12,6 +12,7 @@ import { reassignOffer, unassignOffer } from './offer-assignment.mjs';
 import { createAutoBackupScheduler } from './auto-backup.mjs';
 import { createScanScheduler, localScanRunner } from './scan-schedule.mjs';
 import { computeProposal, loadProposal, refreshProposals, rescoreStoredProposals } from './title-proposals.mjs';
+import { repairCatalogTitles } from './title-repair.mjs';
 import { historyBookLabels } from './history-brief.mjs';
 import { scanCancelled, awaitScan } from './scan-cancellation.mjs';
 import { createVintedDetailCache } from './vinted-detail-cache.mjs';
@@ -62,7 +63,7 @@ import { createBuybackService } from './buyback-quotes.mjs';
 import { createSkupksiazekClient } from './buyback-skupksiazek.mjs';
 import { createImageBackfill, fetchCachedImage, offerImageUrl, proxiedImage } from './offer-images.mjs';
 import { catalogInsights } from './catalog-insights.mjs';
-import { catalogSeries, setWorkUniverse } from './catalog-series.mjs';
+import { catalogSeries, setWorkUniverse, getSeriesDefinition, saveSeriesDefinition } from './catalog-series.mjs';
 import { catalogPersons, personWorks } from './catalog-bibliography.mjs';
 
 let imageBackfill = null;
@@ -883,6 +884,13 @@ export function createLocalAppServer({
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
         return send(response, 200, JSON.stringify({ universes: catalogSeries(catalog.repository) }));
       }
+      if (url.pathname === '/api/catalog/series-definition') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        if (request.method === 'GET') return send(response, 200, JSON.stringify(getSeriesDefinition(catalog.repository, url.searchParams.get('name') || '')));
+        if (request.method === 'PUT') return send(response, 200, JSON.stringify(saveSeriesDefinition(catalog.repository, await readJson(request))));
+        return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
+      }
       if (request.method === 'GET' && url.pathname === '/api/catalog/insights') {
         const catalog = getProductionCatalog();
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
@@ -1451,7 +1459,10 @@ async function main() {
     if (enabled) scheduler.start();
     try {
       const catalog = getProductionCatalog();
-      if (catalog) rescoreStoredProposals(catalog.repository);
+      if (catalog) {
+        rescoreStoredProposals(catalog.repository);
+        repairCatalogTitles(catalog.repository);
+      }
     } catch (error) {
       console.error('Przeliczenie propozycji: ' + error.message);
     }

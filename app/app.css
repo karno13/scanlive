@@ -3338,3 +3338,13 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
 .shortcut-help{position:relative}.shortcut-help>summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);list-style:none;padding:8px 10px;border:1px solid #d9e3dc;border-radius:7px;background:#fff}
 .shortcut-help>summary::-webkit-details-marker{display:none}
 .shortcut-help[open]>.shortcut-hint{position:absolute;right:0;top:calc(100% + 6px);z-index:20;display:flex;flex-wrap:wrap;gap:6px 12px;width:min(420px,80vw);padding:12px;background:#fff;border:1px solid #d9e3dc;border-radius:8px;box-shadow:0 8px 24px rgba(20,40,30,.12)}
+/* Series view: volume number set on the shelf, and the cycle's volume list. */
+.shelf-slot{display:grid;align-content:start;gap:4px;scroll-snap-align:start}
+.shelf-setvol{justify-self:start;border:0;background:transparent;padding:2px 0;color:var(--green);font-size:11px;font-weight:600;cursor:pointer}
+.shelf-setvol:hover{text-decoration:underline}
+.shelf-volume-input{width:80px!important;min-height:30px!important;padding:4px 8px!important;font-size:13px!important}
+.shelf-book.is-missing b{color:var(--muted);font-weight:600}
+.series-volume-editor{margin:6px 0 12px;padding:12px;border:1px dashed #cfdcd4;border-radius:8px;background:#fbfcfb}
+.series-volume-editor textarea{font-family:inherit;font-size:13px;margin-top:6px}
+.series-volume-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+.series-volume-actions small{color:var(--muted);font-size:12px;flex:1 1 220px}

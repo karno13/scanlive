@@ -115,7 +115,8 @@ export function tidyOfferTitle(raw) {
 /** Short display of a catalog work title (BN often stores "Title / Original : subtitle, Series"). */
 export function tidyWorkTitle(raw) {
   const parts = splitBnTitle(raw);
-  return parts.title || String(raw ?? '');
+  // BN writes 'Title : subtitle'; on screen the colon sits on the title.
+  return (parts.title || String(raw ?? '')).replace(/\s+:\s+/g, ': ');
 }
 
 /** Image URL for an ISBN cover via the local cached proxy (Open Library). */
