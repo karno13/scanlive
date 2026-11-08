@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isbnKeys } from './isbn-normalization.mjs';
 import { markUnseenOffers } from './offer-availability.mjs';
 import { normalizedIsbn } from './offer-history.mjs';
 import { sourceOfferId, offerExternalId } from './offer-identity.mjs';
@@ -31,9 +32,9 @@ export function createSqliteBook(catalog, { title, isbn = null } = {}) {
     if (cleanIsbn) {
       const existing = repo.database
         .prepare(
-          "SELECT e.legacy_id,e.id FROM edition_identifiers i JOIN editions e ON e.id=i.edition_id WHERE i.scheme IN ('isbn10','isbn13') AND i.normalized_value=? LIMIT 1",
+          "SELECT e.legacy_id,e.id FROM edition_identifiers i JOIN editions e ON e.id=i.edition_id WHERE i.scheme IN ('isbn10','isbn13') AND i.normalized_value IN (SELECT value FROM json_each(?)) LIMIT 1",
         )
-        .get(cleanIsbn);
+        .get(JSON.stringify(isbnKeys(cleanIsbn).length ? isbnKeys(cleanIsbn) : [cleanIsbn]));
       if (existing) {
         editionId = existing.id;
         bookId = existing.legacy_id || 'edition:' + existing.id;
@@ -55,12 +56,14 @@ export function createSqliteBook(catalog, { title, isbn = null } = {}) {
       at,
     });
     editionId = edition.id;
+    // Both ISBN forms, so offers listed with the other form find this edition too.
     if (cleanIsbn)
-      repo.attachIdentifier(edition.id, cleanIsbn.length === 10 ? 'isbn10' : 'isbn13', cleanIsbn, {
-        source: 'local_manual',
-        verificationStatus: 'manual',
-        at,
-      });
+      for (const key of isbnKeys(cleanIsbn).length ? isbnKeys(cleanIsbn) : [cleanIsbn])
+        repo.attachIdentifier(edition.id, key.length === 10 ? 'isbn10' : 'isbn13', key, {
+          source: 'local_manual',
+          verificationStatus: 'manual',
+          at,
+        });
     created = true;
   });
   return { book: bookFromProjection(catalog, bookId), editionId, created };

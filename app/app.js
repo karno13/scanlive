@@ -329,6 +329,7 @@ function catalogFilters(kind) {
       status:'review_required',
       offerId:state.reviewOffer || '',
       sort: $('#reviewSort').value,
+      bucket: state.reviewBucket || '',
     };
   return {
     query,
@@ -373,12 +374,18 @@ async function loadCatalogPage(kind, { reset = false, pageNumber = null } = {}) 
       data=await json(source.endpoint+'?'+params);
     }
     validateCatalogPage(data, limit, offset);
-    if (!reset && kind !== 'offers' && data.total !== page.total) throw Error('CATALOG_CHANGED_DURING_PAGINATION');
-    if (data.items.length === 0 && offset < data.total) throw Error('INCOMPLETE_CATALOG_PAGE');
+    // The review queue changes all the time during a scan (offers are saved per phrase and
+    // decided by the resolver): take the new total and skip rows already loaded.
+    if (!reset && kind !== 'offers' && kind !== 'jobs' && data.total !== page.total) throw Error('CATALOG_CHANGED_DURING_PAGINATION');
+    if (data.items.length === 0 && offset < data.total && !(kind === 'jobs' && !reset)) throw Error('INCOMPLETE_CATALOG_PAGE');
+    if (kind === 'jobs') state.reviewBuckets = data.buckets || null;
     if (reset || kind === 'offers') {
       state[source.stateKey] = data.items;
       if (kind === 'works' || kind === 'jobs') state.visibleRows[kind] = 100;
-    } else state[source.stateKey] = [...state[source.stateKey], ...data.items];
+    } else {
+      const known = new Set(state[source.stateKey].map((row) => row.id));
+      state[source.stateKey] = [...state[source.stateKey], ...data.items.filter((row) => !known.has(row.id))];
+    }
     if (kind === 'offers') state.offerPage = Math.floor(offset / limit) + 1;
     state.catalogPages[kind] = {
       total: data.total,
@@ -395,6 +402,18 @@ async function loadCatalogPage(kind, { reset = false, pageNumber = null } = {}) 
       updateCatalogLoadControls();
     }
   }
+}
+
+/** Every remaining page (bounded), e.g. before "select all" in the review queue. */
+async function loadAllCatalogPages(kind, { maxPages = 40 } = {}) {
+  for (let page = 0; page < maxPages; page++) {
+    const state_ = state.catalogPages[kind];
+    if (state_.offset >= state_.total) return true;
+    const before = state_.offset;
+    if (!(await loadCatalogPage(kind))) return false;
+    if (state.catalogPages[kind].offset <= before) return false;
+  }
+  return false;
 }
 
 function scheduleGlobalCatalogSearch(kind) {
@@ -617,6 +636,9 @@ function openCatalogForReview({ jobId, isbn = '' }) {
   $('#catalogDialog').showModal();
   $('[data-catalog-mode="isbn"]').click();
   $('#catalogIsbn').value = isbn;
+  // The manual form starts filled in too, in case no source knows the ISBN.
+  if ($('#catalogManualIsbn')) $('#catalogManualIsbn').value = isbn;
+  if ($('#catalogTitle') && !$('#catalogTitle').value) $('#catalogTitle').value = state.catalogReturnToReview.job?.offer?.title || '';
   $('#catalogIsbn').focus();
 }
 
@@ -681,7 +703,9 @@ async function submitCatalog(event) {
         );
         $('#catalogFormMessage').textContent = records.length
           ? `${state.catalogPreview.comparison.status}: ${records.map((record) => `${record.source} — ${record.title || 'bez tytułu'}`).join(' | ')}. Kliknij ponownie, aby zatwierdzić utworzenie rekordu.`
-          : 'Nie znaleziono jednoznacznego rekordu. Nic nie zapisano.';
+          : state.catalogReturnToReview
+            ? 'BN i Open Library nie znają tego ISBN. Nic nie zapisano. Zamknij okno i użyj „Utwórz wydanie z ogłoszenia” w weryfikacji (tytuł i autor uzupełnią się same) albo przełącz na wpis ręczny.'
+            : 'Nie znaleziono jednoznacznego rekordu. Nic nie zapisano.';
         $('#catalogSubmit').textContent = records.length ? 'Zatwierdź rekord' : 'Sprawdź ponownie';
         $('#catalogSubmit').disabled = !records.length;
         return;
@@ -696,7 +720,7 @@ async function submitCatalog(event) {
       state.catalogPreview = null;
       await Promise.all([loadCatalogData(), loadCatalogStatus()]);
       await restoreReviewAfterCatalog({ editionId: result.editionId, isbn });
-      toast(`Katalog: ${result.decision}.`);
+      toast({ matched_existing: 'Ten ISBN był już w katalogu — wybrano istniejące wydanie.', created_edition: 'Dodano nowe wydanie do istniejącego dzieła.', created_work_and_edition: 'Dodano nowe dzieło i wydanie.' }[result.decision] || 'Zapisano rekord w katalogu.');
     } catch (error) {
       $('#catalogFormMessage').textContent = `Nie zapisano rekordu: ${error.message}`;
       toast(error.message);
@@ -909,7 +933,10 @@ $('#reviewList').addEventListener('scroll', async (event) => {
   }
 });
 
-const reviewView = createReviewView({ state, $, $$, json, toast, money, date, escapeHtml, reviewOffers, loadCatalogData, renderCatalog, openCatalogForReview });
+// Review: "select all" covers the whole filtered queue; a tab change reloads it from the server.
+const loadAllReviewRows = () => loadAllCatalogPages('jobs');
+const reloadReview = () => scheduleGlobalCatalogSearch('jobs');
+const reviewView = createReviewView({ state, $, $$, json, toast, money, date, escapeHtml, reviewOffers, loadCatalogData, renderCatalog, openCatalogForReview, loadAllReviewRows, reloadReview });
 const catalogView = createCatalogView({ state, $, $$, json, money, escapeHtml, visibleCatalogRows, openOfferDrawer, loadCatalogData, toast, showView });
 mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData });
 mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogData });

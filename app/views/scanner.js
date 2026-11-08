@@ -91,7 +91,8 @@ function updateProgress(event) {
     $('#progressDetail').textContent = `Strona ${event.page}: ${event.count} ofert`;
   }
   if (event.type === 'language-progress')
-    $('#progressDetail').textContent = `Weryfikacja języka ${event.checked}/${event.total}`;
+    // Vinted listings without a stated language are left out (they may be foreign books): say how many.
+    $('#progressDetail').textContent = `Weryfikacja języka ${event.checked}/${event.total}` + (event.unknown ? ` · bez podanego języka: ${event.unknown} (pominięte)` : '');
   if (event.type === 'retry' && row) {
     row.status = 'Ponawianie';
     row.error = event.code || 'Błąd tymczasowy';

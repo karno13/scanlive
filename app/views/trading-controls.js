@@ -47,14 +47,14 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
     $('#offerScan').replaceChildren(empty);
     for(const run of state.scanRuns) {
       const option=document.createElement('option');option.value=run.at;
-      option.textContent=new Date(run.at).toLocaleString('pl-PL')+' · '+run.found+' ofert'+(run.indexed?'':' · brak szczegółów starego skanu');option.disabled=!run.indexed;$('#offerScan').append(option);
+      option.textContent=new Date(run.at).toLocaleString('pl-PL')+' · '+run.found+' ofert'+(run.context?.cancelled?' · przerwany':'')+(run.indexed?'':' · brak szczegółów starego skanu');option.disabled=!run.indexed;$('#offerScan').append(option);
     }
     $('#offerScan').value=selected;
     const run=state.scanRuns[0];
     if(run?.indexed) {
       $('#scanResults').hidden=false;
       const failed=run.errors?.length||0;
-      $('#scanResultSummary').textContent=`Ostatni zapisany skan: ${run.found} ofert · ${run.newOffers} nowych · ${run.priceChanges} zmian cen${failed?' · '+failed+' zadań z problemami — wyniki mogą być niepełne':''}`;
+      $('#scanResultSummary').textContent=`Ostatni zapisany skan: ${run.found} ofert · ${run.newOffers} nowych · ${run.priceChanges} zmian cen${failed?' · '+failed+' zadań z problemami — wyniki mogą być niepełne':''}${run.context?.cancelled?' · skan przerwany: tylko ukończone frazy':''}`;
       $('#retryFailedScan').hidden=!failed || !run.context;
       renderScanResultCard(run, failed);
     }

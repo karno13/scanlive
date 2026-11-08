@@ -97,12 +97,14 @@
             </details>
           </section>
           <div class="filterbar">
-            <label class="search-field"><span class="sr-only">Szukaj ofert</span><input id="reviewSearch" type="search" placeholder="Szukaj po tytule, źródle lub ISBN"></label><p class="shortcut-hint" id="reviewShortcutHint"><span><kbd>↑</kbd><kbd>↓</kbd> oferta</span><span><kbd>1</kbd>–<kbd>9</kbd> propozycja</span><span><kbd>Enter</kbd> zatwierdź</span><span><kbd>X</kbd> odrzuć</span><span><kbd>S</kbd> pomiń</span><span><kbd>Z</kbd> zestaw</span><span><kbd>F</kbd> skupienie</span></p></div><details class="compact-filters"><summary>Filtry weryfikacji</summary><div class="filterbar">
+            <label class="search-field"><span class="sr-only">Szukaj ofert</span><input id="reviewSearch" type="search" placeholder="Szukaj po tytule, źródle lub ISBN"></label><button type="button" class="button secondary compact" id="reviewSelectToggle" aria-pressed="false">Zaznacz wiele</button><p class="shortcut-hint" id="reviewShortcutHint"><span><kbd>↑</kbd><kbd>↓</kbd> oferta</span><span><kbd>1</kbd>–<kbd>9</kbd> propozycja</span><span><kbd>Enter</kbd> zatwierdź</span><span><kbd>X</kbd> odrzuć</span><span><kbd>S</kbd> pomiń</span><span><kbd>Z</kbd> zestaw</span><span><kbd>F</kbd> skupienie</span></p></div><details class="compact-filters"><summary>Filtry weryfikacji</summary><div class="filterbar">
             <select id="reviewSource" aria-label="Źródło oferty"><option value="">Wszystkie źródła</option></select>
             <select id="reviewIsbn" aria-label="Status ISBN"><option value="">Każdy status ISBN</option><option value="present">ISBN wykryty</option><option value="missing">Brak ISBN</option><option value="catalog">Pasuje do katalogu</option></select>
             <select id="reviewSort" aria-label="Sortowanie"><option value="group" selected>Według frazy (serie)</option><option value="newest">Najnowsze</option><option value="price">Cena rosnąco</option><option value="proposal">Najszybsze decyzje</option></select>
           </div></details>
+          <nav class="rv-tabs" id="reviewTabs" aria-label="Rodzaje ofert do weryfikacji"></nav>
           <p id="reviewScanScope" role="status" hidden></p><details class="review-history"><summary>Ostatnie decyzje i poprawianie pomyłek</summary><div id="reviewDecisionHistory"></div></details>
+          <section class="rv-bulk-bar" id="reviewBulkBar" hidden aria-label="Akcje dla zaznaczonych ofert"></section>
           <div class="split-workspace">
             <div class="review-list" id="reviewList"></div>
             <div class="detail-panel" id="reviewDetail"><div class="empty-detail"><h3>Wybierz ofertę</h3><p>Po lewej pojawi się lista ofert wymagających decyzji.</p></div></div>

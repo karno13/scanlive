@@ -27,7 +27,7 @@ export function mountOfferAssignment({ container, offer, currentEditionId = null
     search.hidden = !search.hidden;
     if (!search.hidden) {
       // Catalogue search matches whole phrases: start from the edition title, or the listing's first words.
-      if (!input.value) input.value = initialQuery || String(offer.title || '').split(/s+/).slice(0, 2).join(' ');
+      if (!input.value) input.value = initialQuery || String(offer.title || '').split(/\s+/).slice(0, 2).join(' ');
       input.focus();
       void find();
     }

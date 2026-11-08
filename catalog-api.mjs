@@ -460,6 +460,107 @@ export function getCatalogOffer(repository, offerId) {
   };
 }
 
+// Queue tabs of "Do weryfikacji". Disjoint: an offer without ISBN is "quick" (it is in the
+// catalogue or has a sure title proposal) or "noisbn"; an offer with ISBN is "add" (no source
+// knows the ISBN / it has several records), "bundle" or "other".
+export const REVIEW_BUCKETS = ['quick', 'add', 'noisbn', 'bundle', 'other'];
+export const ADD_REASONS = ['isbn_not_found_in_metadata_sources', 'multiple_metadata_records'];
+const REASON_SQL = "json_extract(CASE WHEN json_valid(j.result_json) THEN j.result_json ELSE '{}' END,'$.reason[0]')";
+// One placeholder: the JSON list of "quick" job ids.
+const BUCKET_SQL = `(CASE WHEN coalesce(o.observed_isbn,'')='' THEN
+    (CASE WHEN j.id IN (SELECT value FROM json_each(?)) THEN 'quick' ELSE 'noisbn' END)
+  WHEN ${REASON_SQL} IN (${ADD_REASONS.map((reason) => `'${reason}'`).join(',')}) THEN 'add'
+  WHEN ${REASON_SQL}='possible_bundle' THEN 'bundle' ELSE 'other' END)`;
+
+/** Review jobs without ISBN that match the catalogue by title, and those with a sure proposal. */
+function reviewGroups(repository, matcher) {
+  const rows = repository.database
+    .prepare(
+      `SELECT j.id, o.original_title, p.confidence FROM identification_jobs j JOIN offers o ON o.id=j.offer_id
+       LEFT JOIN title_proposals p ON p.job_id=j.id
+       WHERE j.status='review_required' AND coalesce(o.observed_isbn,'')=''`,
+    )
+    .all();
+  const catalog = [];
+  const quick = [];
+  for (const row of rows) {
+    const inCatalog = matcher()(row.original_title, { limit: 1 }).length > 0;
+    if (inCatalog) catalog.push(row.id);
+    if (inCatalog || row.confidence === 'high') quick.push(row.id);
+  }
+  return { catalog, quick };
+}
+
+/**
+ * The decisions a "sure" tab can take at once, for the operator to look through before applying:
+ * - the title matches exactly one work of the catalogue very well (score >= 0.9): its preferred edition;
+ * - otherwise a sure (high) title proposal from BN / Open Library: its ISBN.
+ * Anything ambiguous is left out and stays for a one-by-one decision.
+ */
+export function sureReviewPlan(repository, { jobIds = null } = {}) {
+  const matcher = createLocalWorkMatcher(repository);
+  const rows = repository.database
+    .prepare(
+      `SELECT j.id, o.original_title, o.source, o.current_price, p.confidence, p.candidates_json
+       FROM identification_jobs j JOIN offers o ON o.id=j.offer_id LEFT JOIN title_proposals p ON p.job_id=j.id
+       WHERE j.status='review_required' AND coalesce(o.observed_isbn,'')=''`,
+    )
+    .all()
+    .filter((row) => !jobIds || jobIds.includes(row.id));
+  const items = [];
+  let skipped = 0;
+  for (const row of rows) {
+    // 0.9: a weaker title match ("Mroczne Imperium" vs the trilogy's third book) is not sure.
+    const local = localEditionCandidates(repository, row.original_title, { limit: 6, minScore: 0.9, matcher });
+    const works = new Set(local.map((item) => item.workId));
+    if (local.length && works.size === 1) {
+      const best = local[0];
+      items.push({
+        jobId: row.id, offerTitle: row.original_title, source: row.source, kind: 'edition', editionId: best.editionId,
+        title: best.title, authors: best.authors, publisher: best.publisher, year: best.publicationYear, isbn: best.isbn,
+        score: best.score, editions: local.length,
+      });
+      continue;
+    }
+    const candidate = row.confidence === 'high' ? json(row.candidates_json, [])[0] : null;
+    // A catalogue work that resembles the title (even weakly) makes a new ISBN a real choice.
+    if (!local.length && candidate?.isbn && !matcher(row.original_title, { limit: 1 }).length) {
+      items.push({
+        jobId: row.id, offerTitle: row.original_title, source: row.source, kind: 'isbn', isbn: candidate.isbn,
+        title: candidate.title, authors: candidate.authors?.length ? candidate.authors : [candidate.authorText].filter(Boolean),
+        publisher: candidate.publisher ?? '',
+        year: candidate.publicationYear ?? null, score: candidate.score ?? null,
+      });
+      continue;
+    }
+    if (works.size || candidate) skipped += 1;
+  }
+  return { items, skipped };
+}
+
+/** Applies the items the operator kept from sureReviewPlan, one offer at a time. */
+export async function applySureReviewPlan(catalog, items = []) {
+  const results = [];
+  for (const item of items.slice(0, 500)) {
+    const jobId = String(item?.jobId ?? '');
+    try {
+      if (item?.editionId) {
+        decideIdentificationJob(catalog.repository, jobId, {
+          action: 'approved', editionId: String(item.editionId),
+          reason: 'Zatwierdzono hurtowo: tytuł jednoznacznie pasuje do dzieła z katalogu.',
+        });
+        results.push({ jobId, ok: true });
+      } else if (item?.isbn) {
+        const result = await matchIdentificationJobByIsbn(catalog, jobId, { isbn: String(item.isbn), confirm: true });
+        results.push(result.matched ? { jobId, ok: true } : { jobId, ok: false, error: [].concat(result.reason ?? ['NOT_MATCHED'])[0] });
+      } else results.push({ jobId, ok: false, error: 'INVALID_ITEM' });
+    } catch (error) {
+      results.push({ jobId, ok: false, error: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'DECISION_FAILED' });
+    }
+  }
+  return { results, approved: results.filter((row) => row.ok).length };
+}
+
 export function listIdentificationJobs(repository, options = {}) {
   const { database } = repository,
     { limit, offset, query } = page(options),
@@ -488,6 +589,30 @@ export function listIdentificationJobs(repository, options = {}) {
     params.push(likeLiteral(query), likeLiteral(query), likeLiteral(query));
   }
   if(options.scan) { conditions.push('EXISTS (SELECT 1 FROM scan_offer_results sr WHERE sr.offer_id=o.id AND sr.scanned_at=?)');params.push(String(options.scan)); }
+  // The title matcher reads every work: built at most once per request.
+  let matcherInstance = null;
+  const lazyMatcher = () => (matcherInstance ||= createLocalWorkMatcher(repository));
+  const groups = status === 'review_required' ? reviewGroups(repository, lazyMatcher) : null;
+  // "Pasuje do katalogu" is decided on the server, so it covers the whole queue, not the loaded page.
+  if (isbn === 'catalog') {
+    conditions.push('j.id IN (SELECT value FROM json_each(?))');
+    params.push(JSON.stringify(groups?.catalog ?? []));
+  }
+  // Queue tabs: their counts follow every other filter, the list follows the chosen tab.
+  let buckets = null;
+  if (groups) {
+    buckets = { quick: 0, add: 0, noisbn: 0, bundle: 0, other: 0 };
+    for (const row of database
+      .prepare(
+        `SELECT ${BUCKET_SQL} AS bucket, count(*) AS count FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE ${conditions.join(' AND ')} GROUP BY bucket`,
+      )
+      .all(JSON.stringify(groups.quick), ...params))
+      buckets[row.bucket] = Number(row.count);
+    if (REVIEW_BUCKETS.includes(String(options.bucket || ''))) {
+      conditions.push(`${BUCKET_SQL}=?`);
+      params.push(JSON.stringify(groups.quick), String(options.bucket));
+    }
+  }
   const where = `WHERE ${conditions.join(' AND ')}`;
   const total = Number(
     database
@@ -512,11 +637,12 @@ export function listIdentificationJobs(repository, options = {}) {
     ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
     )
     .all(...params, limit, offset);
-  const matcher = rows.some((row) => !row.observed_isbn) ? createLocalWorkMatcher(repository) : null;
+  const matcher = rows.some((row) => !row.observed_isbn) ? lazyMatcher() : null;
   return {
     total,
     limit,
     offset,
+    ...(buckets ? { buckets } : {}),
     items: rows.map((row) => ({
       id: row.id,
       offerId: row.offer_id,
@@ -585,9 +711,11 @@ export async function matchIdentificationJobByIsbn(
   }
   // A typed ISBN is an explicit operator assertion, not evidence extracted
   // from an unrelated advertisement. Matching uses ISBN alone.
+  const recordId = typeof input.recordId === 'string' && input.recordId.length <= 200 ? input.recordId : null;
   const result = await catalog.resolver.resolve({
     offerId: job.offer_id,
     dryRun: input.preview === true,
+    recordId,
     evidence: {
       status: 'valid',
       values: [isbn],

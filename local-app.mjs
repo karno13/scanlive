@@ -5,6 +5,7 @@ import { createSqliteVintedDetailCache } from './vinted-detail-sqlite-cache.mjs'
 import { publicAssetPath } from './static-asset-path.mjs';
 import { retryIdentificationJobs } from './identification-retry.mjs';
 import { enrichOffers } from './offer-enrichment.mjs';
+import { DETAIL_SOURCES } from './source-details.mjs';
 import { checkOfferLifecycle } from './offer-lifecycle.mjs';
 import { blockedSources } from './source-blocks.mjs';
 import { reassignOffer, unassignOffer } from './offer-assignment.mjs';
@@ -41,7 +42,10 @@ import {
   listIdentificationJobs,
   matchIdentificationJobByIsbn,
   localEditionCandidates,
+  sureReviewPlan,
+  applySureReviewPlan,
 } from './catalog-api.mjs';
+import { offerEditionDraft, createEditionFromOffer, recheckOfferEditions } from './offer-editions.mjs';
 import { analyzedOffers, bookHistory, allBookStatistics } from './price-analysis.mjs';
 import { sqliteHistoryModel } from './sqlite-history-read.mjs';
 import {
@@ -552,10 +556,18 @@ export async function withHistoryWriteLock(work) {
 
 // Reads detail pages of shops that publish the ISBN in structured data, in small paced batches,
 // before the resolver runs so that new evidence is used in the same pass.
+// A source that answered HTTP 429 or a challenge is left alone for half an hour. Without this the
+// five-second scheduler kept it throttled and every poll used up another offer's attempt.
+const enrichmentPausedUntil = new Map();
+const ENRICHMENT_PAUSE_MS = 30 * 60_000;
 async function enrichPendingOffers(catalogStore) {
   if (String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0' || !catalogStore.repository?.database) return null;
   try {
-    const report = await enrichOffers(catalogStore.repository, { limit: 10 });
+    const now = Date.now();
+    const sources = [...DETAIL_SOURCES].filter((source) => !(enrichmentPausedUntil.get(source) > now));
+    if (!sources.length) return null;
+    const report = await enrichOffers(catalogStore.repository, { limit: 10, sources });
+    for (const source of report.paused ?? []) enrichmentPausedUntil.set(source, Date.now() + ENRICHMENT_PAUSE_MS);
     if (report.checked) recordProgress({ type: 'detail_enrichment', ...report });
     return report;
   } catch (error) {
@@ -606,6 +618,25 @@ function scheduleLifecycleCheck(catalogStore) {
     });
 }
 
+// Editions created from listings: BN is asked again about once a week (a few per hour).
+let runningOfferEditions = null;
+let offerEditionsNextAt = 0;
+function scheduleOfferEditionRecheck(catalogStore) {
+  if (runningOfferEditions || Date.now() < offerEditionsNextAt || typeof catalogStore.lookupIsbn !== 'function') return;
+  if (!catalogStore.repository?.database) return;
+  offerEditionsNextAt = Date.now() + 60 * 60_000;
+  runningOfferEditions = recheckOfferEditions(catalogStore, { limit: 5 })
+    .then((report) => {
+      if (report.checked) recordProgress({ type: 'offer_editions_recheck', ...report });
+    })
+    .catch((error) =>
+      recordProgress({ type: 'offer_editions_recheck_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'RECHECK_ERROR' }),
+    )
+    .finally(() => {
+      runningOfferEditions = null;
+    });
+}
+
 let runningCatalogResolution = null;
 function scheduleCatalogResolution(catalogStore) {
   if (runningCatalogResolution) return runningCatalogResolution;
@@ -635,6 +666,7 @@ function scheduleCatalogResolution(catalogStore) {
       runningCatalogResolution = null;
       scheduleProposalRefresh(catalogStore);
       scheduleLifecycleCheck(catalogStore);
+      scheduleOfferEditionRecheck(catalogStore);
     });
   return runningCatalogResolution;
 }
@@ -657,7 +689,14 @@ async function searchAndStore(
   const scanAt = new Date();
   const scanState = createScanState();
   let savedDuringScan = 0;
+  // Offers saved by finished tasks, so that a cancelled scan is still recorded as a (partial) run.
+  const savedOffers = new Map();
   const onOffers = async ({ source, query, offers }) => {
+    for (const offer of offers) {
+      const known = savedOffers.get(offer.url);
+      if (known) known.matchedQueries = [...new Set([...known.matchedQueries, ...offer.matchedQueries])];
+      else savedOffers.set(offer.url, { ...offer, matchedQueries: [...offer.matchedQueries] });
+    }
     const report = await withHistoryWriteLock(async () =>
       persistSqliteScanBatch(catalog, { offers, scanAt: scanAt.toISOString(), state: scanState }),
     );
@@ -665,8 +704,21 @@ async function searchAndStore(
     onProgress({ type: 'offers-saved', source, query, saved: report.saved, newOffers: report.newOffers, total: savedDuringScan });
     if (String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0' && shouldAutoResolve()) scheduleCatalogResolution(catalog);
   };
-  const result = await awaitScan(search(input, { onProgress, detailCache, signal, onOffers, now: () => scanAt }), signal);
-  scanCancelled(signal);
+  let result;
+  try {
+    result = await awaitScan(search(input, { onProgress, detailCache, signal, onOffers, now: () => scanAt }), signal);
+    scanCancelled(signal);
+  } catch (error) {
+    // Cancelled after some tasks finished: their offers are already saved; record the run too, so
+    // that "review this scan" and the new-offer filters see them. Nothing is marked unseen, because
+    // the scan did not finish.
+    if (error?.message === 'SCAN_CANCELLED' && savedOffers.size)
+      await withHistoryWriteLock(async () =>
+        persistSqliteScan(catalog, { offers: [...savedOffers.values()], searchedAt: scanAt.toISOString(), errors: [], scanState,
+          scanContext: { queries: input.queries, sources: input.sources, results: [], cancelled: true } }),
+      ).catch(() => {});
+    throw error;
+  }
   const errors = result.results
     .filter((row) => row.status !== 'ok')
     .map((row) => ({
@@ -1057,6 +1109,40 @@ export function createLocalAppServer({
             listIdentificationJobs(catalog.repository, Object.fromEntries(url.searchParams)),
           ),
         );
+      }
+      // "Szybkie" tab: the sure decisions to look through, then apply the ones the operator kept.
+      if (request.method === 'POST' && url.pathname === '/api/identification-jobs/sure-plan') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        const jobIds = Array.isArray(input?.jobIds) ? input.jobIds.map(String).slice(0, 2000) : null;
+        return send(response, 200, JSON.stringify(sureReviewPlan(catalog.repository, { jobIds })));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/identification-jobs/sure-apply') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        const result = await applySureReviewPlan(catalog, Array.isArray(input?.items) ? input.items : []);
+        // Approvals add ISBNs to the catalogue: the sibling offers with them are matched next.
+        if (result.approved && identificationControl) {
+          identificationControl.start();
+          void identificationControl.tick();
+        }
+        return send(response, 200, JSON.stringify(result));
+      }
+      // ISBN that no source knows: a draft built from the listings, then the edition in one click.
+      const offerEdition = url.pathname.match(/^\/api\/identification-jobs\/([^/]+)\/offer-edition$/);
+      if (offerEdition && ['GET', 'POST'].includes(request.method)) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const jobId = decodeURIComponent(offerEdition[1]);
+        if (request.method === 'GET') return send(response, 200, JSON.stringify(offerEditionDraft(catalog.repository, jobId)));
+        const result = createEditionFromOffer(catalog.repository, jobId, await readJson(request));
+        if (identificationControl) {
+          identificationControl.start();
+          void identificationControl.tick();
+        }
+        return send(response, 200, JSON.stringify(result));
       }
       if (
         request.method === 'POST' &&

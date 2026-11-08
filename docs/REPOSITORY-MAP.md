@@ -11,7 +11,7 @@
 | Skanowanie | `marketplaces.mjs`, `local-scan.mjs`, `vinted-detail.mjs` |
 | SQLite | `catalog-production.mjs`, `sqlite-catalog-repository.mjs`, `catalog-api.mjs`, `offer-sets.mjs` |
 | ISBN / metadane | `catalog-resolver.mjs`, `identification-worker.mjs`, `metadata-lookup.mjs`, `metadata-sources/` |
-| Weryfikacja (od 2026-11-07) | `title-proposals.mjs` (propozycje po tytule), `offer-enrichment.mjs` + `source-details.mjs` (dane ze strony produktu), `app/views/review.js` |
+| Weryfikacja (od 2026-11-07) | `title-proposals.mjs` (propozycje po tytule), `offer-enrichment.mjs` + `source-details.mjs` (dane ze strony produktu), `offer-editions.mjs` (wydania z ogłoszeń, gdy nikt nie zna ISBN), `app/views/review.js` + `review-bulk.js` (zakładki, „Zatwierdź pewne…”, zaznaczanie wielu) |
 | Katalog: dzieła i duplikaty | `work-grouping.mjs`, `app/views/duplicates.js` |
 | Skaner: harmonogram i jakość | `scan-schedule.mjs`, `offer-availability.mjs`, `app/views/scan-schedule.js` |
 | Zdjęcia i okładki | `offer-images.mjs` (walidacja URL, proxy `/api/image` z cache, `og:image`), `app/core/bibliography.js` (czyste etykiety BN, okładki) |

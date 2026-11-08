@@ -4,6 +4,11 @@ import { DETAIL_SOURCES, parseProductDetail } from './source-details.mjs';
 
 const MAX_ATTEMPTS = 3;
 const RETRY_AFTER_MS = 60 * 60 * 1000;
+// A rate limit or a challenge says nothing about the offer itself: it is tried again later and
+// never uses up one of the offer's attempts (offers burnt by HTTP 429 earlier are retried too).
+const THROTTLE_ERRORS = ['SOURCE_HTTP_429', 'SOURCE_CAPTCHA', 'SOURCE_HTTP_403'];
+export const isThrottleError = (error) =>
+  error?.blocked === true || error?.status === 429 || THROTTLE_ERRORS.includes(String(error?.message));
 
 const stableId = (...parts) =>
   'enrich_' + createHash('sha256').update(parts.join('\u0000')).digest('hex').slice(0, 32);
@@ -21,10 +26,11 @@ export function pendingEnrichment(
       `SELECT o.id, o.source, o.normalized_url AS url
        FROM offers o LEFT JOIN offer_enrichment e ON e.offer_id = o.id
        WHERE o.source IN (${marks}) AND (o.observed_isbn IS NULL OR o.observed_isbn = '')
-         AND (e.offer_id IS NULL OR (e.outcome = 'error' AND e.attempts < ? AND e.attempted_at <= ?))
+         AND (e.offer_id IS NULL OR (e.outcome = 'error' AND e.attempted_at <= ?
+              AND (e.attempts < ? OR e.last_error IN (${THROTTLE_ERRORS.map(() => '?').join(',')}))))
        ORDER BY o.last_seen_at DESC LIMIT ?`,
     )
-    .all(...sources, MAX_ATTEMPTS, retryBefore, Math.max(1, Math.min(500, limit)));
+    .all(...sources, retryBefore, MAX_ATTEMPTS, ...THROTTLE_ERRORS, Math.max(1, Math.min(500, limit)));
 }
 
 /** Sends a job back to the resolver when new evidence arrived. Manual decisions and bundles stay put. */
@@ -44,12 +50,13 @@ export function requeueForNewEvidence(repository, offerId, at) {
   return Number(result.changes) > 0;
 }
 
-function record(repository, offer, { outcome, isbn = null, facts = null, error = null }, at) {
+function record(repository, offer, { outcome, isbn = null, facts = null, error = null, countAttempt = true }, at) {
+  const step = countAttempt ? 1 : 0;
   repository.database
     .prepare(
       `INSERT INTO offer_enrichment(offer_id,source,outcome,attempts,attempted_at,isbn,facts_json,last_error)
        VALUES(?,?,?,1,?,?,?,?)
-       ON CONFLICT(offer_id) DO UPDATE SET outcome=excluded.outcome, attempts=offer_enrichment.attempts+1,
+       ON CONFLICT(offer_id) DO UPDATE SET outcome=excluded.outcome, attempts=offer_enrichment.attempts+${step},
          attempted_at=excluded.attempted_at, isbn=excluded.isbn, facts_json=excluded.facts_json, last_error=excluded.last_error`,
     )
     .run(offer.id, offer.source, outcome, at, isbn, facts ? JSON.stringify(facts) : null, error);
@@ -66,12 +73,14 @@ export async function enrichOffers(
     onProgress = () => {},
   } = {},
 ) {
-  const report = { checked: 0, isbnFound: 0, noIsbn: 0, errors: 0, requeued: 0, stopped: null };
+  const report = { checked: 0, isbnFound: 0, noIsbn: 0, errors: 0, requeued: 0, stopped: null, paused: [] };
   for (const offer of pendingEnrichment(repository, { sources, limit, now })) {
     if (signal?.aborted) {
       report.stopped = 'aborted';
       break;
     }
+    // A source that refused us in this run is not asked again; the other sources go on.
+    if (report.paused.includes(offer.source)) continue;
     const at = now().toISOString();
     let html;
     try {
@@ -79,11 +88,13 @@ export async function enrichOffers(
     } catch (error) {
       report.checked += 1;
       report.errors += 1;
-      record(repository, offer, { outcome: 'error', error: String(error?.message ?? error).slice(0, 200) }, at);
-      // A challenge or rate limit applies to the whole source: stop instead of hammering it.
-      if (error?.blocked || error?.status === 429) {
+      const throttled = isThrottleError(error);
+      record(repository, offer, { outcome: 'error', error: String(error?.message ?? error).slice(0, 200), countAttempt: !throttled }, at);
+      // A challenge or rate limit applies to the whole source: leave it alone (the caller also
+      // pauses it for a while) instead of hammering it.
+      if (throttled) {
         report.stopped = String(error.message);
-        break;
+        report.paused.push(offer.source);
       }
       continue;
     }

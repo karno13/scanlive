@@ -35,6 +35,8 @@ import { lookupISBN, SqliteMetadataCache } from './metadata-lookup.mjs';
 import { extractOfferISBN } from './isbn.mjs';
 import { identifyOffer } from './offer-identity.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
+import { requeueForNewEvidence } from './offer-enrichment.mjs';
+import { requeueReviewsWithKnownIsbn } from './identification-retry.mjs';
 
 function stableId(prefix, ...values) {
   return `${prefix}_${createHash('sha256').update(JSON.stringify(values)).digest('hex').slice(0, 32)}`;
@@ -203,6 +205,7 @@ export function createProductionCatalog({
           report.offers += 1;
 
           const evidence = extractOfferISBN(offer);
+          let newEvidence = false;
           for (const observation of evidence.observations.filter((row) => row.valid)) {
             const value = observation.value;
             const evidenceId = stableId('scan_isbn', stored.id, value, observation.classification);
@@ -217,7 +220,10 @@ export function createProductionCatalog({
               observedAt,
               at: observedAt,
             });
-            if (saved.created) report.evidence += 1;
+            if (saved.created) {
+              report.evidence += 1;
+              newEvidence = true;
+            }
           }
           const job = repository.putIdentificationJob({
             offerId: stored.id,
@@ -225,6 +231,9 @@ export function createProductionCatalog({
             at: observedAt,
           });
           if (job.created) report.jobs += 1;
+          // The seller added or corrected the ISBN since the last scan: the offer waiting in review
+          // with the old answer ("no ISBN") goes back to the resolver.
+          else if (newEvidence && requeueForNewEvidence(repository, stored.id, at)) report.requeued = (report.requeued || 0) + 1;
         }
         if (scanSummary) {
           if (scanSummary.at !== at) throw Error('INVALID_SCAN_SUMMARY_TIME');
@@ -238,6 +247,9 @@ export function createProductionCatalog({
       return report;
     },
     async processQueued(limit = Number(process.env.BOOKFLIP_CATALOG_BATCH ?? 25)) {
+      // Offers whose ISBN reached the catalogue since their review (a sibling offer was approved,
+      // the edition was added by hand or by seeding) are matched without another decision.
+      requeueReviewsWithKnownIsbn(repository, now);
       return worker.processBatch(limit);
     },
     beginIdentificationRun(startedAt = new Date().toISOString()) {

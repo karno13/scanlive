@@ -4,7 +4,7 @@ import { extractOfferISBN } from './isbn.mjs';
 import { isbnKeys, normalizeISBN } from './isbn-normalization.mjs';
 import { persistMetadataResults } from './metadata-lookup.mjs';
 
-import { findWorkByKey } from './work-grouping.mjs';
+import { findWorkByKey, mainTitle } from './work-grouping.mjs';
 import { enrichEdition } from './catalog-bibliography.mjs';
 import { looksLikeBundle } from './bundle-detection.mjs';
 import { operatorRejectedEditions } from './offer-assignment.mjs';
@@ -214,10 +214,30 @@ function primarySource(result) {
   return result.bn;
 }
 
-function mergeRecords(result) {
+function mergeRecords(result, chosen = null) {
   const source = primarySource(result);
   const records = source?.status === 'found' ? source.records ?? [] : [];
+  if (chosen) return { record: chosen, records: [chosen] };
   return records.length === 1 ? { record: records[0], records } : null;
+}
+
+/**
+ * One ISBN, several records in the primary source. BN often holds the same book twice (a reprint
+ * catalogued again, a second description). Returns the record to use, or null when they really
+ * describe different books:
+ * - the operator picked a record (recordId) — that one;
+ * - every record has the same main title — the same book: the earliest printing;
+ * - exactly one record agrees with the listing title — that one.
+ */
+export function chooseAmongRecords(records, offerTitle, { recordId = null } = {}) {
+  if (recordId) return records.find((record) => String(record.externalRecordId) === String(recordId)) ?? null;
+  const titles = new Set(records.map((record) => text(mainTitle(record.title))));
+  if (titles.size === 1 && !titles.has(''))
+    return [...records].sort((a, b) => (Number(a.publicationYear) || 9999) - (Number(b.publicationYear) || 9999))[0];
+  if (!offerTitle) return null;
+  const agreeing = records.filter((record) => !titleConflict(offerTitle, { title: record.title, authors: record.authors }) &&
+    text(offerTitle).includes(text(mainTitle(record.title))));
+  return agreeing.length === 1 ? agreeing[0] : null;
 }
 
 /** An ISBN typed or chosen by the operator in review is their assertion: no title check. */
@@ -274,7 +294,7 @@ export class CatalogResolver {
     return extractOfferISBN(candidate);
   }
 
-  async resolve({ offerId = null, offer = null, evidence = null, dryRun = false } = {}) {
+  async resolve({ offerId = null, offer = null, evidence = null, dryRun = false, recordId = null } = {}) {
     const storedOffer = offerId
       ? this.repository.database.prepare('SELECT * FROM offers WHERE id=?').get(offerId)
       : null;
@@ -356,9 +376,22 @@ export class CatalogResolver {
       return decision('not_found', ['isbn_not_found_in_metadata_sources'], proof);
     if (source?.status !== 'found' || !source.records?.length)
       return decision('review_required', ['metadata_invalid_or_incomplete'], proof);
-    if (source.records.length > 1)
-      return decision('review_required', ['multiple_metadata_records'], proof);
-    const selected = mergeRecords(metadata);
+    let chosen = null;
+    if (source.records.length > 1 || recordId) {
+      // A record already linked to a catalogue edition decides at once.
+      const linked = externalEdition(this.repository, source.records);
+      if (linked && !recordId)
+        return this.#matchExisting(linked, currentOffer, offerId, isbnEvidence, proof, dryRun);
+      chosen = chooseAmongRecords(source.records, offerTitleOf(currentOffer), { recordId });
+      if (!chosen)
+        return decision('review_required', ['multiple_metadata_records'], proof, {}, {
+          records: source.records.map((record) => ({
+            id: record.externalRecordId, source: record.source, title: record.title,
+            authors: record.authors, publisher: record.publisher, publicationYear: record.publicationYear,
+          })),
+        });
+    }
+    const selected = chosen ? mergeRecords(metadata, chosen) : mergeRecords(metadata);
     const isbnMatches = (record) => [record.isbn10, record.isbn13]
       .flatMap((value) => value ? isbnKeys(value) : [])
       .some((key) => isbnKeys(isbn).includes(key));

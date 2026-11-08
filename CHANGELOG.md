@@ -2,6 +2,27 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-08 (15) — Przegląd drogi od skanu do katalogu: luki i szybsza weryfikacja
+
+- **Allegro Lokalnie: odczyt ISBN nie umiera na HTTP 429.** Źródło, które odpowiada 429 albo wyzwaniem, ma 30 minut przerwy (wcześniej co 5 s kolejne żądanie i kolejna oferta traciła próbę — 106 ofert nie było już nigdy sprawdzanych). Limit nie zużywa prób oferty, a te 106 ofert wraca do kolejki odczytu. Inne źródła działają dalej.
+- **Nowy ISBN z ponownego skanu** (sprzedawca dopisał lub poprawił numer) odsyła ofertę z weryfikacji z powrotem do automatycznej identyfikacji.
+- **Oferty z tym samym ISBN idą za pierwszą decyzją.** Gdy wydanie z danym ISBN trafi do katalogu (zatwierdzenie, dodanie ręczne, BN, zasilanie katalogu), oferty czekające z „ISBN nieznany źródłom” lub „kilka opisów w BN” same się dopasowują. Ręcznie dodane wydanie dostaje oba warianty ISBN (10 i 13).
+- **„Utwórz wydanie z ogłoszenia”** dla ISBN, którego nie zna BN, Open Library ani Google Books: tytuł i autor wypełniają się z ogłoszeń z tym numerem (bez nazw uniwersów, tomu i autora w tytule), jedno kliknięcie tworzy wydanie i przypisuje ofertę, pozostałe oferty z tym ISBN dołączają same. Wydanie jest „niezweryfikowane”; BN jest pytana ponownie mniej więcej raz w tygodniu i po odpowiedzi wydanie dostaje pełny rekord (migracja 115).
+- **Kilka opisów jednego ISBN w BN:** gdy to ten sam tytuł (dodruk opisany dwa razy), resolver bierze najstarszy druk; gdy tytuł ogłoszenia wskazuje jeden z nich — ten. W pozostałych przypadkach panel pokazuje opisy do wyboru (klawisze 1–9). Oferty wstrzymane wcześniej z tego powodu przechodzą resolver jeszcze raz.
+- **Zakładki kolejki:** Szybkie (jest w katalogu / pewna propozycja), Do dodania, Bez ISBN, Zestawy?, Inne — z licznikami dla całej kolejki. W „Szybkich” **„Zatwierdź pewne…”** pokazuje listę jednoznacznych dopasowań (tytuł pasuje do jednego dzieła z katalogu ≥ 90% albo pewna propozycja BN); poniżej 90% trzeba zaznaczyć ręcznie.
+- Panel oferty z ISBN pokazuje też wydania z katalogu pasujące tytułem (często dodruk znanej książki).
+- Filtr „Pasuje do katalogu” i „Zaznacz wszystkie z filtra” obejmują całą kolejkę, nie tylko wczytane strony. Przewijanie kolejki w trakcie skanu nie kończy się błędem `CATALOG_CHANGED_DURING_PAGINATION`.
+- Podpowiedziane wydanie spoza pierwszych 250 wczytanych dzieł jest dociągane z serwera.
+- **Przerwany skan** zapisuje się jako skan („przerwany: tylko ukończone frazy”), więc jego oferty widać w „wynikach skanu”; niczego nie oznacza jako zniknięte.
+- „Pomiń” pamięta oferty po odświeżeniu strony; skaner pokazuje, ile ofert Vinted bez podanego języka pominięto; komunikaty katalogu po polsku zamiast kodów; formularz ręcznego wpisu z weryfikacji ma już tytuł i ISBN.
+
+## 2026-11-07 (14) — Zaznaczanie wielu ofert w „Do weryfikacji”
+
+- **„Zaznacz wiele”** obok wyszukiwarki: kliknięcie oferty zaznacza ją zamiast otwierać, Shift+klik zaznacza zakres, „Zaznacz wszystkie z filtra” bierze całą przefiltrowaną listę.
+- **Jedna akcja dla wszystkich zaznaczonych:** przypisanie do jednego wydania z katalogu (ręczna decyzja), oznaczenie jako zestawy, ponowna identyfikacja albo odrzucenie. Każda akcja wymaga potwierdzenia i idzie tymi samymi endpointami co pojedyncza decyzja, oferta po ofercie. Nieudane (np. chronione ręczne przypisanie) zostają zaznaczone z powodem, reszta znika z kolejki.
+- W trybie zaznaczania skróty klawiszowe pojedynczej oferty są wyłączone.
+- Poprawka: wyszukiwarka przypisania oferty bez wydania brała zły początek tytułu.
+
 ## 2026-11-07 (13) — Oferty w trakcie skanu, bez ponownego sprawdzania języka
 
 - **Wyniki na bieżąco:** oferty każdej ukończonej pary źródło + fraza są zapisywane od razu i od razu trafiają do kolejki identyfikacji. Wcześniej wszystko czekało na koniec całego skanu. Skaner pokazuje „Zapisano N ofert z: …” i co kilka sekund odświeża listy. Końcowy zapis dodaje podsumowanie skanu; liczniki nowych ofert i zmian cen, liczba wykryć i lista fraz nie są liczone podwójnie. Anulowany skan zachowuje oferty z ukończonych zadań.
