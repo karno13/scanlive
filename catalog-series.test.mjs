@@ -37,12 +37,23 @@ test('series tree groups works by universe and cycle with missing volumes', () =
       repository.createEdition({ workId: work.id, title, publicationYear: 2000 + volume });
     }
     repository.createWork({ title: 'Kosiarz', authors: ['Terry Pratchett'] });
+    repository.createWork({ title: 'Mort', authors: ['Pratchett, Terry (1948-2015)'] });
+    repository.createWork({ title: 'Samotna książka', authors: ['Jan Kowalski'] });
+    repository.createWork({ title: 'Legion', authors: ['Knaak, Richard A. (1961- )'] });
+    repository.createWork({ title: 'Dzień smoka', authors: ['Richard Knaak'] });
+    repository.createWork({ title: 'Bez autora', authors: [] });
     const tree = catalogSeries(repository);
     assert.equal(tree[0].name, 'Forgotten Realms');
     assert.equal(tree[0].cycles[0].name, 'Legenda Drizzta');
     assert.deepEqual(tree[0].cycles[0].volumes, [5, 7]);
     assert.deepEqual(tree[0].cycles[0].missing, [1, 2, 3, 4, 6]);
     assert.equal(tree.at(-1).name, 'Poza seriami');
+    // Outside known worlds works group by author; spelling variants of one author are one group.
+    assert.ok(tree.some((universe) => universe.name === 'Terry Pratchett'));
+    const knaak = tree.filter((universe) => /Knaak/.test(universe.name));
+    assert.equal(knaak.length, 1);
+    assert.equal(knaak[0].works, 2);
+    assert.ok(!tree.some((universe) => universe.name === 'Jan Kowalski'), 'a single stray book is not a group');
   } finally {
     repository.close?.();
   }

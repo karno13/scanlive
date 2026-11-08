@@ -36,7 +36,7 @@ export function mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData })
         return;
       }
       body.innerHTML =
-        '<p class="inline-note">Te dzieła mają ten sam tytuł i pierwszego autora, więc to najpewniej dodruki jednej książki. Połączenie przenosi wszystkie wydania pod jedno dzieło.</p>' +
+        '<p class="inline-note">Te dzieła mają ten sam tytuł i pierwszego autora (albo jedno z nich nie ma autora, a tytuł jest ten sam), więc to najpewniej jedna książka. Połączenie przenosi wszystkie wydania pod dzieło oznaczone „zostaje”.</p>' +
         groups.map(groupMarkup).join('');
       body.querySelectorAll('[data-merge-group]').forEach((button) =>
         button.addEventListener('click', () => merge(groups[Number(button.dataset.mergeGroup)], button)),

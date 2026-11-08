@@ -6,12 +6,16 @@ import { fold } from './title-proposals.mjs';
 const UNIVERSE_PREFIX =
   /^\s*(?:world of warcraft|warcraft|warhammer(?: 40[ ,.]?000| 40k)?|dragonlance|forgotten realms|świat dysku)\s*[:.]\s+/i;
 
+const UNIVERSE_SUFFIX =
+  /\s*[([](?:world of warcraft|warcraft|warhammer(?: 40[ ,.]?000| 40k)?|dragonlance|forgotten realms|świat dysku|swiat dysku|discworld)[)\]]\s*$/i;
+
 /** "Para w ruch / Raising steam, Discworld series ; t. 40" -> "Para w ruch" */
 export function mainTitle(title) {
   const text = String(title ?? '');
   // "World of Warcraft: Illidan" and "Illidan / World of Warcraft" are the same work: a universe
   // prefix followed by ":" or "." is cover branding, not the title (the author must still match).
-  const unbranded = text.replace(UNIVERSE_PREFIX, '');
+  // A universe in brackets after the title ("Blask fantastyczny (ŚWIAT DYSKU)") is branding too.
+  const unbranded = text.replace(UNIVERSE_PREFIX, '').replace(UNIVERSE_SUFFIX, '');
   return (fold(unbranded.split(' / ')[0]).length >= 3 ? unbranded : text)
     .split(' / ')[0]
     .split(' : ')[0]
@@ -121,6 +125,22 @@ export function findDuplicateWorkGroups(repository) {
       else byKey.set(key, work.id);
     }
   }
+  // A work without author never has a key. When its title equals the title of exactly one work
+  // with an author, it is offered in that group (the operator still decides on the merge).
+  const byTitle = new Map();
+  for (const work of works)
+    if (workKeys.get(work.id).length) {
+      const title = fold(mainTitle(work.title));
+      byTitle.set(title, byTitle.has(title) && byTitle.get(title) !== root(work.id) ? null : root(work.id));
+    }
+  for (const work of works) {
+    if (workKeys.get(work.id).length) continue;
+    const title = fold(mainTitle(work.title));
+    const target = title.length >= 3 ? byTitle.get(title) : null;
+    if (!target) continue;
+    parent.set(work.id, target);
+    workKeys.set(work.id, ['title:' + title]);
+  }
   const groups = new Map();
   for (const work of works) {
     if (!workKeys.get(work.id).length) continue;
@@ -141,7 +161,11 @@ export function findDuplicateWorkGroups(repository) {
     .map((list) => {
       // Keep the work that already carries the most offers, then editions, then the oldest.
       const ranked = [...list].sort(
-        (a, b) => b.offers - a.offers || b.editions - a.editions || String(a.createdAt).localeCompare(String(b.createdAt)),
+        (a, b) =>
+          (b.authors.length > 0) - (a.authors.length > 0) ||
+          b.offers - a.offers ||
+          b.editions - a.editions ||
+          String(a.createdAt).localeCompare(String(b.createdAt)),
       );
       const key = ranked[0].keys.find((entry) => !entry.startsWith('orig:')) ?? ranked[0].keys[0];
       return { key, targetId: ranked[0].id, works: ranked.map(({ keys: _keys, ...work }) => work) };

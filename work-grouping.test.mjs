@@ -94,3 +94,18 @@ test('universe prefix on the cover does not split a work', () => {
     workKey('World of Warcraft : kronika. T. 2 /', ['Lacroix, Joseph']),
   );
 });
+
+test('a work without author joins the one authored work of the same title; brackets are branding', () => {
+  assert.equal(mainTitle('Blask fantastyczny (ŚWIAT DYSKU)'), 'Blask fantastyczny');
+  const repo = new SqliteCatalogRepository(':memory:');
+  const work = (id, title, authors) => repo.createWork({ id, title, normalizedTitle: title.toLowerCase(), authors, at: '2026-01-01T00:00:00Z' });
+  work('a', 'Kosiarz', ['Terry Pratchett']);
+  work('b', 'Kosiarz (Świat Dysku)', []);
+  work('c', 'Legion', ['Richard Knaak']);
+  work('d', 'Legion', ['Dan Abnett']);
+  work('e', 'Legion', []);
+  const groups = findDuplicateWorkGroups(repo);
+  assert.equal(groups.length, 1, 'an authorless "Legion" is ambiguous between two authors and stays alone');
+  assert.deepEqual(groups[0].works.map((w) => w.id), ['a', 'b']);
+  assert.equal(groups[0].targetId, 'a', 'the work with an author is kept');
+});

@@ -3348,3 +3348,11 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
 .series-volume-editor textarea{font-family:inherit;font-size:13px;margin-top:6px}
 .series-volume-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
 .series-volume-actions small{color:var(--muted);font-size:12px;flex:1 1 220px}
+/* Catalogue tools (duplicates, suspicious assignments, BN seeding): clearly clickable cards. */
+.catalog-duplicates{background:#fff;border:1px solid #dfe8e2;border-radius:8px;padding:0 14px}
+.catalog-duplicates>summary{list-style:none;gap:8px;color:var(--green);font-size:13px}
+.catalog-duplicates>summary::-webkit-details-marker{display:none}
+.catalog-duplicates>summary::before{content:'▸';display:inline-block;width:12px;transition:transform .15s}
+.catalog-duplicates[open]>summary::before{transform:rotate(90deg)}
+.catalog-duplicates>summary:hover{text-decoration:underline}
+.catalog-duplicates[open]{padding-bottom:12px}

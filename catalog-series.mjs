@@ -118,6 +118,7 @@ export function catalogSeries(repository) {
     }
 
   const definitions = loadSeriesDefinitions(db);
+  const authorNames = new Map();
   const universes = new Map();
   for (const work of works) {
     const statements = recordSeries.get(work.id) || [];
@@ -127,11 +128,27 @@ export function catalogSeries(repository) {
       ...statements.filter((entry) => entry.kind === 'universe').map((entry) => entry.name),
     ];
     const phrase = phrases.get(work.id) || '';
+    // Outside the known worlds a work is grouped by its author, not by the scan phrase that found
+    // it: phrases mix authors ("Salvatore"), single books ("Iron Flame") and name variants.
+    const author = mainAuthor(authorsOf.get(work.id));
+    if (author) {
+      const votes = authorNames.get(author.key) || new Map();
+      votes.set(author.name, (votes.get(author.name) || 0) + 1);
+      authorNames.set(author.key, votes);
+    }
+    // An authorless work found by a phrase that names an author ("Richard Knaak") joins that author.
+    const phraseAuthor = !author && phrase ? mainAuthor([phraseLabel(phrase, authorsOf.get(work.id))]) : null;
     const universe =
       universeOverride.get(work.id) ||
       universeOf(titles.join(' ')) ||
       universeOf(phrase) ||
-      (phrase ? phraseLabel(phrase, authorsOf.get(work.id)) : 'Poza seriami');
+      (author
+        ? AUTHOR_PREFIX + author.key
+        : phraseAuthor
+          ? AUTHOR_PREFIX + phraseAuthor.key
+          : phrase
+            ? phraseLabel(phrase, authorsOf.get(work.id))
+            : NO_UNIVERSE);
     const annotation = manual.get(work.id);
     // BN files some publisher lines as series ("Nowa Fantastyka", "… : fantasy adventure"): not cycles.
     const cycles = statements.filter((entry) => entry.kind === 'cycle' && !NOT_A_CYCLE.test(String(entry.name).trim()));
@@ -165,6 +182,15 @@ export function catalogSeries(repository) {
       offers: Number(work.offers || 0),
       firstYear: years.length ? Math.min(...years) : null,
     });
+  }
+  // Author groups take the spelling used most often; one equal to a named group joins it.
+  for (const [key, list] of [...universes]) {
+    if (!key.startsWith(AUTHOR_PREFIX)) continue;
+    universes.delete(key);
+    const votes = [...(authorNames.get(key.slice(AUTHOR_PREFIX.length)) || new Map())].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length);
+    // One stray book by an author is not a group: it waits under "Poza seriami" unless it has a cycle.
+    const label = list.length < 2 && !list.some((work) => work.cycle) ? NO_UNIVERSE : votes[0]?.[0] || NO_UNIVERSE;
+    universes.set(label, [...(universes.get(label) || []), ...list]);
   }
 
   return [...universes]
@@ -358,4 +384,23 @@ export function saveSeriesDefinition(repository, input = {}, now = () => new Dat
     )
     .run(key, name, JSON.stringify(entries), now().toISOString());
   return { name, entries };
+}
+
+const AUTHOR_PREFIX = 'author:';
+
+/**
+ * The first author of a work as {key, name}: "Knaak, Richard A. (1961- )" and "Richard Knaak"
+ * share the key "r knaak" (first initial + surname), so name variants form one group.
+ */
+export function mainAuthor(authors = []) {
+  const text = String(authors[0] ?? '').trim();
+  if (!text) return null;
+  const bn = text.match(/^(\p{Lu}[\p{L}'’-]+),\s*(\p{Lu}[\p{L}.'’ -]*?)\s*(?=\(|$|\p{Lu}[\p{L}'’-]+,)/u);
+  const name = (bn ? `${bn[2].trim()} ${bn[1]}` : text.replace(/\([^)]*\)/g, ' ')).replace(/\s+/g, ' ').trim();
+  const words = name.split(' ').filter(Boolean);
+  if (words.length < 2) return null;
+  const surname = fold(words.at(-1));
+  const initial = fold(words[0]).charAt(0);
+  if (!surname || !initial || /^(?:praca|red|opracowanie|autor)/.test(fold(name))) return null;
+  return { key: `${initial} ${surname}`, name };
 }
