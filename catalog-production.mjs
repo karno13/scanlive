@@ -29,6 +29,7 @@ import { IdentificationWorker } from './identification-worker.mjs';
 import { createBnAdapter } from './metadata-sources/bn.mjs';
 import { createOpenLibraryAdapter } from './metadata-sources/open-library.mjs';
 import { createGoogleBooksAdapter } from './metadata-sources/google-books.mjs';
+import { createEIsbnAdapter } from './metadata-sources/e-isbn.mjs';
 import { SourceRateLimiter, createJsonRequester } from './metadata-http.mjs';
 import { findTitleIsbnCandidates } from './catalog-title-isbn.mjs';
 import { lookupISBN, SqliteMetadataCache } from './metadata-lookup.mjs';
@@ -89,6 +90,13 @@ export function createProductionCatalog({
     limiter: new SourceRateLimiter({ minIntervalMs: 1_000 }),
     timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
   });
+  // National ISBN registry; BOOKFLIP_E_ISBN=0 turns it off.
+  const eIsbnAdapter = createEIsbnAdapter({
+    fetcher,
+    limiter: new SourceRateLimiter({ minIntervalMs: 1_000 }),
+    timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
+    enabled: String(process.env.BOOKFLIP_E_ISBN ?? '1') !== '0',
+  });
   const openLibraryAdapter = createOpenLibraryAdapter({
     fetcher,
     limiter: openLibraryLimiter,
@@ -114,6 +122,7 @@ export function createProductionCatalog({
       lookupISBN(isbn, {
         bnAdapter,
         openLibraryAdapter,
+        eIsbnAdapter,
         googleBooksAdapter,
         cache,
       }),
@@ -150,7 +159,7 @@ export function createProductionCatalog({
       });
     },
     lookupIsbn(isbn) {
-      return lookupISBN(isbn, { bnAdapter, openLibraryAdapter, googleBooksAdapter, cache });
+      return lookupISBN(isbn, { bnAdapter, openLibraryAdapter, eIsbnAdapter, googleBooksAdapter, cache });
     },
     resolveIsbn(isbn, { dryRun = false } = {}) {
       return resolver.resolve({

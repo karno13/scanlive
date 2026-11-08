@@ -256,7 +256,7 @@ async function lookupWithCache(adapter, isbn, cache) {
 
 export async function lookupISBN(
   isbn,
-  { bnAdapter, openLibraryAdapter, googleBooksAdapter = null, cache = null, repository = null, target = {} } = {},
+  { bnAdapter, openLibraryAdapter, eIsbnAdapter = null, googleBooksAdapter = null, cache = null, repository = null, target = {} } = {},
 ) {
   if (!canonicalLookupKey(isbn)) throw new Error('INVALID_ISBN');
   if (!bnAdapter || !openLibraryAdapter) throw new TypeError('Both metadata adapters are required');
@@ -265,13 +265,21 @@ export async function lookupISBN(
   const openLibrary = ['not_found', 'temporary_error'].includes(bn.status)
     ? await lookupWithCache(openLibraryAdapter, isbn, cache)
     : { source: 'open_library', status: 'skipped', records: [], reason: 'bn_has_priority' };
+  // The national ISBN registry (e-ISBN) when neither BN nor Open Library knows the ISBN: publishers
+  // register books there before BN catalogues them.
+  const eIsbn =
+    eIsbnAdapter?.enabled && ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status !== 'found'
+      ? await lookupWithCache(eIsbnAdapter, isbn, cache)
+      : { source: 'e_isbn', status: 'skipped', records: [], reason: eIsbnAdapter?.enabled ? 'not_needed' : 'not_configured' };
   // Google Books (with the operator's key) when neither the national nor the open catalogue has it.
   const googleBooks =
-    googleBooksAdapter?.enabled && ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status === 'not_found'
+    googleBooksAdapter?.enabled && ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status === 'not_found' && eIsbn.status !== 'found'
       ? await lookupWithCache(googleBooksAdapter, isbn, cache)
       : { source: 'google_books', status: 'skipped', records: [], reason: googleBooksAdapter?.enabled ? 'not_needed' : 'not_configured' };
   const selected =
-    ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status !== 'found' && googleBooks.status === 'found'
+    ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status !== 'found' && eIsbn.status === 'found'
+      ? eIsbn
+      : ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status !== 'found' && googleBooks.status === 'found'
       ? googleBooks
       : bn.status === 'not_found' || (bn.status === 'temporary_error' && openLibrary.status === 'found')
         ? openLibrary
@@ -282,7 +290,7 @@ export async function lookupISBN(
     conflicts: [],
   };
   const persistence = repository
-    ? persistMetadataResults(repository, [bn, openLibrary, googleBooks], target)
+    ? persistMetadataResults(repository, [bn, openLibrary, eIsbn, googleBooks], target)
     : null;
-  return { isbn: canonicalLookupKey(isbn), bn, openLibrary, googleBooks, comparison, persistence };
+  return { isbn: canonicalLookupKey(isbn), bn, openLibrary, eIsbn, googleBooks, comparison, persistence };
 }

@@ -10,7 +10,7 @@
 | Frontend, 6 zakładek | `app/index.html`, `app/app.css`, `app/app.js`, `app/views/*.js` |
 | Skanowanie | `marketplaces.mjs`, `local-scan.mjs`, `vinted-detail.mjs` |
 | SQLite | `catalog-production.mjs`, `sqlite-catalog-repository.mjs`, `catalog-api.mjs`, `offer-sets.mjs` |
-| ISBN / metadane | `catalog-resolver.mjs`, `identification-worker.mjs`, `metadata-lookup.mjs`, `metadata-sources/` |
+| ISBN / metadane | `catalog-resolver.mjs`, `identification-worker.mjs`, `metadata-lookup.mjs`, `metadata-sources/` (BN → Open Library → e-ISBN → Google Books) |
 | Weryfikacja (od 2026-11-07) | `title-proposals.mjs` (propozycje po tytule), `offer-enrichment.mjs` + `source-details.mjs` (dane ze strony produktu), `offer-editions.mjs` (wydania z ogłoszeń, gdy nikt nie zna ISBN), `game-material.mjs` (podręczniki do gier i wydania obcojęzyczne), `app/views/review.js` + `review-bulk.js` (zakładki, „Zatwierdź pewne…”, zaznaczanie wielu) |
 | Katalog: dzieła i duplikaty | `work-grouping.mjs`, `app/views/duplicates.js` |
 | Skaner: harmonogram i jakość | `scan-schedule.mjs`, `offer-availability.mjs`, `app/views/scan-schedule.js` |

@@ -698,13 +698,13 @@ async function submitCatalog(event) {
         }
         state.catalogPreview = preview;
         state.catalogPreviewIsbn = isbn;
-        const records = [state.catalogPreview.bn, state.catalogPreview.openLibrary].flatMap(
+        const records = [state.catalogPreview.bn, state.catalogPreview.openLibrary, state.catalogPreview.eIsbn, state.catalogPreview.googleBooks].flatMap(
           (result) => result?.records || [],
         );
         $('#catalogFormMessage').textContent = records.length
           ? `${state.catalogPreview.comparison.status}: ${records.map((record) => `${record.source} — ${record.title || 'bez tytułu'}`).join(' | ')}. Kliknij ponownie, aby zatwierdzić utworzenie rekordu.`
           : state.catalogReturnToReview
-            ? 'BN i Open Library nie znają tego ISBN. Nic nie zapisano. Zamknij okno i użyj „Utwórz wydanie z ogłoszenia” w weryfikacji (tytuł i autor uzupełnią się same) albo przełącz na wpis ręczny.'
+            ? 'BN, Open Library ani rejestr e-ISBN nie znają tego ISBN. Nic nie zapisano. Zamknij okno i użyj „Utwórz wydanie z ogłoszenia” w weryfikacji (tytuł i autor uzupełnią się same) albo przełącz na wpis ręczny.'
             : 'Nie znaleziono jednoznacznego rekordu. Nic nie zapisano.';
         $('#catalogSubmit').textContent = records.length ? 'Zatwierdź rekord' : 'Sprawdź ponownie';
         $('#catalogSubmit').disabled = !records.length;

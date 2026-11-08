@@ -207,11 +207,10 @@ function externalWork(repository, record) {
 
 /** BN first; Open Library when BN does not know the ISBN or is unreachable and OL has it. */
 function primarySource(result) {
-  // Google Books stands in only when BN and Open Library both have nothing.
-  const google = result.googleBooks?.status === 'found' && result.openLibrary?.status !== 'found' ? result.googleBooks : null;
-  if (result.bn?.status === 'not_found') return google ?? result.openLibrary;
-  if (result.bn?.status === 'temporary_error' && result.openLibrary?.status === 'found') return result.openLibrary;
-  if (result.bn?.status === 'temporary_error' && google) return google;
+  // After BN: Open Library, then the national ISBN registry (e-ISBN), then Google Books.
+  const fallback = [result.openLibrary, result.eIsbn, result.googleBooks].find((entry) => entry?.status === 'found') ?? null;
+  if (result.bn?.status === 'not_found') return fallback ?? result.openLibrary;
+  if (result.bn?.status === 'temporary_error' && fallback) return fallback;
   return result.bn;
 }
 
@@ -247,7 +246,7 @@ function operatorEvidence(evidence) {
 }
 
 function allRecords(metadata) {
-  return [metadata?.bn, metadata?.openLibrary, metadata?.googleBooks].flatMap((entry) => (entry?.status === 'found' ? entry.records ?? [] : []));
+  return [metadata?.bn, metadata?.openLibrary, metadata?.eIsbn, metadata?.googleBooks].flatMap((entry) => (entry?.status === 'found' ? entry.records ?? [] : []));
 }
 
 function offerTitleOf(offer) {
@@ -367,7 +366,7 @@ export class CatalogResolver {
       return this.#matchExisting(existing, currentOffer, offerId, isbnEvidence, proof, dryRun);
 
     const metadata = await this.lookupMetadata(isbn);
-    proof.metadataRecords = [metadata.bn, metadata.openLibrary, metadata.googleBooks]
+    proof.metadataRecords = [metadata.bn, metadata.openLibrary, metadata.eIsbn, metadata.googleBooks]
       .flatMap((entry) => entry?.records ?? [])
       .map((record) => ({
         source: record.source,
@@ -603,7 +602,7 @@ export class CatalogResolver {
             at: this.now(),
           });
       }
-      persistMetadataResults(this.repository, [metadata.bn, metadata.openLibrary, metadata.googleBooks].filter(Boolean), {
+      persistMetadataResults(this.repository, [metadata.bn, metadata.openLibrary, metadata.eIsbn, metadata.googleBooks].filter(Boolean), {
         workId: work.id,
         editionId: edition.id,
       });

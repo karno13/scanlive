@@ -290,7 +290,7 @@ export function createEditionFromOffer(repository, jobId, input = {}, { now = ()
 }
 
 function primaryRecords(metadata) {
-  for (const entry of [metadata?.bn, metadata?.openLibrary, metadata?.googleBooks])
+  for (const entry of [metadata?.bn, metadata?.openLibrary, metadata?.eIsbn, metadata?.googleBooks])
     if (entry?.status === 'found' && entry.records?.length) return entry.records;
   return [];
 }
@@ -335,7 +335,7 @@ export function upgradeOfferEdition(repository, editionId, metadata, { now = () 
       try {
         repository.attachIdentifier(edition.id, scheme, record.externalRecordId, { source: record.source, verificationStatus: 'verified', at });
       } catch {}
-    persistMetadataResults(repository, [metadata.bn, metadata.openLibrary, metadata.googleBooks].filter(Boolean), {
+    persistMetadataResults(repository, [metadata.bn, metadata.openLibrary, metadata.eIsbn, metadata.googleBooks].filter(Boolean), {
       workId: edition.work_id,
       editionId: edition.id,
     });

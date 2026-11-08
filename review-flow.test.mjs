@@ -226,3 +226,32 @@ test('an Empik import from "Książki obcojęzyczne" is marked foreign and leave
     catalog.close();
   }
 });
+
+test('e-ISBN (national ISBN registry) supplies a record when BN and Open Library do not know the ISBN', async () => {
+  const onix = '<?xml version="1.0"?><ONIXMessage release="3.0"><Header/><Product><RecordReference>pl-eisbn-10641160</RecordReference>' +
+    '<ProductIdentifier><ProductIDType>15</ProductIDType><IDValue>9788383520698</IDValue></ProductIdentifier><DescriptiveDetail>' +
+    '<ProductForm>BC</ProductForm><TitleDetail><TitleType>01</TitleType><TitleElement><TitleElementLevel>01</TitleElementLevel><TitleText>Mort</TitleText></TitleElement></TitleDetail>' +
+    '<Contributor><SequenceNumber>1</SequenceNumber><ContributorRole>A01</ContributorRole><PersonNameInverted>Pratchett, Terry</PersonNameInverted></Contributor>' +
+    '<Language><LanguageRole>01</LanguageRole><LanguageCode>pol</LanguageCode></Language></DescriptiveDetail><PublishingDetail><Imprint><ImprintName>Prószyński i S-ka</ImprintName></Imprint>' +
+    '<Publisher><PublishingRole>01</PublishingRole><PublisherName>PRÓSZYŃSKI MEDIA</PublisherName></Publisher><PublishingDate><PublishingDateRole>01</PublishingDateRole><Date>20230710</Date></PublishingDate></PublishingDetail></Product></ONIXMessage>';
+  const fetcher = async (url) => {
+    const href = String(url);
+    if (href.includes('e-isbn.pl')) return new Response(onix, { headers: { 'content-type': 'text/xml' } });
+    if (href.includes('data.bn.org.pl')) return Response.json({ nextPage: '', bibs: [] });
+    if (href.includes('openlibrary.org')) return new Response('not found', { status: 404 });
+    throw new Error('UNEXPECTED_' + href);
+  };
+  const catalog = createProductionCatalog({ databasePath: ':memory:', fetcher, now: () => at });
+  const repo = catalog.repository;
+  try {
+    const url = 'https://www.vinted.pl/items/31-mort';
+    catalog.ingestOffers([{ source: 'Vinted', url, title: 'Mort Terry Pratchett Świat Dysku', price: 2500, isbn: '9788383520698' }], at);
+    const result = await catalog.resolver.resolve({ offerId: offerId(repo, url) });
+    assert.equal(result.decision, 'created_work_and_edition');
+    const edition = repo.database.prepare('SELECT * FROM editions WHERE id=?').get(result.editionId);
+    assert.deepEqual([edition.title, edition.publisher, edition.publication_year, edition.language, edition.binding], ['Mort', 'Prószyński i S-ka', 2023, 'polski', 'miękka']);
+    assert.deepEqual(JSON.parse(repo.database.prepare('SELECT authors_json FROM works WHERE id=?').get(result.workId).authors_json), ['Pratchett, Terry']);
+  } finally {
+    catalog.close();
+  }
+});

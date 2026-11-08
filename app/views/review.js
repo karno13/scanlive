@@ -507,7 +507,7 @@ function renderReviewDetail() {
         return;
       }
       const reasons = {
-        isbn_not_found_in_metadata_sources: 'Brak ISBN w Bibliotece Narodowej i Open Library.',
+        isbn_not_found_in_metadata_sources: 'Tego ISBN nie znają: Biblioteka Narodowa, Open Library ani rejestr e-ISBN.',
         metadata_source_temporary_error: 'Zewnętrzne API jest chwilowo niedostępne. Spróbuj ponownie.',
         metadata_sources_conflict: 'Źródła podają sprzeczne informacje. Weryfikacja ręczna jest konieczna.',
         offer_metadata_conflict: 'Dane ogłoszenia są sprzeczne z metadanymi książki.',
@@ -701,7 +701,7 @@ async function renderOfferEdition(job, box, current) {
     ? ` Obejmie też ${draft.siblings} ${draft.siblings === 1 ? 'inną ofertę' : [2, 3, 4].includes(draft.siblings % 10) && ![12, 13, 14].includes(draft.siblings % 100) ? 'inne oferty' : 'innych ofert'} z tym ISBN.`
     : '';
   mount.innerHTML = `<form class="rv-offer-edition-form" novalidate>
-      <div class="rv-section-title"><h4>Nikt nie zna tego ISBN — utwórz wydanie z ogłoszenia</h4><small>BN sprawdzi je ponownie za tydzień</small></div>
+      <div class="rv-section-title"><h4>BN, Open Library i e-ISBN nie znają tego ISBN — utwórz wydanie z ogłoszenia</h4><small>BN sprawdzi je ponownie za tydzień</small></div>
       <label class="field"><span>Tytuł</span><input name="title" type="text" maxlength="300" required value="${escapeHtml(draft.title)}"></label>
       <label class="field"><span>Autor <small>(kilku: po przecinku)</small></span><input name="authors" type="text" maxlength="250" value="${escapeHtml(draft.authors.join(', '))}" placeholder="np. Dan Abnett"></label>
       <p class="inline-note">ISBN ${escapeHtml(draft.isbn || '')}${draft.universe ? ' · ' + escapeHtml(draft.universe) : ''}.${escapeHtml(siblings)}</p>

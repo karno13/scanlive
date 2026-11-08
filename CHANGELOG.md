@@ -2,6 +2,12 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-08 (18) — Rejestr e-ISBN jako źródło opisu książki
+
+- **e-ISBN** (e-isbn.pl, krajowy rejestr ISBN prowadzony przez Bibliotekę Narodową) jest pytany, gdy BN i Open Library nie znają numeru (także gdy Open Library ma awarię). Wydawcy rejestrują tam książkę przy nadaniu ISBN, często zanim BN ją skataloguje. Z rekordu ONIX brane są: tytuł, autor, wydawca (imprint), rok, język i oprawa. Przed Google Books; `BOOKFLIP_E_ISBN=0` wyłącza.
+- Pomiar na kolejce 2026-11-08: e-ISBN zna 12 z 81 numerów „nieznanych źródłom” (31 ze 139 ofert, m.in. Pratchett z Prószyńskiego, Warcraft i Diablo z Insignis). Nowych wydań Copernicusa (978-83-8232, 978-83-61656) nie zna — dla nich zostaje „Utwórz wydanie z ogłoszenia”.
+- Migracja 117: oferty czekające z „ISBN nieznany źródłom” przechodzą resolver jeszcze raz.
+
 ## 2026-11-08 (17) — Zestaw bez potwierdzania
 
 - „Zestaw” (Z) w weryfikacji działa od razu, bez okna potwierdzenia; komunikat ma „Cofnij”, a panel przechodzi do następnej oferty.
