@@ -111,7 +111,7 @@ test('scanner saved-offer search and source filter are separated from scan count
 });
 
 test('desktop workspace preserves functional scanner controls and adds editorial shell', () => {
-  for (const id of ['sourceGrid','startSearch','scanProgressPanel','scannerOfferList']) assert.ok(html.includes('id=\"'+id+'\"'));
+  for (const id of ['sourceGrid','startSearch','scanRun','scanRunSources','scannerOfferList']) assert.ok(html.includes('id=\"'+id+'\"'));
   assert.match(styles, /#view-scanner\{display:grid/);
   assert.match(styles, /#view-scanner>\.scanner-discover\{grid-column:2/);
 });

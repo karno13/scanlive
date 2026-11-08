@@ -181,20 +181,22 @@ export async function readSourceHtml(
     if ([403, 429].includes(response.status)) {
       const retryAfter = retryAfterSeconds(response.headers.get('retry-after'), now());
       gate.cooldown(source, retryAfter, {now});
-      if (response.status === 403) {
-        let html;
-        try {
-          html = await readBody(response, 100000);
-        } catch {
-          throw Object.assign(Error('SOURCE_FORBIDDEN_UNREADABLE'), {
-            blocked: true,
-            status: 403,
-            retryAfter,
-          });
-        }
-        if (sourceChallenge(html))
-          throw Object.assign(Error('SOURCE_CAPTCHA'), { blocked: true, status: 403, retryAfter });
-      } else await response.body?.cancel();
+      let html;
+      try {
+        html = await readBody(response, 100000);
+      } catch {
+        if (response.status === 403)
+          throw Object.assign(Error('SOURCE_FORBIDDEN_UNREADABLE'), { blocked: true, status: 403, retryAfter });
+        html = '';
+      }
+      // A bot check answered with 403 or 429 (Allegro Lokalnie) is a block, not a rate limit:
+      // retrying it only lengthens the scan. BookFlip does not get around such checks.
+      if (sourceChallenge(html))
+        throw Object.assign(Error('SOURCE_CAPTCHA'), { blocked: true, status: response.status, retryAfter });
+      // CloudFront's refusal page (OLX) rejects automated requests outright: no retry either.
+      // Other 403s may be a temporary throttle (Vinted) and stay retryable.
+      if (response.status === 403 && /The request could not be satisfied/i.test(html))
+        throw Object.assign(Error('SOURCE_HTTP_403'), { status: 403, blocked: true, retryAfter });
       throw Object.assign(Error('SOURCE_HTTP_' + response.status), {
         status: response.status,
         blocked: false,
@@ -207,6 +209,9 @@ export async function readSourceHtml(
       await response.body?.cancel();
       if (!location) throw Error('SOURCE_REDIRECT_MISSING');
       url = new URL(location, url);
+      // Dedalus sends every request to /captcha.php: that is a bot check, not a page to read.
+      if (/captcha|challenge/i.test(url.pathname))
+        throw Object.assign(Error('SOURCE_CAPTCHA'), { blocked: true, status: response.status });
       continue;
     }
     if (!response.ok) {

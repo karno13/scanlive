@@ -3329,8 +3329,6 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
 @media (max-width:600px){.sets-card{grid-template-columns:auto minmax(0,1fr)}.sets-card-actions,.sets-card>.button{grid-column:1/-1;justify-self:end}}
 .drawer-pills{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
 .offer-gone{color:#966c23;font-weight:650}
-/* Live scan counters only next to a scan started in this session; the saved result panel covers the rest. */
-#scanProgressPanel[hidden]+.stats-grid{display:none}
 .rv-cand-note{margin:2px 0 8px;font-size:12px}.rv-cand-note.is-tie{color:#966c23;font-weight:600}
 .rv-same-isbn{display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:#e6efe9;color:#2c5c45;font-size:11px;font-weight:700}
 /* Idle identification: one line (title, state, buttons, details link) instead of a dashboard. */
@@ -3375,3 +3373,33 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
 .insight-fold>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:0 14px;border:1px solid #dfe8e2;border-radius:8px;background:#fff;font-size:13px;font-weight:600;color:var(--green)}
 .insight-fold[open]>summary{border-bottom-left-radius:0;border-bottom-right-radius:0}
 .insight-fold>.insight-board{margin-top:0;border-top-left-radius:0;border-top-right-radius:0}
+/* Scanner: one panel for the running or last scan (scan-run.js). */
+.scan-run{margin-top:12px}
+.scan-run-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.scan-run-head h3{margin:0;font-size:16px}
+.scan-run-head small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.scan-run-elapsed{margin-left:auto;color:var(--muted);font-size:12px;align-self:center}
+.scan-run .progress-track{margin-top:12px}
+.scan-run[data-state=running] .scan-run-head h3::before{content:'';display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:#d29b2e;vertical-align:middle;animation:scanPulse 1.2s ease-in-out infinite}
+@keyframes scanPulse{50%{opacity:.3}}
+.scan-run-current{margin:10px 0 0;font-size:13px;min-height:20px}
+.scan-run-current small{color:var(--muted)}
+.scan-run-totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.scan-run-totals>div{padding:10px 12px;border-radius:8px;background:#f4f7f5}
+.scan-run-totals span{display:block;font-size:11px;color:var(--muted)}
+.scan-run-totals strong{font-size:18px}
+.scan-run-totals .is-warn{background:#fff5df}.scan-run-totals .is-warn strong{color:#966c23}
+.scan-run-table{width:100%;font-size:13px;border-collapse:collapse}
+.scan-run-table th{font-size:11px;font-weight:600;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid #e2e9e4}
+.scan-run-table td{padding:8px;border-bottom:1px solid #eef2ef;vertical-align:middle}
+.scan-run-table td:nth-child(n+2):nth-child(-n+4){font-variant-numeric:tabular-nums}
+.scan-run-table .source-dot{margin-right:6px}
+.scan-run-issue{display:block;margin-top:3px;font-size:11px;color:var(--muted)}
+.scan-run-advice:empty{display:none}
+.scan-run-advice{margin-top:10px;padding:10px 12px;border-radius:8px;background:#fffaf0;border:1px solid #f0e2bf;font-size:12px;line-height:1.5}
+.scan-run-advice p{margin:0 0 6px}
+@media (max-width:600px){.scan-run-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.scan-run-table th:nth-child(4),.scan-run-table td:nth-child(4){display:none}}
+/* During a scan the previous scan's "after the scan" box would show stale numbers. */
+#scanRun[data-state=running]~#scanResults{display:none}
+/* After the scan the "Po skanie" box carries the totals; the run panel keeps the per-source table. */
+#scanRun:not([data-state=running]) .scan-run-totals{display:none}

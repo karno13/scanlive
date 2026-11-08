@@ -435,3 +435,21 @@ test('Polish metadata overrides English words in a title but explicit English ed
   );
   assert.equal(isPolishBook('Władca Pierścieni wydanie angielskie', { language: 'pl' }), false);
 });
+
+test('bot checks are blocks, not rate limits: 429 challenge, CloudFront 403 and a captcha redirect', async () => {
+  const read = (source, fetcher) => readSourceHtml(searchUrl({ ...task(source), host: source === 'Dedalus.pl' ? 'dedalus.pl' : task(source).host }), { source, pause: async () => {}, fetcher });
+  let calls = 0;
+  await assert.rejects(
+    () => read('Allegro Lokalnie', async () => { calls++; return new Response('<html><head><title>allegrolokalnie.pl</title></head><body><div id="no-js-code">captcha</div></body></html>', { status: 429 }); }),
+    (e) => e.message === 'SOURCE_CAPTCHA' && e.blocked === true,
+  );
+  assert.equal(calls, 1);
+  await assert.rejects(
+    () => read('OLX', async () => new Response('<H1>403 ERROR</H1><H2>The request could not be satisfied.</H2>', { status: 403 })),
+    (e) => e.message === 'SOURCE_HTTP_403' && e.blocked === true && !e.retryable,
+  );
+  await assert.rejects(
+    () => read('Dedalus.pl', async () => new Response('', { status: 307, headers: { location: 'https://dedalus.pl/captcha.php?from=%2Fs' } })),
+    (e) => e.message === 'SOURCE_CAPTCHA' && e.blocked === true,
+  );
+});

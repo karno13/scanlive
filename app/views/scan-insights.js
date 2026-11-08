@@ -78,21 +78,19 @@ export function createScanInsights({ $, json, escapeHtml }) {
       $('#scanInsightsErrors').textContent = Number(diagnostics.errorCount || 0);
       $('#scanInsightsPercent').textContent = progress.percent == null ? '—' : progress.percent + '%';
       $('#scanInsightsBar').value = progress.percent || 0;
-      if (state === 'running' && lastState !== 'running' && diagnostics.startedAt) {
-        $('#scanProgressPanel').hidden = false;
-      }
       lastState = state;
-      const rows = Object.entries(diagnostics.sources || {});
-      $('#scanInsightsSources').innerHTML = rows.length ? rows.map(([name, row]) =>
-        `<div class="scan-insights-row"><strong>${safe(name)}</strong><small>${Number(row.completed || 0)} zadań · ${Number(row.offers || 0)} ofert · ${Number(row.retries || 0)} ponowień</small>
-        <span>${safe(explain(row.lastError) || row.status || 'pending')}</span></div>`).join('')
-        : '<p>Brak rozpoczętego skanu.</p>';
+      // Declared before the rows below use it (it used to be after them: every refresh threw).
       const codeLabels = {
         SOURCE_HTTP_403: 'Odmowa dostępu (403)', SOURCE_HTTP_429: 'Limit żądań (429)',
         SOURCE_CAPTCHA: 'Wymagana weryfikacja CAPTCHA', RATE_LIMIT: 'Ograniczenie tempa',
         PAGINATION_LOOP: 'Powtarzająca się strona', SOURCE_TIMEOUT: 'Przekroczony czas odpowiedzi',
       };
       const explain = code => codeLabels[code] || code;
+      const rows = Object.entries(diagnostics.sources || {});
+      $('#scanInsightsSources').innerHTML = rows.length ? rows.map(([name, row]) =>
+        `<div class="scan-insights-row"><strong>${safe(name)}</strong><small>${Number(row.completed || 0)} zadań · ${Number(row.offers || 0)} ofert · ${Number(row.retries || 0)} ponowień</small>
+        <span>${safe(explain(row.lastError) || row.status || 'pending')}</span></div>`).join('')
+        : '<p>Brak rozpoczętego skanu.</p>';
       const events = (diagnostics.events || []).slice(-16).reverse();
       $('#scanInsightsEvents').innerHTML = events.length ? events.map(event =>
         `<div class="scan-insights-event"><span>${safe(event.type)}</span><strong>${safe(event.source)}</strong><small>${safe(explain(event.code) || event.query || '')}</small></div>`).join('')

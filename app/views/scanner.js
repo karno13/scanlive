@@ -16,43 +16,27 @@ export async function requestScanCancellation({ $, toast }) {
 }
 
 
-// Scanner view owns its progress state and UI; dependencies are injected by the shell.
-export function createScannerView({ state, $, escapeHtml, shortTime, readQueries, selectedSources, toast, loadHistory, loadCatalogStatus, loadCatalogData, storage = globalThis.localStorage }) {
+// Scanner view: starts a scan and follows its stream. Counters and the per-source table live in
+// the "Przebieg skanu" panel (scan-run.js), read from the server, so they are right whichever tab
+// or schedule started the scan; the stream only makes this tab's panel update without delay.
+export function createScannerView({ state, $, escapeHtml, shortTime, readQueries, selectedSources, toast, loadHistory, loadCatalogStatus, loadCatalogData, scanRun = null, storage = globalThis.localStorage }) {
 function resetScanUi(queries, sources, tasks = null) {
   state.scan.total = tasks?.length || queries.length * sources.length;
   state.scan.completed = 0;
-  state.scan.rows = new Map();
-  for (const source of sources)
-    state.scan.rows.set(source, {
-      source,
-      status: 'Oczekuje',
-      offers: 0,
-      completed: 0,
-      tasks: tasks ? tasks.filter(task=>task.source===source).length : queries.length,
-      error: '',
-      failures: 0,
-      finishedAt: null,
-    });
-  $('#scanProgressPanel').hidden = false;
-  $('#progressTrack').dataset.indeterminate = 'false';
+  $('#scanRun').hidden = false;
   $('#progressBar').style.width = '0%';
+  $('#progressTrack').dataset.indeterminate = 'true';
+  $('#progressMessage').textContent = 'Przygotowywanie skanu…';
+  $('#progressDetail').textContent = '';
   $('#scanStateBadge').textContent = 'Skanowanie';
   $('#scanStateBadge').className = 'state-badge warning';
-  for (const id of ['statFound', 'statNew', 'statUpdated', 'statPriceChanges', 'statErrors'])
-    $(`#${id}`).textContent = '0';
-  renderSourceRows();
+  scanRun?.setLocal(true);
+  scanRun?.refreshSoon();
 }
 
+// Kept for callers that render the table after a scan; the run panel owns it now.
 function renderSourceRows() {
-  const rows = [...state.scan.rows.values()];
-  $('#sourceStatusBody').innerHTML = rows.length
-    ? rows
-        .map(
-          (row) =>
-            `<tr><td><strong>${escapeHtml(row.source)}</strong><span class="offer-subtitle">${row.completed}/${row.tasks} zadań</span></td><td><span class="status-pill ${row.error ? 'error' : row.completed === row.tasks ? 'success' : row.status === 'Oczekuje' ? 'neutral' : 'warning'}">${escapeHtml(row.status)}</span></td><td>${row.offers}</td><td>-</td><td>${shortTime(row.finishedAt)}</td><td>${escapeHtml(row.error || '-')}</td></tr>`,
-        )
-        .join('')
-    : '<tr><td colspan="6" class="empty-cell">Uruchom skan, aby zobaczyć statusy źródeł.</td></tr>';
+  scanRun?.refreshSoon();
 }
 
 // Offers saved during the scan: refresh the lists at most every few seconds.
@@ -70,61 +54,22 @@ function scheduleLiveRefresh() {
 }
 
 function updateProgress(event) {
-  const row = state.scan.rows.get(event.source);
   if (event.type === 'offers-saved') {
-    state.scan.liveNew = (state.scan.liveNew || 0) + Number(event.newOffers || 0);
-    $('#statNew').textContent = state.scan.liveNew;
-    $('#progressDetail').textContent = `Zapisano ${event.saved} ofert z: ${event.source} · ${event.query}`;
+    $('#progressDetail').textContent = `zapisano ${event.saved} ofert (${event.newOffers || 0} nowych)`;
     $('#goToOffers').disabled = false;
     scheduleLiveRefresh();
   }
-  if (event.type === 'source-start' && row) {
-    row.status = 'Skanowanie';
+  if (event.type === 'source-start' || event.type === 'page-start') {
     $('#progressMessage').textContent = `${event.source}: ${event.query}`;
-    $('#progressDetail').textContent = 'Łączenie ze źródłem';
+    $('#progressDetail').textContent = event.type === 'page-start' ? `strona ${event.page}` : 'Łączenie ze źródłem';
   }
-  if (event.type === 'page-start') {
-    $('#progressMessage').textContent = `${event.source}: ${event.query}`;
-    $('#progressDetail').textContent = `Pobieranie strony ${event.page}`;
-  }
-  if (event.type === 'page-done' && row) {
-    $('#progressDetail').textContent = `Strona ${event.page}: ${event.count} ofert`;
-  }
+  if (event.type === 'page-done') $('#progressDetail').textContent = `strona ${event.page}: ${event.count} ofert`;
   if (event.type === 'language-progress')
     // Vinted listings without a stated language are left out (they may be foreign books): say how many.
     $('#progressDetail').textContent = `Weryfikacja języka ${event.checked}/${event.total}` + (event.unknown ? ` · bez podanego języka: ${event.unknown} (pominięte)` : '');
-  if (event.type === 'retry' && row) {
-    row.status = 'Ponawianie';
-    row.error = event.code || 'Błąd tymczasowy';
-    $('#progressDetail').textContent = `Ponowienie ${event.attempt}/${event.maxAttempts}`;
-  }
-  if (event.type === 'source-error' && row) {
-    row.failures += 1;
-    row.error = event.code || 'SOURCE_ERROR';
-    row.status = event.partial ? 'Częściowy' : 'Błąd';
-  }
-  if (event.type === 'source-done' && row) {
-    row.completed += 1;
-    row.offers += Number(event.offers || 0);
-    if(event.status==='ok' && !row.failures) row.error='';
-    row.status = row.failures ? 'Częściowy' :
-      event.status === 'ok' && row.completed === row.tasks
-        ? 'Zakończony'
-        : event.status === 'ok'
-          ? 'Skanowanie'
-          : 'Częściowy';
-    row.finishedAt = new Date().toISOString();
-    state.scan.completed += 1;
-  }
-  const found = [...state.scan.rows.values()].reduce((sum, item) => sum + item.offers, 0);
-  $('#statFound').textContent = found;
-  $('#statErrors').textContent = [...state.scan.rows.values()].filter((item) => item.error).length;
-  const percent = state.scan.total
-    ? Math.min(100, Math.round((state.scan.completed / state.scan.total) * 100))
-    : 0;
-  $('#progressBar').style.width = `${percent}%`;
-  $('#progressDetail').textContent += ` - ${state.scan.completed}/${state.scan.total} zadań`;
-  renderSourceRows();
+  if (event.type === 'retry') $('#progressDetail').textContent = `ponowienie ${event.attempt}/${event.maxAttempts} (${event.code || 'błąd tymczasowy'})`;
+  if (event.type === 'source-done') state.scan.completed += 1;
+  if (['source-done', 'source-error', 'offers-saved'].includes(event.type)) scanRun?.refreshSoon();
 }
 
 async function startSearch(options = {}) {
@@ -156,8 +101,8 @@ async function startSearch(options = {}) {
   $('#startSearch').textContent = 'Skanowanie...';
   $('#scanGuardMessage').textContent = 'Skan trwa na serwerze także po zamknięciu karty. Aby go zatrzymać, kliknij Anuluj skan.';
   state.scan.timer = setInterval(() => {
-    $('#progressElapsed').textContent =
-      `${Math.floor((Date.now() - state.scan.startedAt) / 1000)} s`;
+    const seconds = Math.floor((Date.now() - state.scan.startedAt) / 1000);
+    $('#progressElapsed').textContent = seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${String(seconds % 60).padStart(2, '0')} s`;
   }, 1000);
   try {
     const response = await fetch('/api/search?stream=1', {
@@ -168,25 +113,15 @@ async function startSearch(options = {}) {
     if (!response.ok) throw Error(`SEARCH_HTTP_${response.status}`);
     state.scan.result = await readSearchStream(response, updateProgress);
     state.scan.completed = state.scan.total;
-    $('#progressBar').style.width = '100%';
-    $('#progressMessage').textContent = 'Skan zakończony';
-    const summary = state.scan.result.summary || {},
-      last = state.scan.result.lastScan || {};
-    $('#statFound').textContent = summary.offers || last.found || 0;
-    $('#statNew').textContent = summary.newOffers || last.newOffers || 0;
-    $('#statUpdated').textContent = Math.max(0, (summary.offers || 0) - (summary.newOffers || 0));
-    $('#statPriceChanges').textContent = summary.priceChanges || last.priceChanges || 0;
-    $('#statErrors').textContent = (state.scan.result.results || []).filter(
-      (row) => row.status !== 'ok',
-    ).length;
+    const summary = state.scan.result.summary || {};
     const problems=(state.scan.result.results || []).filter(row=>row.status!=='ok').length;
     $('#progressMessage').textContent=problems ? `Zapisano ${summary.offers || 0} ofert; ${problems} zadań z problemami` : `Zapisano ${summary.offers || 0} ofert`;
+    $('#progressDetail').textContent = '';
     document.dispatchEvent(new CustomEvent('bookflip-scan-complete'));
     $('#scanStateBadge').textContent = problems ? 'Zakończony z problemami' : 'Zakończony';
     $('#scanStateBadge').className = problems ? 'state-badge warning' : 'state-badge neutral';
     $('#goToOffers').disabled = false;
     await Promise.all([loadHistory(), loadCatalogStatus(), loadCatalogData()]);
-    renderSourceRows();
     toast(`Skan zakończony: ${summary.offers || 0} ofert.`);
   } catch (error) {
     if (error.message === 'SCAN_CANCELLED') {
@@ -204,11 +139,14 @@ async function startSearch(options = {}) {
     $('#scanStateBadge').className = 'state-badge warning';
     toast(`Nie udało się wykonac skanu: ${error.message}`);
   } finally {
+    scanRun?.setLocal(false);
+    void scanRun?.refresh();
     clearInterval(state.scan.timer);
     state.scan.running = false;
     $('#cancelSearch').hidden = true;
     $('#startSearch').disabled = false;
-    $('#startSearch').textContent = 'Uruchom skan';
+    $('#startSearch').innerHTML = '<span aria-hidden="true">◎</span> Rozpocznij skan <span aria-hidden="true">→</span>';
+    $('#progressElapsed').textContent = '';
     $('#scanGuardMessage').textContent = '';
   }
 }

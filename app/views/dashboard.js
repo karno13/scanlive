@@ -27,7 +27,7 @@ export function installDashboard({ state, showView }) {
       localStorage.setItem('bookflip.dashboardOpen', fold.open ? '1' : '0');
     } catch {}
   });
-  const anchor = scanner.querySelector('.stats-grid');
+  const anchor = scanner.querySelector('.scan-advanced');
   if (anchor) anchor.before(fold);
   else scanner.append(fold);
 

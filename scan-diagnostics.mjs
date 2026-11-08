@@ -2,9 +2,11 @@
 export function createScanDiagnostics({ queries = [], sources = [], tasks = null, startedAt = new Date().toISOString() } = {}) {
   return {
     startedAt, totalTasks: tasks?.length || queries.length * sources.length, completedTasks: 0,
-    offersSeen: 0, retryCount: 0, errorCount: 0, active: null, lastActivityAt: startedAt,
+    offersSeen: 0, newOffers: 0, retryCount: 0, errorCount: 0, active: null, lastActivityAt: startedAt,
     sources: Object.fromEntries(sources.map(source => [source, {
-      completed: 0, offers: 0, retries: 0, errors: 0, status: 'pending', lastError: null,
+      // tasks: the phrases this source has to answer; newOffers: listings not seen before.
+      tasks: tasks ? tasks.filter(task => task?.source === source).length : queries.length,
+      completed: 0, offers: 0, newOffers: 0, pages: 0, retries: 0, errors: 0, status: 'pending', lastError: null,
     }])),
     events: [],
   };
@@ -23,6 +25,12 @@ export function addScanEvent(diagnostics, event) {
       row.lastError = typeof code === 'string' ? code.slice(0, 100) : 'SOURCE_ERROR';
       row.status = 'error';
     }
+    if (type === 'offers-saved') {
+      const fresh = Math.max(0, Number(event.newOffers) || 0);
+      row.newOffers = (row.newOffers || 0) + fresh;
+      diagnostics.newOffers = (diagnostics.newOffers || 0) + fresh;
+    }
+    if (type === 'page-done') row.pages = (row.pages || 0) + 1;
     if (type === 'source-done') {
       row.completed++; diagnostics.completedTasks++;
       const observed = Math.max(0, Number(offers) || 0);

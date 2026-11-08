@@ -34,17 +34,14 @@
             <div class="source-grid" id="sourceGrid"><span class="loading-copy">Wczytywanie źródeł...</span></div>
             <div class="form-actions"><span class="form-note" id="scanGuardMessage"></span><button class="button secondary compact" id="cancelSearch" type="button" hidden>Anuluj skan</button><button class="button primary scan-cta" id="startSearch" type="button"><span aria-hidden="true">◎</span> Rozpocznij skan <span aria-hidden="true">→</span></button></div>
           </div>
-          </div><div class="panel scan-progress-panel" id="scanProgressPanel" hidden aria-live="polite">
-            <div class="progress-heading"><div><strong id="progressMessage">Przygotowywanie skanu...</strong><small id="progressDetail">Oczekiwanie na backend</small></div><span id="progressElapsed">0 s</span></div>
-            <div class="progress-track" id="progressTrack" data-indeterminate="true"><i id="progressBar"></i></div>
-          </div>
-          <div class="stats-grid" aria-label="Statystyki aktualnego skanu">
-            <article class="metric"><span class="metric-symbol" aria-hidden="true">▤</span><span>Znalezione oferty</span><strong id="statFound">0</strong><small>ten skan</small></article>
-            <article class="metric"><span class="metric-symbol" aria-hidden="true">✦</span><span>Nowe oferty</span><strong id="statNew">0</strong><small>ten skan</small></article>
-            <article class="metric"><span class="metric-symbol" aria-hidden="true">↻</span><span>Zaktualizowane</span><strong id="statUpdated">0</strong><small>ponownie wykryte</small></article>
-            <article class="metric"><span class="metric-symbol" aria-hidden="true">↘</span><span>Zmiany cen</span><strong id="statPriceChanges">0</strong><small>ten skan</small></article>
-            <article class="metric"><span class="metric-symbol" aria-hidden="true">!</span><span>Błędy źródeł</span><strong id="statErrors">0</strong><small>ten skan</small></article>
-          </div>
+          </div><section class="panel scan-run" id="scanRun" hidden aria-labelledby="scanRunTitle">
+            <div class="scan-run-head"><div><h3 id="scanRunTitle">Przebieg skanu</h3><small id="scanRunMeta"></small></div><span id="progressElapsed" class="scan-run-elapsed"></span><button class="button secondary compact" type="button" id="goToOffers" disabled>Oferty z tego skanu</button></div>
+            <div class="progress-track" id="progressTrack" data-indeterminate="false"><i id="progressBar"></i></div>
+            <p class="scan-run-current" aria-live="polite"><strong id="progressMessage"></strong> <small id="progressDetail"></small></p>
+            <div class="scan-run-totals" id="scanRunTotals"></div>
+            <div class="table-wrap"><table class="scan-run-table"><thead><tr><th>Źródło</th><th>Zapytania</th><th>Oferty</th><th>Nowe</th><th>Stan</th></tr></thead><tbody id="scanRunSources"></tbody></table></div>
+            <div class="scan-run-advice" id="scanRunAdvice"></div>
+          </section>
           <section class="panel scan-results" id="scanResults" hidden aria-label="Wynik skanowania"><p class="section-eyebrow">PO SKANIE · CO DALEJ?</p><div class="scan-results-stats" id="scanResultStats" role="list"></div><h3 id="scanResultSummary">Wyniki skanu</h3><div class="quick-actions"><button class="button primary" id="scanAllResults" type="button">Pokaż wyniki tego skanu</button><button class="button secondary" id="scanNewResults" type="button">Nowe oferty</button><button class="button secondary" id="scanPriceResults" type="button">Zmiany cen</button><button class="button secondary" id="scanReviewResults" type="button">Do weryfikacji</button><button class="button secondary" id="retryFailedScan" type="button" hidden>Ponów nieudane zadania</button></div></section>
 <details class="scan-advanced"><summary>Szczegóły źródeł i diagnostyka</summary>
           <section class="panel scan-insights" aria-label="Centrum diagnostyki skanowania">
@@ -63,10 +60,7 @@
               <section><h4>Ostatnie zdarzenia</h4><div id="scanInsightsEvents" class="scan-insights-events" aria-live="off"><p>Brak zdarzeń.</p></div></section>
             </div>
           </section>
-          <div class="panel source-status-panel">
-            <div class="panel-heading"><div><h3>Status źródeł</h3><p>Postęp i wynik każdego zadania skanowania.</p></div><button class="button secondary compact" type="button" id="goToOffers" disabled>Przejdź do ofert</button></div>
-            <div class="table-wrap"><table><thead><tr><th>Źródło</th><th>Status</th><th>Oferty</th><th>Nowe</th><th>Zakończono</th><th>Komunikat</th></tr></thead><tbody id="sourceStatusBody"><tr><td colspan="6" class="empty-cell">Uruchom skan, aby zobaczyć statusy źródeł.</td></tr></tbody></table></div>
-          </div>
+          
 </details>
           <section class="panel scanner-discover" aria-labelledby="scannerDiscoverTitle">
             <div class="panel-heading"><div><p class="section-eyebrow">OSTATNIO ZAPISANE</p><h3 id="scannerDiscoverTitle">Ostatnie oferty</h3><p id="scannerDiscoverSummary">Odczyt z lokalnego magazynu ofert; nie są to wyniki bieżącego skanu.</p></div><button class="button secondary compact" type="button" id="scannerBrowseOffers">Wszystkie oferty</button></div>

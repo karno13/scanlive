@@ -5,6 +5,7 @@ import { identificationProgress } from './core/identification-progress.js';
 import { installTradingControls } from './views/trading-controls.js';
 import { installDashboard } from './views/dashboard.js';
 import { installSinceLastVisit } from './views/since-last-visit.js';
+import { createScanRun } from './views/scan-run.js';
 import { installScanProfiles } from './views/scan-profiles.js';
 import { createScanInsights } from './views/scan-insights.js';
 import { createSetsView } from './views/sets.js';
@@ -227,6 +228,7 @@ function showView(name, options = {}) {
   }
   firstViewRender = false;
   if (name === 'scanner') {
+    void scanRun?.refresh();
     refreshWorkflowDashboard?.();
     refreshSinceVisit?.();
   }
@@ -612,9 +614,16 @@ async function loadCatalogStatus() {
   }
 }
 
-const { startSearch, renderSourceRows } = createScannerView({
+// One panel for the running or last scan, from the server (any tab, the phone or the schedule).
+const scanRun = createScanRun({ $ });
+document.addEventListener('bookflip-remote-scan-complete', () => {
+  document.dispatchEvent(new CustomEvent('bookflip-scan-complete'));
+  void Promise.all([loadHistory(), loadCatalogStatus(), loadCatalogData()]).catch(() => {});
+  void restoreLastScanStatus();
+});
+const { startSearch } = createScannerView({
   state, $, escapeHtml, shortTime, readQueries, selectedSources, toast,
-  loadHistory, loadCatalogStatus, loadCatalogData,
+  loadHistory, loadCatalogStatus, loadCatalogData, scanRun,
 });
 
 const { renderSettings, runDiagnostics, mountQueryStats } = createSettingsView({ state, $, escapeHtml, loadCatalogStatus });
@@ -1003,7 +1012,12 @@ setInterval(async () => {
 
 // Live diagnostics are read-only and do not interfere with scan streaming.
 void scanInsights.refresh();
-setInterval(() => { if (!document.hidden) void scanInsights.refresh(); }, 3000);
+setInterval(() => {
+  if (document.hidden) return;
+  void scanInsights.refresh();
+  // A scan started by the schedule or another device: the run panel picks it up within seconds.
+  if (!state.scan.running && state.activeView === 'scanner' && $('#scanRun').dataset.state !== 'running') void scanRun.refresh();
+}, 3000);
 
 installDetailNavigation();
 installCoverFallback();

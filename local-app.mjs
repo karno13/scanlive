@@ -178,9 +178,18 @@ export async function searchOffers(
     languageCache = detailCache;
   await Promise.all(
     sources.map(async (source) => {
+      // A source that blocked automated requests (CAPTCHA, 403) blocks the rest of this scan too:
+      // its remaining phrases are reported at once instead of being asked and retried one by one.
+      let blockedBy = null;
       for (const query of queries) {
         if(tasks && !tasks.some(task=>task.source===source && task.query===query)) continue;
         scanCancelled(signal);
+        if (blockedBy) {
+          onProgress({ type: 'source-error', source, query, code: blockedBy.code, partial: 0 });
+          results.push({ source, query, status: 'unavailable', offers: [], diagnostic: { ...blockedBy, skipped: true } });
+          onProgress({ type: 'source-done', source, query, offers: 0, pages: 0, status: 'unavailable' });
+          continue;
+        }
         const task = {
           source,
           host: localSourceHosts[source],
@@ -217,6 +226,7 @@ export async function searchOffers(
             diagnostic = diagnostic || filtered.diagnostic;
           }
           const status = diagnostic ? (offers.length ? 'partial' : 'unavailable') : 'ok';
+          if (diagnostic?.blocked && !offers.length) blockedBy = diagnostic;
           if (diagnostic)
             onProgress({
               type: 'source-error',
@@ -249,6 +259,7 @@ export async function searchOffers(
         } catch (error) {
           scanCancelled(signal);
           const diagnostic = errorDiagnostic(error);
+          if (diagnostic.blocked) blockedBy = diagnostic;
           onProgress({ type: 'source-error', source, query, code: diagnostic.code, partial: 0 });
           results.push({ source, query, status: 'unavailable', offers: [], diagnostic });
           onProgress({type:'source-done',source,query,offers:0,pages:0,status:'unavailable'});
@@ -1343,7 +1354,7 @@ export function createLocalAppServer({
                 signal: scanAbortController.signal,
                 shouldAutoResolve: () => identificationControl?.status().running ?? true,
               });
-              currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: result.summary };
+              currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: { ...result.summary, scanAt: result.lastScan?.at ?? null } };
               await persistScanStatus(currentScan);
               if (!response.destroyed) response.write(JSON.stringify({ type: 'result', result }) + '\n');
               if (!response.destroyed) response.end();
@@ -1366,7 +1377,7 @@ export function createLocalAppServer({
             signal: scanAbortController.signal,
             shouldAutoResolve: () => identificationControl?.status().running ?? true,
           });
-          currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: result.summary };
+          currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: { ...result.summary, scanAt: result.lastScan?.at ?? null } };
           await persistScanStatus(currentScan);
           return send(response, 200, JSON.stringify(result));
         } catch (error) {

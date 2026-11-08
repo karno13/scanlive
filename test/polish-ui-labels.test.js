@@ -10,6 +10,6 @@ test('scanner and shell display common Polish status labels with diacritics', as
   assert.match(scanner, /Weryfikacja języka/);
   assert.match(scanner, /Łączenie ze źródłem/);
   assert.doesNotMatch(scanner, /Zakonczony|Laczenie ze zrodlem|Weryfikacja jezyka/);
-  assert.match(html, /Zakończono/);
+  assert.match(html, /Przebieg skanu/);
   assert.match(offers, /Otwórz ogłoszenie/);
 });

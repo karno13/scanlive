@@ -16,8 +16,9 @@ test('settings view is initialized before diagnostic listener', () => {
   assert.match(shell, /import \{ createSettingsView \} from '\.\/views\/settings\.js'/);
   assert.doesNotMatch(offers, /createSettingsView\(/);
 });
-test('scanner source renderer is available for other workspaces', () => {
-  assert.match(shell, /const \{ startSearch, renderSourceRows \} = createScannerView\(/);
+test('scanner view and its run panel are created by the shell', () => {
+  assert.match(shell, /const \{ startSearch \} = createScannerView\(/);
+  assert.match(shell, /const scanRun = createScanRun\(/);
   for (const name of ['review', 'catalog', 'offers'])
     assert.ok(shell.includes('const ' + name + 'View = create' + name[0].toUpperCase() + name.slice(1) + 'View('));
 });

@@ -212,3 +212,23 @@ test('a programming TypeError is not treated as a transient source failure', asy
   assert.equal(attempts, 1);
   assert.equal(result.summary.unavailable, 1);
 });
+
+test('a source that blocks automated requests is not asked again for the other phrases', async () => {
+  const asked = [];
+  const events = [];
+  const result = await searchOffers(
+    { queries: ['Mort', 'Kosiarz', 'Eryk'], sources: ['OLX'] },
+    {
+      scanner: async (task) => {
+        asked.push(task.searchQuery);
+        throw Object.assign(Error('SOURCE_HTTP_403'), { status: 403, blocked: true });
+      },
+      retryWait: async () => {},
+      onProgress: (event) => events.push(event.type),
+    },
+  );
+  assert.deepEqual(asked, ['Mort'], 'only the first phrase reaches the blocked source');
+  assert.equal(result.results.length, 3);
+  assert.ok(result.results.every((row) => row.status === 'unavailable' && row.diagnostic.code === 'SOURCE_HTTP_403'));
+  assert.equal(events.filter((type) => type === 'source-done').length, 3, 'progress still counts every phrase');
+});

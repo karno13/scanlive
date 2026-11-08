@@ -20,10 +20,11 @@ test('scanner reset initializes task counts without fetching external data', () 
   });
   view.resetScanUi(['one', 'two'], ['Vinted', 'Allegro']);
   assert.equal(state.scan.total, 4);
-  assert.equal(state.scan.rows.size, 2);
-  assert.equal($('#scanProgressPanel').hidden, false);
+  assert.equal($('#scanRun').hidden, false);
   view.updateProgress({ type: 'source-start', source: 'Vinted', query: 'one' });
-  assert.equal(state.scan.rows.get('Vinted').status, 'Skanowanie');
+  assert.equal($('#progressMessage').textContent, 'Vinted: one');
+  view.updateProgress({ type: 'source-done', source: 'Vinted', query: 'one', offers: 3, status: 'ok' });
+  assert.equal(state.scan.completed, 1);
 });
 
 test('settings view re-enables diagnostics button after a failed request', async () => {
