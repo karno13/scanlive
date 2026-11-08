@@ -325,6 +325,8 @@ export function listCatalogOffers(repository, options = {}) {
   if (status === 'matched') conditions.push('m.id IS NOT NULL');
   if (status === 'review')
     conditions.push("j.status IN ('queued','running','retry_wait','review_required','failed')");
+  // Listings first seen after a moment (e.g. the operator's previous visit).
+  if (options.since && !Number.isNaN(Date.parse(String(options.since)))) { conditions.push('o.first_seen_at>?'); params.push(new Date(String(options.since)).toISOString()); }
   if (options.watched === '1') conditions.push('ow.watched=1');
   if (options.target === '1') conditions.push("ow.watched=1 AND ow.target_price IS NOT NULL AND o.currency='PLN' AND o.current_price<=round(ow.target_price*100)");
   if (options.purchaseStatus) {conditions.push('ow.purchase_status=?');params.push(String(options.purchaseStatus));}

@@ -4,6 +4,7 @@ import { viewFromSearch, idFromSearch, urlForView, shouldPush } from './core/vie
 import { identificationProgress } from './core/identification-progress.js';
 import { installTradingControls } from './views/trading-controls.js';
 import { installDashboard } from './views/dashboard.js';
+import { installSinceLastVisit } from './views/since-last-visit.js';
 import { installScanProfiles } from './views/scan-profiles.js';
 import { createScanInsights } from './views/scan-insights.js';
 import { createSetsView } from './views/sets.js';
@@ -225,7 +226,10 @@ function showView(name, options = {}) {
     else history.replaceState({ view: name }, '', urlForView(name, keepId));
   }
   firstViewRender = false;
-  if (name === 'scanner') refreshWorkflowDashboard?.();
+  if (name === 'scanner') {
+    refreshWorkflowDashboard?.();
+    refreshSinceVisit?.();
+  }
   if(['sets','settings'].includes(name)) $('#mobileMore')?.setAttribute('aria-current','page');
   else $('#mobileMore')?.removeAttribute('aria-current');
   if (name === 'review') { renderReview(); void tradingControls?.refreshDecisions(); }
@@ -258,7 +262,7 @@ async function loadSources() {
   const healthNote = (source) => sourceHealthNote(health.items?.find((row) => row.source === source), { short: true });
   const blockLabel = (code) => (code === 'SOURCE_CAPTCHA' ? 'blokuje odczyt (CAPTCHA)' : 'blokuje odczyt (HTTP 403)');
   // Sources that refused every recent scan start unchecked unless the operator saved them.
-  const chosen = new Set(savedSearch?.sources || state.sources.filter((source) => !blocked[source]));
+  const chosen = new Set(savedSearch?.sources || state.sources.filter((source) => !blocked[source] && healthNote(source) !== 'nie działa'));
   $('#sourceGrid').innerHTML =
     state.sources
       .map(
@@ -961,6 +965,7 @@ async function changeOfferPage(page) {
 const tradingControls = installTradingControls({state,$,json,toast,showView,loadCatalogData,loadCatalogStatus,openOfferDrawer,
   onOfferFilters:()=>scheduleGlobalCatalogSearch('offers'),onCatalogFilters:()=>scheduleGlobalCatalogSearch('works')});
 const refreshWorkflowDashboard = installDashboard({ state, showView });
+const refreshSinceVisit = installSinceLastVisit({ state, showView });
 const startupView = viewFromSearch(location.search);
 const startupItem = idFromSearch(location.search);
 showView(startupView);
@@ -971,6 +976,7 @@ Promise.all([loadSources().then(() => installScanProfiles({ queriesInput: $('#qu
   },
 ).then(async () => {
   await restoreItem(startupView, startupItem);
+  refreshSinceVisit();
   itemUrlReady = true;
   syncItemUrl();
 });

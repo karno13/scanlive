@@ -308,6 +308,23 @@ function editVolumeNumber(button) {
   input.addEventListener('blur', save);
 }
 
+const GAPS_PROFILE = 'Braki w seriach';
+/** Up to 10 phrases for the missing volumes, titled ones first; written to the gaps scan profile. */
+async function saveGapsProfile({ create }) {
+  const titled = missingTargets.flatMap((target) => target.missing.filter((number) => target.titles?.[number]).map((number) => `${target.titles[number]} ${target.name}`));
+  const numbered = missingTargets.flatMap((target) => target.missing.filter((number) => !target.titles?.[number]).map((number) => `${target.name} tom ${number}`));
+  const queries = [...new Set([...titled, ...numbered])].slice(0, MAX_SCAN_QUERIES);
+  if (!queries.length) return 0;
+  const { items: profiles = [] } = await json('/api/scan-profiles');
+  const existing = profiles.find((profile) => profile.name === GAPS_PROFILE);
+  if (!existing && !create) return 0;
+  if (existing && !create && JSON.stringify(existing.queries) === JSON.stringify(queries)) return queries.length;
+  const checked = [...document.querySelectorAll('#sourceGrid input:checked')].map((input) => input.value);
+  const sources = existing?.sources?.length ? existing.sources : checked.length ? checked : [...document.querySelectorAll('#sourceGrid input')].map((input) => input.value);
+  await json('/api/scan-profiles/' + encodeURIComponent(GAPS_PROFILE), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ queries, sources }) });
+  return queries.length;
+}
+
 async function renderSeriesTree() {
   const list = $('#catalogList');
   if (!seriesTree) list.innerHTML = '<p class="inline-note">Układanie serii…</p>';
@@ -342,7 +359,7 @@ async function renderSeriesTree() {
     .join('');
   const missingTotal = missingTargets.reduce((sum, target) => sum + target.missing.length, 0);
   const gapsBar = missingTotal
-    ? `<div class="series-gaps"><span><b>Braki w seriach: ${missingTotal}</b> ${missingTotal === 1 ? 'tom' : pluralForm(missingTotal) === 'few' ? 'tomy' : 'tomów'} w ${missingTargets.length} ${missingTargets.length === 1 ? 'cyklu' : 'cyklach'}</span><button class="button ghost compact" type="button" id="copySeriesGaps">Kopiuj listę braków</button></div>`
+    ? `<div class="series-gaps"><span><b>Braki w seriach: ${missingTotal}</b> ${missingTotal === 1 ? 'tom' : pluralForm(missingTotal) === 'few' ? 'tomy' : 'tomów'} w ${missingTargets.length} ${missingTargets.length === 1 ? 'cyklu' : 'cyklach'}</span><button class="button ghost compact" type="button" id="copySeriesGaps">Kopiuj listę braków</button><button class="button ghost compact" type="button" id="saveGapsProfile" title="Zapisz frazy brakujących tomów jako profil skanu; odświeża się sam, gdy zmieniają się braki">Zapisz jako profil skanu</button></div>`
     : '';
   list.innerHTML = visible.length
     ? gapsBar + `<nav class="series-jump" aria-label="Uniwersa">${visible.map((universe) => `<a href="#series-${escapeHtml(foldText(universe.name).replace(/[^a-z0-9]+/g, '-'))}">${escapeHtml(universe.name)} <small>${universe.works}</small></a>`).join('')}</nav>` + universeMarkup
@@ -350,6 +367,19 @@ async function renderSeriesTree() {
   list.querySelectorAll('[data-find-missing]').forEach((button) =>
     button.addEventListener('click', () => findMissing(missingTargets[Number(button.dataset.findMissing)])),
   );
+  $('#saveGapsProfile')?.addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true;
+    try {
+      const saved = await saveGapsProfile({ create: true });
+      toast(`Zapisano profil „${GAPS_PROFILE}” (${saved} fraz). Uruchomisz go albo włączysz automatyczny skan w Skaner → Zapisane wyszukiwania i profile.`);
+    } catch (error) {
+      toast('Nie zapisano profilu: ' + error.message);
+    } finally {
+      event.currentTarget.disabled = false;
+    }
+  });
+  // An existing gaps profile follows the current gaps without a click.
+  void saveGapsProfile({ create: false }).catch(() => {});
   $('#copySeriesGaps')?.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(missingListText(missingTargets));

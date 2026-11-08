@@ -3364,3 +3364,12 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
 .sets-bulk-actions{margin:8px 0}
 .sets-range{display:grid;grid-template-columns:minmax(0,2fr) minmax(70px,1fr) minmax(70px,1fr) auto;gap:8px;align-items:end;margin-top:12px}
 @media (max-width:600px){.sets-range{grid-template-columns:1fr 1fr}.sets-range .field:first-child,.sets-range button{grid-column:1/-1}}
+
+/* Scanner: what changed since the last visit, and the folded catalogue board. */
+.since-visit{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;margin:0 0 14px;padding:10px 14px;border:1px solid #dfe8e2;border-radius:8px;background:#fff;font-size:13px}
+.since-visit .link-button{min-height:28px;padding:0 4px}
+.since-visit .since-warn{color:#966c23;font-weight:600}
+.insight-fold{margin:12px 0}
+.insight-fold>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:0 14px;border:1px solid #dfe8e2;border-radius:8px;background:#fff;font-size:13px;font-weight:600;color:var(--green)}
+.insight-fold[open]>summary{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.insight-fold>.insight-board{margin-top:0;border-top-left-radius:0;border-top-right-radius:0}

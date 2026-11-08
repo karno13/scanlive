@@ -12,9 +12,24 @@ export function installDashboard({ state, showView }) {
   panel.className = 'panel insight-board';
   panel.setAttribute('aria-label', 'Stan katalogu');
   panel.innerHTML = '<p class="inline-note">Wczytywanie stanu katalogu…</p>';
+  const fold = document.createElement('details');
+  fold.className = 'insight-fold';
+  fold.id = 'workflowDashboardFold';
+  let open = false;
+  try {
+    open = localStorage.getItem('bookflip.dashboardOpen') === '1';
+  } catch {}
+  fold.open = open;
+  fold.innerHTML = '<summary>Stan katalogu, jakość źródeł i postęp serii</summary>';
+  fold.append(panel);
+  fold.addEventListener('toggle', () => {
+    try {
+      localStorage.setItem('bookflip.dashboardOpen', fold.open ? '1' : '0');
+    } catch {}
+  });
   const anchor = scanner.querySelector('.stats-grid');
-  if (anchor) anchor.before(panel);
-  else scanner.append(panel);
+  if (anchor) anchor.before(fold);
+  else scanner.append(fold);
 
   let backfillTimer = null;
   let backfillWasRunning = false;
