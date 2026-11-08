@@ -41,7 +41,7 @@ Weryfikacja ISBN najpierw pokazuje propozycję; przypisanie następuje po
 zatwierdzeniu. Ostatnie ręczne decyzje można ponownie otworzyć do poprawienia
 w zakładce **Do weryfikacji**, z zachowaniem historii.
 
-Migracja **104** dodaje dane procesu zakupowego. Nie zmieniaj starszych plików
+Migracja **118** dodaje listy tomów cykli (widok Serie). Migracja **104** dodaje dane procesu zakupowego. Nie zmieniaj starszych plików
 migracji. Przed aktualizacją istniejącego schematu działa mechanizm kopii
 zapasowej opisany poniżej. Szczegóły zmian: [Przebudowa UX/UI](docs/archive/ZMIANY-UX-UI.md).
 

@@ -2,6 +2,15 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-08 (21) — Przegląd UX: weryfikacja, katalog, serie, zestawy, skaner
+
+- **Oferta:** w szczegółach osobno stan ogłoszenia (Aktywna / Mogła zniknąć / Sprzedana) i stan identyfikacji — „Zakończona” nie udaje już zamkniętego ogłoszenia. „Najnowsze” sortuje po pierwszym wykryciu; karty ofert pokazują datę wykrycia. Przycisk „Oznacz jako zestaw” w szczegółach oferty (z potwierdzeniem, gdy odłącza przypisanie).
+- **Weryfikacja:** cała kolejka jest wczytywana (liczniki menu, nagłówka i zakładek się zgadzają). Gdy jedna książka z katalogu wyraźnie wygrywa, jej najczęściej używane wydanie jest zaznaczone — wystarczy `Enter`; przy remisie różnych książek ostrzeżenie. Gadżety i dodatki (dziennik, kolorowanka, opis świata, podręcznik, kalendarz…) mają mocno obniżony wynik; zapisane propozycje są przy starcie przeliczane bez zapytań do sieci. Oferty z tym samym ISBN, które pójdą za pierwszą decyzją, są jednym wierszem „×N”. Panel identyfikacji zwija się, gdy nic nie działa; skróty pod przyciskiem „Skróty”. Okładki propozycji widoczne także w wąskim panelu. Telefon: przesunięcie w lewo pomija ofertę, w prawo wraca.
+- **Katalog:** tytuły bez polskich znaków albo pisane wielkimi literami („PROSPERO W PLOMIENIACH”) dostają litery z przypisanych ogłoszeń o tych samych słowach; „Tytuł : podtytuł” z BN wyświetla się jako „Tytuł: podtytuł”. Dzieło bez autora o tym samym tytule co dzieło z autorem (też z dopiskiem „(ŚWIAT DYSKU)”) trafia do „Możliwych duplikatów”.
+- **Serie (migracja 118):** lista tomów cyklu wklejana w widoku Serie nadaje numery dziełom o pasujących tytułach i podpisuje brakujące tomy tytułami („Szukaj brakujących” szuka po tytule). Numer tomu ustawia się pod okładką. Poza znanymi światami dzieła grupują się po autorze (warianty nazwiska razem, pojedyncze przypadkowe książki w „Poza seriami”). Braki można zapisać jako profil skanu „Braki w seriach”, który sam się aktualizuje.
+- **Zestawy:** „Dodaj z opisu ogłoszenia” (wklejony opis → książki z katalogu) i „Dodaj tomy” z zakresu cyklu; nazwa świata zapisana jako cykl nie podsuwa już przypadkowych tomów.
+- **Skaner:** pasek „Od ostatniej wizyty” (nowe oferty, decyzje, niedziałające źródła); stan źródeł przy polach wyboru, a niedziałające źródła nie są domyślnie zaznaczone; panel stanu katalogu zwinięty; liczniki zerowe ukryte, gdy nie trwa skan. Ceny skupu tylko w trybie handlu.
+
 ## 2026-11-08 (20) — Zestawy: działające dodawanie książek i widok jak w weryfikacji
 
 - **Błąd:** dodawanie książki do zestawu, usuwanie jej i zdejmowanie oznaczenia zestawu nigdy nie działały — serwer liczył części adresu `/api/sets/<id>/…` razem z prefiksem i żadna ścieżka nie pasowała (stąd 96 zestawów bez ani jednej książki; nie działało też „Cofnij” po oznaczeniu zestawu w weryfikacji). Naprawione, z testem HTTP.

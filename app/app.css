@@ -2968,11 +2968,13 @@ body.density-compact .work-row .cover-md {
     gap: 16px;
     padding: 16px 18px;
   }
+  /* Narrow panel: covers shrink but stay — comparing them with the listing photo picks the edition. */
   .rv-cand {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto 40px minmax(0, 1fr) auto;
+    gap: 10px;
   }
   .rv-cand .cover {
-    display: none;
+    width: 40px;
   }
 }
 @container review (max-width: 560px) {

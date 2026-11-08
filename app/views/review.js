@@ -1047,6 +1047,26 @@ document.addEventListener('keydown', (event) => {
   actions[key]();
 });
 
+// Phone: a horizontal swipe on the offer moves through the queue — left skips to the next offer,
+// right goes back. Nothing is approved or rejected by a gesture; those stay explicit taps.
+let swipeStart = null;
+$('#reviewDetail').addEventListener('touchstart', (event) => {
+  const touch = event.touches[0];
+  const inControl = event.target.closest('input, textarea, select, .series-shelf, .rv-cands, [contenteditable]');
+  swipeStart = event.touches.length === 1 && !inControl ? { x: touch.clientX, y: touch.clientY, at: Date.now() } : null;
+}, { passive: true });
+$('#reviewDetail').addEventListener('touchend', (event) => {
+  if (!swipeStart || reviewDecisionPending) return;
+  const touch = event.changedTouches[0];
+  const dx = touch.clientX - swipeStart.x;
+  const dy = touch.clientY - swipeStart.y;
+  const quick = Date.now() - swipeStart.at < 600;
+  swipeStart = null;
+  if (!quick || Math.abs(dx) < 90 || Math.abs(dy) > 60) return;
+  if (dx < 0) skipReview();
+  else navigateReview(-1);
+}, { passive: true });
+
 return { filteredReviewOffers, visibleCatalogRows, renderReview, normalizedIsbn, reviewCandidateMarkup, renderReviewDetail, renderReviewBookChoices, approveReview, decideReview };
 }
 
