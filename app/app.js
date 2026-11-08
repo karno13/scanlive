@@ -15,7 +15,7 @@ import { mountTitleConflicts } from './views/title-conflicts.js';
 import { mountScanSchedule } from './views/scan-schedule.js';
 import { createOffersView } from './views/offers.js';
 import { json } from './core/api.js';
-import { escapeHtml, money, date, shortTime } from './core/formatters.js';
+import { escapeHtml, money, date, shortTime, sourceHealthNote } from './core/formatters.js';
 import { createSettingsView } from './views/settings.js';
 import { createScannerView } from './views/scanner.js';
 import { requestScanCancellation } from './views/scanner.js';
@@ -142,7 +142,7 @@ function renderScannerOffers() {
             .toLocaleLowerCase('pl')
             .includes(needle)),
     )
-    .sort((a, b) => String(b.lastSeenAt || '').localeCompare(String(a.lastSeenAt || '')));
+    .sort((a, b) => String(b.firstSeenAt || b.lastSeenAt || '').localeCompare(String(a.firstSeenAt || a.lastSeenAt || '')));
   const offers = filtered.slice(0, 12);
   $('#scannerOfferCount').textContent =
     `Pokazano ${offers.length} z ${state.scannerTotal} pasujących ofert`;
@@ -153,7 +153,7 @@ function renderScannerOffers() {
         .map((item) => {
           const title = tidyOfferTitle(item.title || item.originalTitle || 'Tytuł nieznany');
           const isbn = item.observedIsbn || item.isbn || 'ISBN nieznany';
-          return `<button class="scanner-offer-row" type="button" data-scanner-offer-id="${escapeHtml(item.id)}">${coverMarkup(item.image, title, { size: 'sm', escapeHtml })}<span class="scanner-offer-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(item.source)}"></span>${escapeHtml(item.source)} · ${escapeHtml(isbn)}</small><small>${escapeHtml(date(item.lastSeenAt))}</small></span><span class="scanner-offer-price">${money(item.currentPrice)}</span></button>`;
+          return `<button class="scanner-offer-row" type="button" data-scanner-offer-id="${escapeHtml(item.id)}">${coverMarkup(item.image, title, { size: 'sm', escapeHtml })}<span class="scanner-offer-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(item.source)}"></span>${escapeHtml(item.source)} · ${escapeHtml(isbn)}</small><small>wykryta ${escapeHtml(date(item.firstSeenAt || item.lastSeenAt))}</small></span><span class="scanner-offer-price">${money(item.currentPrice)}</span></button>`;
         })
         .join('')
     : '<div class="empty-detail"><p>Brak ofert zgodnych z filtrami albo baza jest pusta.</p></div>';
@@ -224,6 +224,9 @@ function showView(name, options = {}) {
   if(['sets','settings'].includes(name)) $('#mobileMore')?.setAttribute('aria-current','page');
   else $('#mobileMore')?.removeAttribute('aria-current');
   if (name === 'review') { renderReview(); void tradingControls?.refreshDecisions(); }
+  // Tabs, phrase groups and counts are only right on the whole queue; it is a few hundred rows.
+  if (name === 'review' && state.catalogPages.jobs.offset < state.catalogPages.jobs.total)
+    void loadAllCatalogPages('jobs').then((done) => { if (done && state.activeView === 'review') renderReview(); }).catch(() => {});
   if (name === 'catalog') renderCatalog();
   if (name === 'offers') renderOffers();
   if (name === 'scanner') { renderScannerOffers(); void refreshScannerOffers(); }
@@ -247,9 +250,10 @@ window.addEventListener('popstate', () => {
 });
 
 async function loadSources() {
-  const data = await json('/api/sources');
+  const [data, health] = await Promise.all([json('/api/sources'), json('/api/source-health').catch(() => ({ items: [] }))]);
   state.sources = data.sources || [];
   const blocked = data.blocked || {};
+  const healthNote = (source) => sourceHealthNote(health.items?.find((row) => row.source === source), { short: true });
   const blockLabel = (code) => (code === 'SOURCE_CAPTCHA' ? 'blokuje odczyt (CAPTCHA)' : 'blokuje odczyt (HTTP 403)');
   // Sources that refused every recent scan start unchecked unless the operator saved them.
   const chosen = new Set(savedSearch?.sources || state.sources.filter((source) => !blocked[source]));
@@ -257,7 +261,7 @@ async function loadSources() {
     state.sources
       .map(
         (source) =>
-          `<label class="source-option"${blocked[source] ? ' title="Ten portal odrzucał automatyczne zapytania w ostatnich skanach. BookFlip nie obchodzi takich blokad."' : ''}><input type="checkbox" value="${escapeHtml(source)}" ${chosen.has(source) ? 'checked' : ''}><span>${escapeHtml(source)}${blocked[source] ? ' <small class="source-blocked">' + escapeHtml(blockLabel(blocked[source])) + '</small>' : ''}</span></label>`,
+          `<label class="source-option"${blocked[source] ? ' title="Ten portal odrzucał automatyczne zapytania w ostatnich skanach. BookFlip nie obchodzi takich blokad."' : ''}><input type="checkbox" value="${escapeHtml(source)}" ${chosen.has(source) ? 'checked' : ''}><span>${escapeHtml(source)}${blocked[source] ? ' <small class="source-blocked">' + escapeHtml(blockLabel(blocked[source])) + '</small>' : healthNote(source) ? ' <small class="source-blocked">' + escapeHtml(healthNote(source)) + '</small>' : ''}</span></label>`,
       )
       .join('') || '<span class="loading-copy">Brak aktywnych adapterow.</span>';
   $('#settingsSources').innerHTML = state.sources
@@ -281,7 +285,7 @@ function fillSourceFilters() {
 async function loadHistory() {
   state.history = await json('/api/history/brief');
   $('#offersNavCount').textContent = `${allOffers().length} zapisanych`;
-  $('#reviewNavCount').textContent = `${state.catalogPages.jobs.total} pozycji`;
+  $('#reviewNavCount').textContent = `${state.catalogPages.jobs.total} do decyzji`;
   renderReview();
   renderCatalog();
   renderOffers();
@@ -490,7 +494,7 @@ async function loadCatalogData() {
     ]);
     if (loaded.some((value) => value !== true)) throw Error('CATALOG_PAGE_LOAD_IN_PROGRESS');
     $('#offersNavCount').textContent = `${state.catalogPages.offers.total} zapisanych`;
-    $('#reviewNavCount').textContent = `${state.catalogPages.jobs.total} pozycji`;
+    $('#reviewNavCount').textContent = `${state.catalogPages.jobs.total} do decyzji`;
     renderReview();
     renderCatalog();
     renderOffers();

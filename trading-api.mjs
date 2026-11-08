@@ -204,7 +204,9 @@ export async function tradingRoute({repo,method,path,input}) {
   if(path==='/api/trading-defaults'&&method==='GET') return getTradingDefaults(repo);
   if(path==='/api/trading-defaults'&&method==='PUT') return saveTradingDefaults(repo,input);
   if(path==='/api/scan-runs'&&method==='GET') return {items:listScanRuns(repo)};
-  if(path==='/api/source-health'&&method==='GET') return {items:repo.database.prepare('SELECT * FROM source_health ORDER BY source').all()};
+  // offers_seen: listings this source returned in its last checked scan, so a source whose
+  // health row predates per-phrase success tracking is not shown as dead while it delivers offers.
+  if(path==='/api/source-health'&&method==='GET') return {items:repo.database.prepare('SELECT h.*,(SELECT count(*) FROM offers o WHERE o.source=h.source AND o.last_seen_at>=h.last_checked_at) AS offers_seen FROM source_health h ORDER BY h.source').all()};
   if(path==='/api/review-decisions'&&method==='GET') return {items:recentReviewDecisions(repo)};
   const reopen=path.match(/^\/api\/review-decisions\/([^/]+)\/reopen$/);
   if(reopen&&method==='POST') return reopenReviewDecision(repo,decodeURIComponent(reopen[1]));

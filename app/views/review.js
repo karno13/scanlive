@@ -217,8 +217,9 @@ function renderReview() {
   if (!state.history) return;
   renderTabs();
   const rows = filteredReviewOffers();
-  $('#reviewCount').textContent = `${rows.length} z ${state.catalogPages.jobs.total} oczekujących`;
-  $('#reviewNavCount').textContent = `${reviewOffers().length} pozycji`;
+  const pending = state.catalogPages.jobs.total;
+  $('#reviewCount').textContent = rows.length === reviewOffers().length && reviewOffers().length >= pending ? `${pending} oczekujących` : `${rows.length} widocznych z ${pending} oczekujących`;
+  $('#reviewNavCount').textContent = `${pending} do decyzji`;
   if (state.selectedReviewId && !rows.some((row) => row.id === state.selectedReviewId))
     state.selectedReviewId = null;
   const reviewListScroll = $('#reviewList').scrollTop;

@@ -61,7 +61,7 @@ export function installCommandPalette({ $, json, escapeHtml, money, showView, op
         ...(works.items || []).map((work) => ({
           group: 'Katalog',
           label: tidyWorkTitle(work.title),
-          hint: parseBnPeople((work.authors || []).join(' '), work.authors).join(', ') || `${work.editionCount} wydań`,
+          hint: parseBnPeople((work.authors || []).join(' '), work.authors).join(', ') || `${work.editionCount} ${work.editionCount === 1 ? 'wydanie' : 'wydań'}`,
           meta: `${work.offerCount} ofert`,
           cover: work.cover || null,
           run: () => openWork(work.id),

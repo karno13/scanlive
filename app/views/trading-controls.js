@@ -1,6 +1,7 @@
 import { openDetailView } from '../core/detail-navigation.js';
 import { amountInput, readAmount, statusLabel, markDirty,watchForm } from '../core/ux.js';
 import { confirmDialog } from '../core/dialogs.js';
+import { sourceHealthNote } from '../core/formatters.js';
 export function installTradingControls({state,$,json,toast,showView,loadCatalogData,loadCatalogStatus,openOfferDrawer,onOfferFilters,onCatalogFilters}) {
   const write=(path,body,method='PUT')=>json(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   let settingsLoaded=false;
@@ -128,7 +129,7 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
       for(const source of state.sources) {
         const row=health.items.find(item=>item.source===source);
         const item=document.createElement('span'),title=document.createElement('b'),copy=document.createElement('small');title.textContent=source;
-        copy.textContent=row ? `${row.status==='ok'?'Ostatnia próba udana':'Ostatnia próba z problemami'} · sukces: ${row.last_success_at?new Date(row.last_success_at).toLocaleString('pl-PL'):'brak'} · błąd: ${row.last_error_at?new Date(row.last_error_at).toLocaleString('pl-PL'):'brak'}` : 'Dostępny w programie; jeszcze nie sprawdzono działania.';
+        copy.textContent=sourceHealthNote(row);
         item.append(title,copy);$('#settingsSources').append(item);
       }
       if(!settingsLoaded) {

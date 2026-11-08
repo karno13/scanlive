@@ -60,7 +60,7 @@ export function mountSeriesEditor(work, target, onSave = () => {}, options = {})
   const block = document.createElement('section');
   block.className = 'detail-section series-editor';
   const heading = document.createElement('h4');
-  heading.textContent = options.save ? 'Seria i tom (SQLite)' : 'Seria i tom (notatka lokalna)';
+  heading.textContent = options.save ? 'Seria i tom' : 'Seria i tom (notatka w tej przeglądarce)';
   const series = document.createElement('input');
   series.placeholder = 'Nazwa serii, np. Horus Heresy';
   series.maxLength = 120;

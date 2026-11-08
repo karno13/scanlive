@@ -1,11 +1,20 @@
 import { mountOfferAssignment } from './offer-assignment.js';
 import {statusLabel,markDirty,hasUnsavedChanges,confirmDiscard,watchForm} from '../core/ux.js';
-import { safeOfferHref , availabilityLabel } from '../core/formatters.js';
+import { safeOfferHref , availabilityLabel, availabilityBadge } from '../core/formatters.js';
 import { groszeToZloty, moneyFromZloty } from '../core/formatters.js';
 import { isWatchedOffer, mountOfferWorkspace, loadOfferWorkspace, allSavedOfferNotes, readOfferNotes } from './offer-workspace.js';
 import { confirmDialog, noticeDialog } from '../core/dialogs.js';
 import { coverMarkup, tidyOfferTitle } from '../core/bibliography.js';
 const tradingMode = () => document.body.classList.contains('trading-mode');
+// Two separate facts: is the listing still up, and did identification place it in the catalogue.
+function drawerPills(offer, active) {
+  const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const listing = availabilityBadge(offer);
+  const job = offer.identificationJob?.status;
+  const identification = active ? 'W katalogu' : job === 'completed' ? 'Bez przypisania' : statusLabel(job);
+  const tone = active ? 'success' : job === 'review_required' ? 'warning' : 'neutral';
+  return `<span class="status-pill ${listing.tone}" title="Stan ogłoszenia">${esc(listing.label)}</span> <span class="status-pill ${tone}" title="Stan identyfikacji">${esc(identification)}</span>`;
+}
 // offers workspace, preserving existing behavior while isolating its implementation.
 export function createOffersView({ state, $, $$, json, money, date, escapeHtml, allOffers, bookFor, showView, priceStats, onFiltersChange, toast, onAssignmentChanged }) {
 let drawerSerial=0;
@@ -92,7 +101,7 @@ function renderOffers() {
               : null);
           const title = tidyOfferTitle(item.title || item.originalTitle);
           const status = tradingMode() && item.purchaseStatus ? statusLabel(item.purchaseStatus) : match ? 'W katalogu' : 'Do sprawdzenia';
-          return `<button class="mobile-offer offer-card" data-mobile-offer-id="${escapeHtml(item.id)}" type="button">${coverMarkup(item.image, title, { size: 'sm', escapeHtml })}<span class="mobile-offer-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(item.source)}"></span>${escapeHtml(item.source)} · ${escapeHtml(item.observedIsbn || item.isbn || 'ISBN nieznany')}</small>${match?.workTitle ? `<small class="offer-match">↳ ${escapeHtml(match.workTitle)}</small>` : ''}</span><span class="mobile-offer-price"><b>${money(item.currentPrice)}</b><small class="status-tag ${match ? 'is-good' : 'is-warn'}">${tradingMode() && item.targetReached ? 'Cena docelowa · ' : ''}${escapeHtml(status)}</small></span></button>`;
+          return `<button class="mobile-offer offer-card" data-mobile-offer-id="${escapeHtml(item.id)}" type="button">${coverMarkup(item.image, title, { size: 'sm', escapeHtml })}<span class="mobile-offer-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(item.source)}"></span>${escapeHtml(item.source)} · ${escapeHtml(item.observedIsbn || item.isbn || 'ISBN nieznany')} · wykryta ${escapeHtml(date(item.firstSeenAt || item.lastSeenAt))}${(() => { const badge = availabilityBadge(item); return badge.label === 'Aktywna' ? '' : ' · <b class="offer-gone">' + escapeHtml(badge.label) + '</b>'; })()}</small>${match?.workTitle ? `<small class="offer-match">↳ ${escapeHtml(match.workTitle)}</small>` : ''}</span><span class="mobile-offer-price"><b>${money(item.currentPrice)}</b><small class="status-tag ${match ? 'is-good' : 'is-warn'}">${tradingMode() && item.targetReached ? 'Cena docelowa · ' : ''}${escapeHtml(status)}</small></span></button>`;
         })
         .join('') || '<div class="empty-detail">Brak ofert zgodnych z filtrami.</div>';
     mobile
@@ -107,7 +116,7 @@ function renderOffers() {
             (offer.bookId
               ? { workTitle: bookFor(offer.bookId)?.title, method: offer.linkMode }
               : null);
-          return `<tr><td><span class="offer-cell">${coverMarkup(offer.image, offer.title || offer.originalTitle, { size: 'xs', escapeHtml })}<span><button class="link-button offer-title" type="button" data-offer-id="${escapeHtml(offer.id)}">${escapeHtml(tidyOfferTitle(offer.title || offer.originalTitle))}</button><span class="offer-subtitle">${escapeHtml(offer.matchedQueries?.join(', ') || '')}</span></span></span></td><td>${escapeHtml(offer.source)}</td><td>${money(offer.currentPrice)}${offer.targetReached ? ' ✓ próg' : ''}</td><td>${escapeHtml(offer.observedIsbn || offer.isbn || '-')}</td><td>${escapeHtml(matched?.workTitle || matched?.editionTitle || '-')}</td><td>${tradingMode() ? `<strong>${escapeHtml(statusLabel(offer.purchaseStatus))}</strong><br>` : ''}<span class="status-pill ${matched?.method === 'manual' ? 'success' : matched ? 'warning' : 'neutral'}">${matched?.method === 'manual' ? 'Ręczne' : matched ? 'Automatyczne' : escapeHtml(statusLabel(offer.identification?.status))}</span></td><td>${escapeHtml(date(offer.lastSeenAt))}</td></tr>`;
+          return `<tr><td><span class="offer-cell">${coverMarkup(offer.image, offer.title || offer.originalTitle, { size: 'xs', escapeHtml })}<span><button class="link-button offer-title" type="button" data-offer-id="${escapeHtml(offer.id)}">${escapeHtml(tidyOfferTitle(offer.title || offer.originalTitle))}</button><span class="offer-subtitle">${escapeHtml(offer.matchedQueries?.join(', ') || '')}</span></span></span></td><td>${escapeHtml(offer.source)}</td><td>${money(offer.currentPrice)}${offer.targetReached ? ' ✓ próg' : ''}</td><td>${escapeHtml(offer.observedIsbn || offer.isbn || '-')}</td><td>${escapeHtml(matched?.workTitle || matched?.editionTitle || '-')}</td><td>${tradingMode() ? `<strong>${escapeHtml(statusLabel(offer.purchaseStatus))}</strong><br>` : ''}<span class="status-pill ${matched?.method === 'manual' ? 'success' : matched ? 'warning' : 'neutral'}">${matched?.method === 'manual' ? 'Ręczne' : matched ? 'Automatyczne' : escapeHtml(statusLabel(offer.identification?.status))}</span></td><td>${escapeHtml(date(offer.firstSeenAt || offer.lastSeenAt))}</td></tr>`;
         })
         .join('')
     : '<tr><td colspan="7" class="empty-cell">Brak ofert zgodnych z filtrami.</td></tr>';
@@ -205,7 +214,7 @@ async function openOfferDrawer(id) {
       active = offer.matches.find((item) => item.status === 'active');
     if(serial!==drawerSerial) return;
     $('#offerDrawerContent').innerHTML =
-      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><span class="status-pill ${active ? 'success' : 'neutral'}">${active ? 'Przypisana' : escapeHtml(statusLabel(offer.identificationJob?.status))}</span><h2>${escapeHtml(offer.title)}</h2><div class="detail-grid"><span><b>Cena</b><small>${money(offer.currentPrice)}</small></span><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span></div>${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}</div>`;
+      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><p class="drawer-pills">${drawerPills(offer, active)}</p><h2>${escapeHtml(offer.title)}</h2><div class="detail-grid"><span><b>Cena</b><small>${money(offer.currentPrice)}</small></span><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span></div>${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}</div>`;
     const primaryActions = $('#offerDrawerContent .detail-actions');
     $('#offerDrawerContent h2').after(primaryActions);
     await ensureWorkspaceLoaded();
@@ -215,7 +224,7 @@ async function openOfferDrawer(id) {
     $('#offerDrawerContent .detail-grid').after(workspace);
     const freshness=document.createElement('p');freshness.className='inline-note';
     const age=offer.lastSeenAt ? Math.floor((Date.now()-Date.parse(offer.lastSeenAt))/86400000) : null;
-    freshness.textContent='Dostępność: '+availabilityLabel(offer)+(age!==null?' · od ostatniego wykrycia: '+age+' dni':'');
+    freshness.textContent='Stan ogłoszenia: '+availabilityLabel(offer)+(age!==null?' · od ostatniego wykrycia: '+age+' dni':'');
     $('#offerDrawerContent .detail-grid').after(freshness);
     const scenario=$('#offerDrawerContent .scenario-calculator');workspace.after(scenario);
     try {

@@ -31,3 +31,22 @@ test('offer lifecycle labels and purchasable filter', async () => {
   assert.equal(isPurchasable({ availability: 'sold' }), false);
   assert.equal(isPurchasable({ availability: 'not_seen' }), true);
 });
+
+test('listing badge describes the listing, not the identification job', async () => {
+  const { availabilityBadge } = await import('./formatters.js');
+  const now = Date.parse('2026-11-08T12:00:00Z');
+  assert.equal(availabilityBadge({ availability: 'sold' }, now).label, 'Sprzedana');
+  assert.equal(availabilityBadge({ availability: 'not_seen' }, now).label, 'Mogła zniknąć');
+  assert.equal(availabilityBadge({ availability: 'unconfirmed', lastSeenAt: '2026-11-08T09:55:51Z' }, now).label, 'Aktywna');
+  assert.equal(availabilityBadge({ availability: 'unconfirmed', lastSeenAt: '2026-10-01T09:55:51Z' }, now).label, 'Dawno niewidziana');
+});
+
+test('source health note separates a dead source from a partly failing one', async () => {
+  const { sourceHealthNote } = await import('./formatters.js');
+  assert.equal(sourceHealthNote({ status: 'ok', last_success_at: '2026-11-08T09:00:00Z' }, { short: true }), '');
+  assert.equal(sourceHealthNote({ status: 'failed', last_error: 'SOURCE_403' }, { short: true }), 'nie działa');
+  assert.match(sourceHealthNote({ status: 'failed', last_error: 'SOURCE_403' }), /nigdy nie zadziałał/);
+  assert.equal(sourceHealthNote({ status: 'partial', last_success_at: '2026-11-08T09:00:00Z' }, { short: true }), 'część zapytań zawodzi');
+  assert.equal(sourceHealthNote({ status: 'partial' }, { short: true }), 'nie działa');
+  assert.equal(sourceHealthNote({ status: 'partial', offers_seen: 223 }, { short: true }), 'część zapytań zawodzi');
+});

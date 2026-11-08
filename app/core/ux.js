@@ -1,5 +1,5 @@
 const labels = {
-  queued:'W kolejce',running:'Identyfikacja w toku',retry_wait:'Oczekuje na ponowienie',review_required:'Wymaga decyzji',failed:'Błąd identyfikacji',completed:'Zakończona',
+  queued:'W kolejce',running:'Identyfikacja w toku',retry_wait:'Oczekuje na ponowienie',review_required:'Wymaga decyzji',failed:'Błąd identyfikacji',completed:'Identyfikacja zakończona',
   manual:'Potwierdzone ręcznie',verified:'Zweryfikowane',unverified:'Niezweryfikowane',historical_unverified:'Dane historyczne',
   watching:'Obserwowana',check:'Do sprawdzenia',negotiating:'Negocjowana',bought:'Kupiona',rejected:'Odrzucona',
   missing_isbn:'Brak ISBN',invalid_isbn:'Niepoprawny ISBN',operator_correction:'Ponownie otwarte do poprawienia',

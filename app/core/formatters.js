@@ -62,5 +62,39 @@ export function availabilityLabel(offer = {}) {
   }
 }
 
+/** Short listing state for a badge: what the listing is now, never the identification job state. */
+export function availabilityBadge(offer = {}, now = Date.now()) {
+  switch (offer.availability) {
+    case 'sold':
+      return { label: 'Sprzedana', tone: 'neutral' };
+    case 'reserved':
+      return { label: 'Zarezerwowana', tone: 'warning' };
+    case 'unavailable':
+      return { label: 'Usunięta', tone: 'neutral' };
+    case 'available':
+      return { label: 'Aktywna', tone: 'success' };
+    case 'not_seen':
+      return { label: 'Mogła zniknąć', tone: 'warning' };
+    default: {
+      const seen = Date.parse(offer.lastSeenAt || '');
+      if (Number.isFinite(seen) && now - seen <= 3 * 86400000) return { label: 'Aktywna', tone: 'success' };
+      return { label: 'Dawno niewidziana', tone: 'neutral' };
+    }
+  }
+}
+
 /** Offers that can still be bought: sold, reserved and removed listings are out of current prices. */
 export const isPurchasable = (offer = {}) => !['unavailable', 'sold', 'reserved'].includes(offer.availability);
+
+/** One line about a scan source's recent health; `short` is for the scanner checkbox. */
+export function sourceHealthNote(row, { short = false } = {}) {
+  if (!row) return short ? '' : 'Dostępny w programie; jeszcze nie sprawdzono działania.';
+  const day = (value) => (value ? new Date(value).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) : null);
+  if (row.status === 'ok') return short ? '' : 'Działa · ostatni udany odczyt ' + day(row.last_success_at);
+  // Rows saved before 'failed' existed: 'partial' without any success means the source never worked.
+  if (row.status === 'failed' || (row.status === 'partial' && !row.last_success_at && !row.offers_seen)) {
+    const since = row.last_success_at ? 'ostatnio działał ' + day(row.last_success_at) : 'jeszcze nigdy nie zadziałał';
+    return short ? 'nie działa' : 'Nie działa w ostatnim skanie (' + (row.last_error || 'błąd') + ') · ' + since;
+  }
+  return short ? 'część zapytań zawodzi' : 'Działa częściowo: część zapytań kończy się błędem (' + (row.last_error || 'błąd') + ') · ostatni udany odczyt ' + (day(row.last_success_at) || 'brak');
+}

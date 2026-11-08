@@ -23,7 +23,11 @@ export function isbn13Of(identifiers = []) {
 }
 
 // Section in the edition card: last quote, its age and a "check now" button.
+// Buyback prices are a trading aid: hidden while trading mode is off.
+const tradingMode = () => typeof document !== 'undefined' && document.body?.classList.contains('trading-mode');
+
 export function mountEditionBuyback({ row, target, toast }) {
+  if (!tradingMode()) return;
   const isbn = isbn13Of(row.identifiers);
   const section = document.createElement('section');
   section.className = 'detail-section buyback-box';
@@ -60,6 +64,7 @@ export function mountEditionBuyback({ row, target, toast }) {
 
 // Work card: a small price chip on each edition line that already has a quote.
 export async function annotateEditionLines(row, target) {
+  if (!tradingMode()) return;
   const byEdition = new Map(row.editions.map((edition) => [edition.id, isbn13Of(edition.identifiers)]).filter(([, isbn]) => isbn));
   if (!byEdition.size) return;
   let quotes;
@@ -81,6 +86,7 @@ export async function annotateEditionLines(row, target) {
 
 // Dashboard strip: how much of the catalogue has a buyback quote, and the slow background check.
 export function mountBuybackBatch(container) {
+  if (!tradingMode()) return;
   let timer = null;
   const box = document.createElement('div');
   box.className = 'buyback-batch';

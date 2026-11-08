@@ -352,8 +352,9 @@ export function listCatalogOffers(repository, options = {}) {
     database.prepare(`SELECT count(DISTINCT o.id) AS count ${from} ${where}`).get(...params).count,
   );
   const offerSort = {
-    newest: 'o.last_seen_at DESC,o.id',
-    oldest: 'o.last_seen_at ASC,o.id',
+    // Newest = first discovered: after a scan every listing shares last_seen_at.
+    newest: 'COALESCE(o.first_seen_at,o.last_seen_at) DESC,o.last_seen_at DESC,o.id',
+    oldest: 'COALESCE(o.first_seen_at,o.last_seen_at) ASC,o.id',
     title: 'bookflip_fold(o.original_title) ASC,o.id',
     'title-desc': 'bookflip_fold(o.original_title) DESC,o.id',
     source: 'bookflip_fold(o.source) ASC,o.id',

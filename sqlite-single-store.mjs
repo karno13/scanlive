@@ -183,13 +183,16 @@ export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], sc
         grouped.get(result.source).push(result);
       }
       for (const [source,results] of grouped) {
+        // ok: every phrase answered; partial: some did (the source works, a few queries failed);
+        // failed: nothing answered, so the source is effectively down for this scan.
         const ok=results.every(result=>result.status==='ok');
-        const code=results.filter(result=>result.status!=='ok').map(result=>result.diagnostic?.code||'SOURCE_REQUEST_FAILED').join(', ');
+        const someOk=results.some(result=>result.status==='ok'||result.status==='partial');
+        const code=[...new Set(results.filter(result=>result.status!=='ok').map(result=>result.diagnostic?.code||'SOURCE_REQUEST_FAILED'))].join(', ');
         db.prepare(`INSERT INTO source_health(source,last_checked_at,last_success_at,last_error_at,last_error,status) VALUES(?,?,?,?,?,?)
           ON CONFLICT(source) DO UPDATE SET last_checked_at=excluded.last_checked_at,
           last_success_at=COALESCE(excluded.last_success_at,source_health.last_success_at),
           last_error_at=COALESCE(excluded.last_error_at,source_health.last_error_at),
-          last_error=COALESCE(excluded.last_error,source_health.last_error),status=excluded.status`).run(source,at,ok?at:null,ok?null:at,ok?null:code,ok?'ok':'partial');
+          last_error=COALESCE(excluded.last_error,source_health.last_error),status=excluded.status`).run(source,at,someOk?at:null,ok?null:at,ok?null:code,ok?'ok':someOk?'partial':'failed');
       }
     }
     return report;
