@@ -115,6 +115,7 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
       ? `<span class="source-chip" data-source="${safe(set.source)}">${safe(set.source)}</span>${set.lastSeenAt ? `<span>widziana ${safe(new Date(set.lastSeenAt).toLocaleDateString('pl-PL'))}</span>` : ''}${['not_seen', 'sold', 'unavailable'].includes(set.availability) ? '<span class="proposal-chip is-stale">mogła zniknąć</span>' : ''}`
       : '';
     document.querySelector('#view-sets .sets-search-panel').hidden = !set;
+    $('#setBulkPanel').hidden = !set;
     if (!set) {
       $('#setSelectedMeta').textContent = 'Zawartość zestawu pojawi się tutaj.';
       $('#setPhoto').innerHTML = '';
@@ -132,6 +133,8 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
     renderUnknown(set);
     renderActions(set);
     $('#setEditionResults').innerHTML = '';
+    $('#setDescriptionResults').innerHTML = '';
+    $('#setRangeResult').textContent = '';
     void renderSuggestions(set);
     $('#setTradingMount').innerHTML = '';
     mountSetTrading({ active: set, target: $('#setTradingMount'), json, refresh: refreshSets, toast });
@@ -300,6 +303,56 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
       finally { button.disabled = false; }
     });
   }
+  // Books named in a pasted description: each found one is offered with "Dodaj", like suggestions.
+  async function fromDescription() {
+    if (!activeId) return toast('Najpierw wybierz zestaw.');
+    const text = $('#setDescription').value;
+    const mount = $('#setDescriptionResults');
+    if (!text.trim()) return toast('Wklej opis ogłoszenia.');
+    mount.innerHTML = '<p class="inline-note">Szukam w katalogu…</p>';
+    const { items = [] } = await request('POST', '/api/sets/' + encodeURIComponent(activeId) + '/candidates', { text });
+    const have = included();
+    const fresh = items.filter((item) => !have.has(item.editionId));
+    if (!fresh.length) {
+      mount.innerHTML = '<p class="inline-note">' + (items.length ? 'Wszystkie znalezione książki są już w zestawie.' : 'Nie rozpoznano tytułów z katalogu. Brakujące dopisz jako „Nie ma w katalogu”.') + '</p>';
+      return;
+    }
+    mount.innerHTML = `<div class="rv-section-title"><h4>Znalezione w opisie</h4>${fresh.length > 1 ? `<button type="button" class="link-button" data-add-all>Dodaj wszystkie (${fresh.length})</button>` : ''}</div>
+      <ol class="sets-cards">${fresh.map((item) => editionCard(item, { action: `<button type="button" class="button secondary compact" data-add-edition="${safe(item.editionId)}">Dodaj</button>` })).join('')}</ol>`;
+    wireAdd(mount);
+    mount.querySelector('[data-add-all]')?.addEventListener('click', async (event) => {
+      event.currentTarget.disabled = true;
+      try { await addEditions(fresh.map((item) => item.editionId)); mount.innerHTML = ''; toast(`Dodano ${books(fresh.length)} z opisu.`); }
+      catch (error) { toast('Nie dodano wszystkich: ' + error.message); await refreshSets(activeId); }
+    });
+  }
+
+  // "Świat Dysku tomy 1–4": the volumes of a cycle as numbered in the series view.
+  async function addRange() {
+    if (!activeId) return toast('Najpierw wybierz zestaw.');
+    const name = $('#setCycleName').value.trim();
+    const from = $('#setVolumeFrom').value;
+    const to = $('#setVolumeTo').value || from;
+    if (!name || !from) return toast('Podaj cykl i numer pierwszego tomu.');
+    const result = await json('/api/sets-cycle-volumes?' + new URLSearchParams({ name, from, to }));
+    const have = included();
+    const fresh = result.items.filter((item) => !have.has(item.editionId));
+    if (fresh.length) await addEditions(fresh.map((item) => item.editionId));
+    $('#setRangeResult').textContent =
+      (fresh.length ? `Dodano ${books(fresh.length)}.` : 'Nic nowego do dodania.') +
+      (result.missing.length ? ` Brak w katalogu tomów: ${result.missing.join(', ')} — dopisz je jako „Nie ma w katalogu” albo nadaj numery w widoku Serie.` : '');
+  }
+
+  async function fillCycleNames() {
+    try {
+      const tree = await json('/api/catalog/series-tree');
+      const names = [...new Set(tree.universes.flatMap((universe) => universe.cycles.map((cycle) => cycle.name).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'pl'));
+      $('#setCycleNames').innerHTML = names.map((name) => `<option value="${safe(name)}"></option>`).join('');
+    } catch {}
+  }
+  $('#setBulkPanel').addEventListener('toggle', () => { if ($('#setBulkPanel').open && !$('#setCycleNames').children.length) void fillCycleNames(); });
+  wire('#setFromDescription', fromDescription);
+  wire('#setAddRange', addRange);
   wire('#setSearchOffers', searchOffers);
   wire('#setSearchEditions', searchEditions);
   wire('#setMarkOffer', async () => {

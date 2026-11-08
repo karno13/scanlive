@@ -6,6 +6,11 @@ import { isWatchedOffer, mountOfferWorkspace, loadOfferWorkspace, allSavedOfferN
 import { confirmDialog, noticeDialog } from '../core/dialogs.js';
 import { coverMarkup, tidyOfferTitle } from '../core/bibliography.js';
 const tradingMode = () => document.body.classList.contains('trading-mode');
+// Titles that list several books ("A + B + C", "zestaw", "tomy 1-4"): the set action is offered first.
+function looksLikeSet(title) {
+  const text = String(title ?? '').toLowerCase();
+  return /\p{L}\s*\+\s*\p{L}/u.test(text) || /\b(?:zestaw|komplet|pakiet|kolekcja)\b|\b\d{1,3}\s*(?:tomy|tomów|książki|książek|części|szt)\b|\btomy?\s*\d{1,3}\s*[-–]\s*\d{1,3}\b/u.test(text);
+}
 // Two separate facts: is the listing still up, and did identification place it in the catalogue.
 function drawerPills(offer, active) {
   const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -214,7 +219,7 @@ async function openOfferDrawer(id) {
       active = offer.matches.find((item) => item.status === 'active');
     if(serial!==drawerSerial) return;
     $('#offerDrawerContent').innerHTML =
-      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><p class="drawer-pills">${drawerPills(offer, active)}</p><h2>${escapeHtml(offer.title)}</h2><div class="detail-grid"><span><b>Cena</b><small>${money(offer.currentPrice)}</small></span><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span></div>${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}</div>`;
+      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><p class="drawer-pills">${drawerPills(offer, active)}</p><h2>${escapeHtml(offer.title)}</h2><div class="detail-grid"><span><b>Cena</b><small>${money(offer.currentPrice)}</small></span><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span></div>${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}<button class="button secondary" type="button" id="drawerMarkSet" title="Jedno ogłoszenie, kilka książek: skład ustalisz w zakładce Zestawy">${looksLikeSet(offer.title) ? 'Oznacz jako zestaw' : 'To zestaw kilku książek'}</button></div>`;
     const primaryActions = $('#offerDrawerContent .detail-actions');
     $('#offerDrawerContent h2').after(primaryActions);
     await ensureWorkspaceLoaded();
@@ -275,6 +280,20 @@ async function openOfferDrawer(id) {
     ['scenarioPurchase', 'scenarioShipping', 'scenarioOther', 'scenarioResale'].forEach((id) =>
       $('#' + id)?.addEventListener('input', calculateScenario),
     );
+    $('#drawerMarkSet')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      // A set has no single edition: an existing assignment is detached, so it is confirmed first.
+      if (active && !(await confirmDialog(`Oferta jest przypisana do wydania „${active.editionTitle || 'z katalogu'}”. Oznaczenie jako zestaw odłączy to przypisanie, a skład zestawu ustalisz w zakładce Zestawy.`, { title: 'Oznaczyć jako zestaw?', confirmLabel: 'Oznacz jako zestaw', cancelLabel: 'Anuluj' }))) return;
+      button.disabled = true;
+      try {
+        await json('/api/sets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ offerId: offer.id }) });
+      } catch (error) {
+        // Already a set: just open it.
+        if (!/SET_EXISTS|ALREADY/i.test(error.message)) { button.disabled = false; return toast('Nie oznaczono: ' + error.message); }
+      }
+      const go = () => document.dispatchEvent(new CustomEvent('bookflip-open-set', { detail: { offerId: offer.id } }));
+      if (closeOfferDrawer(go)) go();
+    });
     $('#drawerReview')?.addEventListener('click', () => {
       const go=()=>document.dispatchEvent(new CustomEvent('bookflip-review-offer',{detail:{offerId:offer.id,jobId:offer.identificationJob.id}}));
       if(closeOfferDrawer(go))go();

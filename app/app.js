@@ -180,6 +180,11 @@ function syncItemUrl() {
   if (location.pathname + location.search !== target) history.replaceState(history.state, '', target);
 }
 // Opens the item named in the URL once its data is available. Unknown ids are ignored.
+// The offer drawer marks a listing as a set and opens it in the sets workspace.
+document.addEventListener('bookflip-open-set', (event) => {
+  if (showView('sets') === false) return;
+  void restoreItem('sets', event.detail.offerId);
+});
 async function restoreItem(view, id) {
   if (!id) return;
   try {

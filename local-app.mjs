@@ -19,7 +19,7 @@ import { createVintedDetailCache } from './vinted-detail-cache.mjs';
 import { listOfferWorkspace, setOfferWorkspace, importOfferWorkspace } from './offer-workspace-api.mjs';
 import { listWorkSeries, updateWorkSeries } from './work-series-api.mjs';
 import { createScanDiagnostics, addScanEvent, scanProgress, scanTelemetry } from './scan-diagnostics.mjs';
-import { listOfferSets, markOfferAsSet, updateSetEdition, unmarkOfferSet, setCandidates } from './offer-sets.mjs';
+import { listOfferSets, markOfferAsSet, updateSetEdition, unmarkOfferSet, setCandidates, cycleVolumeEditions } from './offer-sets.mjs';
 import { defaultCatalogPath } from './catalog-data-location.mjs';
 import { normalizeISBN } from './isbn-normalization.mjs';
 import { createServer } from 'node:http';
@@ -1109,10 +1109,18 @@ export function createLocalAppServer({
         return send(response, 200, JSON.stringify(markOfferAsSet(catalog.repository, input.offerId)));
       }
       const setCandidatesPath = url.pathname.match(/^\/api\/sets\/([^/]+)\/candidates$/);
-      if (setCandidatesPath && request.method === 'GET') {
+      // GET: suggestions from the listing title; POST {text}: books named in a pasted description.
+      if (setCandidatesPath && ['GET', 'POST'].includes(request.method)) {
         const catalog = getProductionCatalog();
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify(setCandidates(catalog.repository, decodeURIComponent(setCandidatesPath[1]))));
+        const input = request.method === 'POST' ? await readJson(request) : {};
+        const text = typeof input?.text === 'string' ? input.text.slice(0, 20000) : '';
+        return send(response, 200, JSON.stringify(setCandidates(catalog.repository, decodeURIComponent(setCandidatesPath[1]), { text })));
+      }
+      if (request.method === 'GET' && url.pathname === '/api/sets-cycle-volumes') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(response, 200, JSON.stringify(cycleVolumeEditions(catalog.repository, url.searchParams.get('name') || '', url.searchParams.get('from'), url.searchParams.get('to'))));
       }
       if (url.pathname.startsWith('/api/sets/') && ['POST','DELETE'].includes(request.method)) {
         const catalog = getProductionCatalog();

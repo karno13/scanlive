@@ -3,7 +3,7 @@
 import { proxiedImage } from './offer-images.mjs';
 import { localEditionCandidates } from './catalog-api.mjs';
 import { fold } from './title-proposals.mjs';
-import { NOT_A_CYCLE } from './catalog-series.mjs';
+import { NOT_A_CYCLE, BRAND_ONLY, catalogSeries, cycleKey } from './catalog-series.mjs';
 
 export function listOfferSets(repository) {
   const db = repository.database;
@@ -70,9 +70,23 @@ export function unmarkOfferSet(repository, offerId) {
  * ("Kroniki Malusa: Klątwa demona, Spaczony miecz…"), and the edition of the ISBN the listing shows.
  * Suggestions only; the operator adds each one.
  */
-export function setCandidates(repository, offerId) {
+export function setCandidates(repository, offerId, { text = '' } = {}) {
   const offer = repository.database.prepare('SELECT original_title, observed_isbn FROM offers WHERE id=?').get(offerId);
   if (!offer) throw Object.assign(Error('OFFER_NOT_FOUND'), { statusCode: 404 });
+  // Pasted listing description: every line / list item is looked up on its own, strictly, since a
+  // description names one book per entry ("1. Kolor magii", "Mort, Straż! Straż!").
+  if (String(text).trim()) {
+    const found = [];
+    const seen = new Set();
+    for (const part of descriptionParts(text)) {
+      const hit = localEditionCandidates(repository, part, { limit: 1, minScore: 0.85 })[0];
+      if (hit && !seen.has(hit.workId)) {
+        seen.add(hit.workId);
+        found.push({ ...hit, fromText: part });
+      }
+    }
+    return { items: found.slice(0, 40) };
+  }
   const items = localEditionCandidates(repository, offer.original_title, { limit: 12, minScore: 0.6 });
   if (offer.observed_isbn) {
     let edition = null;
@@ -98,7 +112,8 @@ export function setCandidates(repository, offerId) {
       .prepare("SELECT DISTINCT normalized_name, name FROM edition_series WHERE kind='cycle' AND length(normalized_name) >= 6")
       .all()
       // A one-word name ("Kroniki") is too common to tell one universe's cycle from another's.
-      .filter((row) => fold(row.name).includes(' ') && listing.includes(' ' + fold(row.name) + ' '));
+      // "Świat Dysku" filed as a cycle is the universe: it would pull in arbitrary volumes.
+      .filter((row) => fold(row.name).includes(' ') && !BRAND_ONLY.test(fold(row.name)) && listing.includes(' ' + fold(row.name) + ' '));
     const fromMembers = items.length
       ? db.prepare(`SELECT DISTINCT s.normalized_name, s.name FROM edition_series s WHERE s.kind='cycle'
           AND s.edition_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(items.map((item) => item.editionId)))
@@ -129,4 +144,43 @@ export function setCandidates(repository, offerId) {
     }
   }
   return { items };
+}
+
+/** A pasted description split into the entries that may each name one book. */
+export function descriptionParts(text) {
+  return String(text ?? '')
+    .split(/\r?\n|[;•●▪|]|,(?=\s)|\s\+\s|\s[–—-]\s/)
+    .map((part) => part.replace(/^\s*(?:\d{1,3}\s*[.)]|tom\s*\d{1,3}\s*[.:)-]?|[-*•])\s*/i, '').replace(/\s+/g, ' ').trim())
+    .filter((part) => part.length >= 3 && part.length <= 160)
+    .slice(0, 120);
+}
+
+/**
+ * Editions for volumes `from`…`to` of a cycle, by the series view's numbering (BN records, the
+ * operator's annotations and volume lists); the most used edition of each work.
+ */
+export function cycleVolumeEditions(repository, cycleName, from, to) {
+  const key = cycleKey(cycleName);
+  const low = Number(from);
+  const high = Number(to);
+  if (!key || !Number.isInteger(low) || !Number.isInteger(high) || low < 1 || high < low || high - low > 100)
+    throw Object.assign(Error('INVALID_VOLUME_RANGE'), { statusCode: 400 });
+  const works = catalogSeries(repository)
+    .flatMap((universe) => universe.cycles)
+    .filter((cycle) => cycle.name && cycleKey(cycle.name) === key)
+    .flatMap((cycle) => cycle.works)
+    .filter((work) => Number.isInteger(work.volume) && work.volume >= low && work.volume <= high);
+  const edition = repository.database.prepare(
+    `SELECT e.id, e.title FROM editions e WHERE e.work_id=?
+     ORDER BY (SELECT count(*) FROM offer_matches m WHERE m.edition_id=e.id AND m.status='active') DESC, e.created_at LIMIT 1`,
+  );
+  const items = [];
+  for (const work of works.sort((a, b) => a.volume - b.volume)) {
+    const row = edition.get(work.id);
+    if (row) items.push({ editionId: row.id, workId: work.id, title: work.title, volume: work.volume });
+  }
+  const found = new Set(items.map((item) => item.volume));
+  const missing = [];
+  for (let volume = low; volume <= high; volume++) if (!found.has(volume)) missing.push(volume);
+  return { items, missing };
 }
