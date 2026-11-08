@@ -96,7 +96,10 @@ const titleMismatch = (job) => [].concat(job.result?.reason ?? []).includes('isb
 
 function proposalChip(job) {
   if (titleMismatch(job)) return ' · <span class="proposal-chip is-mismatch">ISBN innej książki?</span>';
-  if ([].concat(job.result?.reason ?? [])[0] === 'multiple_metadata_records') return ' · <span class="proposal-chip is-medium">kilka opisów w BN</span>';
+  const reason = [].concat(job.result?.reason ?? [])[0];
+  if (reason === 'multiple_metadata_records') return ' · <span class="proposal-chip is-medium">kilka opisów w BN</span>';
+  if (reason === 'game_rulebook') return ' · <span class="proposal-chip is-stale">podręcznik do gry</span>';
+  if (reason === 'foreign_edition') return ' · <span class="proposal-chip is-stale">wydanie obcojęzyczne</span>';
   if (job.catalogMatch) return ' · <span class="proposal-chip is-catalog">jest w katalogu</span>';
   const label = proposalLabels[job.proposal?.confidence];
   return label ? ` · <span class="proposal-chip is-${job.proposal.confidence}">${label}</span>` : '';
@@ -111,6 +114,7 @@ const REVIEW_TABS = [
   ['add', 'Do dodania', 'ISBN, którego nie zna BN ani Open Library, albo kilka opisów jednego ISBN'],
   ['noisbn', 'Bez ISBN', 'Bez ISBN i bez pewnej propozycji'],
   ['bundle', 'Zestawy?', 'Ogłoszenie wygląda na kilka książek'],
+  ['games', 'Gry / obce', 'Podręczniki do gier (Codex, Battletome…) i wydania obcojęzyczne — zwykle do odrzucenia hurtem'],
   ['other', 'Inne', 'Pozostałe: ISBN innej książki, sprzeczne dane…'],
 ];
 function renderTabs() {

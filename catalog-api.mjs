@@ -463,11 +463,13 @@ export function getCatalogOffer(repository, offerId) {
 // Queue tabs of "Do weryfikacji". Disjoint: an offer without ISBN is "quick" (it is in the
 // catalogue or has a sure title proposal) or "noisbn"; an offer with ISBN is "add" (no source
 // knows the ISBN / it has several records), "bundle" or "other".
-export const REVIEW_BUCKETS = ['quick', 'add', 'noisbn', 'bundle', 'other'];
+export const REVIEW_BUCKETS = ['quick', 'add', 'noisbn', 'bundle', 'games', 'other'];
+export const GAME_REASONS = ['game_rulebook', 'foreign_edition'];
 export const ADD_REASONS = ['isbn_not_found_in_metadata_sources', 'multiple_metadata_records'];
 const REASON_SQL = "json_extract(CASE WHEN json_valid(j.result_json) THEN j.result_json ELSE '{}' END,'$.reason[0]')";
 // One placeholder: the JSON list of "quick" job ids.
-const BUCKET_SQL = `(CASE WHEN coalesce(o.observed_isbn,'')='' THEN
+const BUCKET_SQL = `(CASE WHEN ${REASON_SQL} IN ('game_rulebook','foreign_edition') THEN 'games'
+  WHEN coalesce(o.observed_isbn,'')='' THEN
     (CASE WHEN j.id IN (SELECT value FROM json_each(?)) THEN 'quick' ELSE 'noisbn' END)
   WHEN ${REASON_SQL} IN (${ADD_REASONS.map((reason) => `'${reason}'`).join(',')}) THEN 'add'
   WHEN ${REASON_SQL}='possible_bundle' THEN 'bundle' ELSE 'other' END)`;
@@ -478,7 +480,8 @@ function reviewGroups(repository, matcher) {
     .prepare(
       `SELECT j.id, o.original_title, p.confidence FROM identification_jobs j JOIN offers o ON o.id=j.offer_id
        LEFT JOIN title_proposals p ON p.job_id=j.id
-       WHERE j.status='review_required' AND coalesce(o.observed_isbn,'')=''`,
+       WHERE j.status='review_required' AND coalesce(o.observed_isbn,'')=''
+         AND coalesce(json_extract(CASE WHEN json_valid(j.result_json) THEN j.result_json ELSE '{}' END,'$.reason[0]'),'') NOT IN ('game_rulebook','foreign_edition')`,
     )
     .all();
   const catalog = [];
@@ -503,7 +506,8 @@ export function sureReviewPlan(repository, { jobIds = null } = {}) {
     .prepare(
       `SELECT j.id, o.original_title, o.source, o.current_price, p.confidence, p.candidates_json
        FROM identification_jobs j JOIN offers o ON o.id=j.offer_id LEFT JOIN title_proposals p ON p.job_id=j.id
-       WHERE j.status='review_required' AND coalesce(o.observed_isbn,'')=''`,
+       WHERE j.status='review_required' AND coalesce(o.observed_isbn,'')=''
+         AND coalesce(${REASON_SQL},'') NOT IN ('game_rulebook','foreign_edition')`,
     )
     .all()
     .filter((row) => !jobIds || jobIds.includes(row.id));
@@ -601,7 +605,7 @@ export function listIdentificationJobs(repository, options = {}) {
   // Queue tabs: their counts follow every other filter, the list follows the chosen tab.
   let buckets = null;
   if (groups) {
-    buckets = { quick: 0, add: 0, noisbn: 0, bundle: 0, other: 0 };
+    buckets = { quick: 0, add: 0, noisbn: 0, bundle: 0, games: 0, other: 0 };
     for (const row of database
       .prepare(
         `SELECT ${BUCKET_SQL} AS bucket, count(*) AS count FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE ${conditions.join(' AND ')} GROUP BY bucket`,

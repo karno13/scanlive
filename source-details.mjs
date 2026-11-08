@@ -92,7 +92,27 @@ export function parseProductDetail(html) {
   };
 }
 
+/**
+ * Empik product page: its category path ("Książki obcojęzyczne / Books / …") from the page's own
+ * embedded state. Empik loads the ISBN through a separate API, which is not read; the category
+ * still tells a foreign-language import from a Polish book.
+ */
+export function empikCategories(html) {
+  const text = String(html ?? '');
+  const start = text.indexOf('"categoryInfo":{');
+  if (start < 0) return [];
+  const block = text.slice(start, start + 4000);
+  const end = block.indexOf(']');
+  const names = [];
+  for (const match of (end > 0 ? block.slice(0, end) : block).matchAll(/"__typename":"Category","id":"\d+","name":"((?:[^"\\]|\\.)*)"/g)) {
+    try {
+      names.push(JSON.parse('"' + match[1] + '"'));
+    } catch {}
+  }
+  return names.slice(0, 6);
+}
+
 // Sources whose detail page exposes the product's own structured data.
 // Allegro Lokalnie: only the seller's parameter table is read (never the description or images,
-// which carry other books' ISBNs). Empik renders its details through a separate API: not read.
-export const DETAIL_SOURCES = new Set(['Tezeusz.pl', 'Allegro Lokalnie']);
+// which carry other books' ISBNs). Empik: only the category of the product (see empikCategories).
+export const DETAIL_SOURCES = new Set(['Tezeusz.pl', 'Allegro Lokalnie', 'Empik']);

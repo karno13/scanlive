@@ -46,7 +46,12 @@ export function isPolishBook(title, metadata) {
 }
 export function acceptsBook(task, title, metadata) {
   if (task.language === 'pl' && !isPolishBook(title, metadata)) return false;
-  if (excludesProduct(title) || !matchesTopic(task, title)) return false;
+  if (excludesProduct(title)) return false;
+  // Empik searches series and descriptions inside its book category: a Black Library novel
+  // ("Kosmiczny Wilk. Tom 1") found for "warhammer" rarely names the universe in its title.
+  // Its own fantasy / SF genre is trusted; other genres must still name the topic.
+  if (task.source === 'Empik' && /^Książki\/Fantastyka/i.test(String(metadata?.category ?? ''))) return true;
+  if (!matchesTopic(task, title)) return false;
   return true; // Matching query + product exclusions; no mandatory generic book keyword.
 }
 export function searchUrl(task) {
@@ -73,7 +78,9 @@ export function searchUrl(task) {
     u = new URL('https://allegro.pl/listing');
     u.searchParams.set('string', task.mode === 'watchlist' ? query : query + ' książki');
   } else if (task.source === 'Empik') {
-    u = new URL('https://www.empik.com/szukaj/produkt');
+    // Category "Książki" (31): Polish books only. The whole-shop search returned figurines, video
+    // games and "Książki obcojęzyczne", which no Polish bibliographic source can identify.
+    u = new URL('https://www.empik.com/ksiazki,31,s');
     u.searchParams.set('q', query);
     u.searchParams.set('qtype', 'basicForm');
   } else if (task.source === 'Allegro Lokalnie')
@@ -352,7 +359,9 @@ function parseEmpikCards(html, add) {
       end = Math.min(starts[index + 1]?.index ?? html.length, root.index + 50000),
       segment = html.slice(root.index, end),
       productId = attribute(attrs, 'data-product-id');
-    if (!/^p\d+$/.test(productId)) continue;
+    // Newer products are "p1730634714"; older catalogue entries (often second-hand copies sold by
+    // Empik's partner bookshops) keep a plain number: ",301657,ksiazka-p".
+    if (!/^p?\d+$/.test(productId)) continue;
     let title = textOnly(attribute(attrs, 'data-product-name'));
     if (!title) {
       for (const match of segment.matchAll(/<strong\b([^>]*)>([\s\S]*?)<\/strong>/gi)) {
@@ -373,8 +382,8 @@ function parseEmpikCards(html, add) {
       } catch {
         continue;
       }
-      const pathId = url.pathname.match(/,p(\d+),ksiazka-p$/i)?.[1];
-      if (pathId && 'p' + pathId === productId) {
+      const pathId = url.pathname.match(/,(p?\d+),ksiazka-p$/i)?.[1];
+      if (pathId && pathId === productId) {
         rawUrl = url.href;
         break;
       }
@@ -404,6 +413,7 @@ function parseEmpikCards(html, add) {
     );
     add(title, rawUrl, price, currency, {
       isbn: attribute(attrs, 'data-product-ean') || attribute(attrs, 'data-ean'),
+      category: attribute(attrs, 'data-product-category'),
       image: imageTag && (attribute(imageTag[1], 'lazy-img') || attribute(imageTag[1], 'src')),
     });
   }
@@ -421,7 +431,7 @@ function parseBookstore(html, book, source) {
       return;
     }
     if (source === 'Allegro' && !/^\/oferta\/[^/]+-\d+$/.test(url.pathname)) return;
-    if (source === 'Empik' && !/,p\d+,ksiazka-p$/.test(url.pathname)) return;
+    if (source === 'Empik' && !/,p?\d+,ksiazka-p$/.test(url.pathname)) return;
     if (
       url.protocol !== 'https:' ||
       url.hostname !== host ||
@@ -432,7 +442,7 @@ function parseBookstore(html, book, source) {
         url.pathname,
       ) ||
       !title ||
-      !book.accept(title) ||
+      !book.accept(title, metadata.category ? { category: metadata.category } : undefined) ||
       currency !== 'PLN'
     )
       return;
@@ -678,6 +688,9 @@ export function marketplacePageInfo(html, task, offers) {
         return { page, digest, state: 'more', nextPage: next };
     } catch {}
   }
+  // Empik draws its pager with JavaScript: a full page of 60 tiles means there is another one.
+  if (task.source === 'Empik' && !ended && (html.match(/\bta-product-tile\b/g) || []).length >= 60)
+    return { page, digest, state: 'more', nextPage: page + 1 };
   return { page, digest, state: ended ? 'end' : 'unknown', nextPage: null };
 }
 export async function scanMarketplace(task, options = {}) {

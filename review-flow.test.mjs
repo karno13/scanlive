@@ -8,6 +8,7 @@ import { chooseAmongRecords } from './catalog-resolver.mjs';
 import { listIdentificationJobs, sureReviewPlan } from './catalog-api.mjs';
 import { offerEditionDraft, createEditionFromOffer, upgradeOfferEdition, titleFromListing } from './offer-editions.mjs';
 import { createSqliteBook } from './sqlite-single-store.mjs';
+import { notCatalogueMaterial } from './game-material.mjs';
 
 const offline = async () => {
   throw new Error('NETWORK_NOT_EXPECTED');
@@ -178,12 +179,49 @@ test('queue tabs cover the whole queue and the sure plan only takes unambiguous 
     review(repo, offerId(repo, 'https://www.vinted.pl/items/21-x'), 'isbn_not_found_in_metadata_sources');
     review(repo, offerId(repo, 'https://www.vinted.pl/items/22-y'), 'possible_bundle');
     const all = listIdentificationJobs(repo, { status: 'review_required' });
-    assert.deepEqual(all.buckets, { quick: 1, add: 1, noisbn: 1, bundle: 1, other: 0 });
+    assert.deepEqual(all.buckets, { quick: 1, add: 1, noisbn: 1, bundle: 1, games: 0, other: 0 });
     const tab = listIdentificationJobs(repo, { status: 'review_required', bucket: 'quick' });
     assert.deepEqual(tab.items.map((item) => item.id), [quick]);
     assert.equal(listIdentificationJobs(repo, { status: 'review_required', isbn: 'catalog' }).total, 1);
     const plan = sureReviewPlan(repo);
     assert.deepEqual(plan.items.map((item) => [item.jobId, item.kind, item.editionId]), [[quick, 'edition', 'e-illidan']]);
+  } finally {
+    catalog.close();
+  }
+});
+
+test('game rulebooks and foreign editions get their own review reason, Polish RPG books do not', async () => {
+  assert.equal(notCatalogueMaterial('Codex Tyranids, Warhammer 40000'), 'game_rulebook');
+  assert.equal(notCatalogueMaterial("Warhammer age of sigmar General's handbook 2021"), 'game_rulebook');
+  assert.equal(notCatalogueMaterial('Duchy Gaunta (ENG)'), 'foreign_edition');
+  assert.equal(notCatalogueMaterial('Warhammer Fantasy Roleplay. Podręcznik podstawowy'), null);
+  assert.equal(notCatalogueMaterial('Kosmiczny Wilk. Tom 1'), null);
+  const catalog = catalogue();
+  const repo = catalog.repository;
+  try {
+    catalog.ingestOffers([{ source: 'Empik', url: 'https://www.empik.com/codex,p9,ksiazka-p', title: 'Codex: Death Guard, Warhammer 40000', price: 18990 }], at);
+    const result = await catalog.resolver.resolve({ offerId: offerId(repo, 'https://www.empik.com/codex,p9,ksiazka-p') });
+    assert.deepEqual([result.decision, result.reason], ['review_required', ['game_rulebook']]);
+    review(repo, offerId(repo, 'https://www.empik.com/codex,p9,ksiazka-p'), 'game_rulebook');
+    assert.equal(listIdentificationJobs(repo, { status: 'review_required' }).buckets.games, 1);
+  } finally {
+    catalog.close();
+  }
+});
+
+test('an Empik import from "Książki obcojęzyczne" is marked foreign and leaves the no-ISBN queue', async () => {
+  const catalog = catalogue();
+  const repo = catalog.repository;
+  try {
+    const url = 'https://www.empik.com/words-of-war,p1631256233,ksiazka-p';
+    catalog.ingestOffers([{ source: 'Empik', url, title: 'Warhammer 40,000 Words of War', price: 9999 }], at);
+    const job = review(repo, offerId(repo, url), 'no_isbn_evidence');
+    const page = '<script>{"categoryInfo":{"__typename":"CategoryInfo","categories":[{"__typename":"Category","id":"20","name":"Ksi\u0105\u017cki obcoj\u0119zyczne","url":"x"},{"__typename":"Category","id":"2021","name":"Books","url":"y"}]}}</script>';
+    const report = await enrichOffers(repo, { fetchHtml: async () => page, sources: ['Empik'], now: () => at });
+    assert.equal(report.foreign, 1);
+    assert.equal(jobStatus(repo, job), 'queued');
+    const result = await catalog.resolver.resolve({ offerId: offerId(repo, url) });
+    assert.deepEqual(result.reason, ['foreign_edition']);
   } finally {
     catalog.close();
   }

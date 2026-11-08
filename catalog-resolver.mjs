@@ -9,6 +9,7 @@ import { enrichEdition } from './catalog-bibliography.mjs';
 import { looksLikeBundle } from './bundle-detection.mjs';
 import { operatorRejectedEditions } from './offer-assignment.mjs';
 import { titleConflict } from './title-consistency.mjs';
+import { notCatalogueMaterial } from './game-material.mjs';
 const TRUSTED = new Set(['structured', 'labelled_description']);
 const REVIEW_ONLY = new Set(['unlabelled_description', 'ocr', 'uncertain', 'legacy']);
 
@@ -307,6 +308,14 @@ export class CatalogResolver {
     const proof = { isbn: isbnEvidence, metadataRecords: [] };
     const manual = activeMatch(this.repository, offerId);
     const manualProtected = manual && ['manual', 'legacy_manual'].includes(manual.method);
+    // Game rulebooks and foreign editions never enter the catalogue automatically; an ISBN the
+    // operator typed or chose still does.
+    // The offer's own language (Vinted detail, Empik category) counts as much as its title.
+    const foreignLanguage = currentOffer.language && !/^(?:pl|pol|polish|polski|język polski)$/i.test(String(currentOffer.language).trim());
+    const material = offerId && !manualProtected && !operatorEvidence(isbnEvidence)
+      ? notCatalogueMaterial(offerTitleOf(currentOffer)) ?? (foreignLanguage ? 'foreign_edition' : null)
+      : null;
+    if (material) return decision('review_required', [material], proof);
 
     if (isbnEvidence.status === 'missing')
       return manualProtected

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readSourceHtml } from './marketplaces.mjs';
-import { DETAIL_SOURCES, parseProductDetail } from './source-details.mjs';
+import { DETAIL_SOURCES, parseProductDetail, empikCategories } from './source-details.mjs';
 
 const MAX_ATTEMPTS = 3;
 const RETRY_AFTER_MS = 60 * 60 * 1000;
@@ -101,6 +101,16 @@ export async function enrichOffers(
     report.checked += 1;
     const detail = parseProductDetail(html);
     const facts = { ...detail, isbn: undefined };
+    if (offer.source === 'Empik') {
+      const categories = empikCategories(html);
+      facts.category = categories.join(' / ') || null;
+      // An import from "Książki obcojęzyczne": no Polish source will know it.
+      if (categories[0] === 'Książki obcojęzyczne') {
+        repository.database.prepare("UPDATE offers SET language='obcojęzyczna' WHERE id=?").run(offer.id);
+        if (requeueForNewEvidence(repository, offer.id, at)) report.requeued += 1;
+        report.foreign = (report.foreign || 0) + 1;
+      }
+    }
     if (!detail.isbn) {
       report.noIsbn += 1;
       record(repository, offer, { outcome: 'no_isbn', facts }, at);

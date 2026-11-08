@@ -2,6 +2,15 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-08 (16) — Empik: tylko polskie książki, pełne wyniki; podręczniki do gier osobno
+
+- **Empik szuka w kategorii „Książki”** zamiast w całym sklepie: koniec figurek, gier wideo i „Książek obcojęzycznych”, których żadne polskie źródło nie rozpozna.
+- **Empik czyta wszystkie strony wyników.** Pager Empiku rysuje JavaScript, więc w HTML nie było linku „dalej” i skaner kończył na pierwszych 60 wynikach; pełna strona 60 kafelków oznacza teraz, że jest następna.
+- **Starsze produkty Empiku** (`,301657,ksiazka-p` — często używane egzemplarze z księgarń partnerskich) nie były w ogóle odczytywane.
+- **Powieści bez nazwy uniwersum w tytule** („Kosmiczny Wilk. Tom 1”, „Duchy Gaunta. Tom 2”) przechodzą, gdy Empik zalicza je do „Fantastyka, horror”; inne gatunki nadal muszą zawierać szukaną frazę.
+- **Odczyt strony oferty Empiku:** tylko kategoria produktu (ISBN Empik ładuje osobnym API, którego nie czytamy). Import z „Książek obcojęzycznych” dostaje język „obcojęzyczna”.
+- **Zakładka „Gry / obce”:** podręczniki do gier Games Workshop (Codex, Battletome, Arcane Journal, Rulebook, General's Handbook, Getting Started, Dawnbringers…) i wydania obcojęzyczne nie trafiają automatycznie do katalogu ani do „Zatwierdź pewne”; w zakładce można je odrzucić hurtem. Polskie podręczniki RPG (np. Warhammer Fantasy Roleplay) zostają jak dotąd. Migracja 116 jednorazowo przepuszcza przez resolver oczekujące oferty, których tytuł na to wskazuje.
+
 ## 2026-11-08 (15) — Przegląd drogi od skanu do katalogu: luki i szybsza weryfikacja
 
 - **Allegro Lokalnie: odczyt ISBN nie umiera na HTTP 429.** Źródło, które odpowiada 429 albo wyzwaniem, ma 30 minut przerwy (wcześniej co 5 s kolejne żądanie i kolejna oferta traciła próbę — 106 ofert nie było już nigdy sprawdzanych). Limit nie zużywa prób oferty, a te 106 ofert wraca do kolejki odczytu. Inne źródła działają dalej.

@@ -202,7 +202,7 @@ test('Empik uses sixty-result pagination and accepts its lowercase canonical que
   const html =
     '<div class="search-content js-search-content" itemtype="https://schema.org/ItemList">' +
     empikCard() +
-    '</div><a href="/szukaj/produkt?start=61&q=warcraft&qtype=basicForm " class="arrow next ta-next-page"><i></i></a>';
+    '</div><a href="/ksiazki,31,s?start=61&q=warcraft&qtype=basicForm " class="arrow next ta-next-page"><i></i></a>';
   const result = await scanMarketplace(empikTask, {
     pause: async () => {},
     fetcher: async () => new Response(html, { headers: { 'content-type': 'text/html' } }),
@@ -210,4 +210,21 @@ test('Empik uses sixty-result pagination and accepts its lowercase canonical que
   assert.equal(result.pagination.state, 'more');
   assert.equal(result.pagination.nextPage, 2);
   assert.equal(new URL(searchUrl({ ...empikTask, page: 2 })).searchParams.get('start'), '61');
+});
+
+test('Empik searches the Polish books category and pages on full result pages', async () => {
+  assert.equal(new URL(searchUrl(empikTask)).pathname, '/ksiazki,31,s');
+  const page = (count) =>
+    '<div class="search-content js-search-content" itemtype="https://schema.org/ItemList">' +
+    Array.from({ length: count }, (_, i) => empikCard({ id: 'p' + (1730634700 + i), title: 'Warcraft tom ' + i })).join('') +
+    '</div>';
+  const scan = (html) =>
+    scanMarketplace(empikTask, {
+      pause: async () => {},
+      fetcher: async () => new Response(html, { headers: { 'content-type': 'text/html' } }),
+    });
+  const full = await scan(page(60));
+  assert.deepEqual([full.pagination.state, full.pagination.nextPage], ['more', 2]);
+  const last = await scan(page(12));
+  assert.notEqual(last.pagination.state, 'more');
 });
