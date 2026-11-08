@@ -181,7 +181,7 @@ function findMissing(target) {
 
 function shelfBookMarkup(work) {
   const title = tidyWorkTitle(work.title);
-  return `<button type="button" class="shelf-book${work.id === state.selectedCatalogId ? ' active' : ''}" data-series-work="${escapeHtml(work.id)}" title="${escapeHtml(work.title)}">${coverMarkup(work.cover, title, { size: 'lg', escapeHtml })}${work.volume ? `<span class="shelf-vol">${work.volume}</span>` : ''}<b>${escapeHtml(title)}</b><small>${escapeHtml([work.firstYear, offersLabel(work.offers)].filter(Boolean).join(' · '))}</small></button>`;
+  return `<button type="button" class="shelf-book${work.id === state.selectedCatalogId ? ' active' : ''}" data-series-work="${escapeHtml(work.id)}" title="${escapeHtml(work.title)}">${coverMarkup(work.cover, title, { size: 'lg', escapeHtml })}${work.volume ? `<span class="shelf-vol${work.guessed ? ' is-guess' : ''}"${work.guessed ? ' title="Numer tomu z tytułów ogłoszeń — sprawdź; poprawisz go w karcie dzieła"' : ''}>${work.volume}</span>` : ''}<b>${escapeHtml(title)}</b><small>${escapeHtml([work.firstYear, offersLabel(work.offers)].filter(Boolean).join(' · '))}</small></button>`;
 }
 
 function cycleMarkup(cycle, universe, onlyCycle) {
@@ -447,7 +447,7 @@ function bibliographyMarkup(row) {
   if (people.length)
     cells.push(['Osoby', people.map((person) => '<button type="button" class="link-button" data-person-search="' + escapeHtml(person.name) + '" title="Pokaż wszystkie książki tej osoby">' + escapeHtml(person.name) + '</button> <small>' + escapeHtml(ROLE_LABELS[person.role] || person.role) + '</small>').join('<br>')]);
   if ((row.series || []).length)
-    cells.push(['Seria', row.series.map((entry) => escapeHtml(entry.name) + (entry.volume != null ? ' — t. ' + escapeHtml(entry.volume) : '') + ' <small>' + escapeHtml(SERIES_KIND[entry.kind] || '') + '</small>').join('<br>')]);
+    cells.push(['Seria', row.series.map((entry) => escapeHtml(entry.name) + (entry.volume != null ? ' — t. ' + escapeHtml(entry.volume) : '') + ' <small>' + escapeHtml([SERIES_KIND[entry.kind], entry.source === 'listing' ? 'z ogłoszeń' : entry.source === 'e_isbn' ? 'e-ISBN' : ''].filter(Boolean).join(' · ')) + '</small>').join('<br>')]);
   const physical = [row.pageCount ? row.pageCount + ' s.' : '', row.heightCm ? row.heightCm + ' cm' : '', row.placeOfPublication || ''].filter(Boolean).join(' · ');
   if (physical) cells.push(['Opis fizyczny', escapeHtml(physical)]);
   if ((row.genres || []).length) cells.push(['Gatunek', escapeHtml(row.genres.join(', '))]);

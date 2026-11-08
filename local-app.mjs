@@ -46,6 +46,7 @@ import {
   applySureReviewPlan,
 } from './catalog-api.mjs';
 import { offerEditionDraft, createEditionFromOffer, recheckOfferEditions } from './offer-editions.mjs';
+import { inferListingSeries } from './edition-series.mjs';
 import { analyzedOffers, bookHistory, allBookStatistics } from './price-analysis.mjs';
 import { sqliteHistoryModel } from './sqlite-history-read.mjs';
 import {
@@ -618,6 +619,19 @@ function scheduleLifecycleCheck(catalogStore) {
     });
 }
 
+// Cycle and volume read from listing titles, recomputed every ten minutes (local SQL only).
+let listingSeriesNextAt = 0;
+function scheduleListingSeries(catalogStore) {
+  if (Date.now() < listingSeriesNextAt || !catalogStore.repository?.database) return;
+  listingSeriesNextAt = Date.now() + 10 * 60_000;
+  try {
+    const report = inferListingSeries(catalogStore.repository);
+    if (report.works) recordProgress({ type: 'listing_series', ...report });
+  } catch (error) {
+    recordProgress({ type: 'listing_series_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'LISTING_SERIES_ERROR' });
+  }
+}
+
 // Editions created from listings: BN is asked again about once a week (a few per hour).
 let runningOfferEditions = null;
 let offerEditionsNextAt = 0;
@@ -667,6 +681,7 @@ function scheduleCatalogResolution(catalogStore) {
       scheduleProposalRefresh(catalogStore);
       scheduleLifecycleCheck(catalogStore);
       scheduleOfferEditionRecheck(catalogStore);
+      scheduleListingSeries(catalogStore);
     });
   return runningCatalogResolution;
 }

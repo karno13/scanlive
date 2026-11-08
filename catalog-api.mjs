@@ -108,9 +108,9 @@ function editionBibliography(database, row) {
       .all(row.id)
       .map((item) => ({ id: item.id, name: item.name, role: item.role })),
     series: database
-      .prepare('SELECT name, kind, volume FROM edition_series WHERE edition_id=? ORDER BY position, name')
+      .prepare('SELECT name, kind, volume, source FROM edition_series WHERE edition_id=? ORDER BY position, name')
       .all(row.id)
-      .map((item) => ({ name: item.name, kind: item.kind, volume: item.volume })),
+      .map((item) => ({ name: item.name, kind: item.kind, volume: item.volume, source: item.source })),
   };
 }
 

@@ -2,6 +2,15 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-08 (19) — Tomy i cykle dla książek spoza BN
+
+- **Cykl i tom z tytułów ogłoszeń** dla dzieł, których nie opisuje rekord BN (wydania z e-ISBN, Open Library, utworzone z ogłoszenia): „Duchy Gaunta. Tom 2. Komisarz Gaunt”, „Stacja Ocalenie - Dan Abnett … Duchy Gaunta tom 13”, „Kolor magii. Świat Dysku. Tom 1”. Z nazwy cyklu wypadają tytuł książki, autorzy (także współautorzy i tłumacze z katalogu), nazwy uniwersów i inicjały; zakresy („TOM 1-3”), połówki („Tom 1,5”) i numeracje kolekcji gazetowych są pomijane. Wygrywa cykl i numer, na który wskazuje najwięcej ogłoszeń (tytuł wydania liczy się podwójnie); remis co do numeru = brak numeru.
+- Pierwszeństwo bez zmian: ręczna adnotacja > seria z rekordu BN / e-ISBN > cykl z tytułu BN > ogłoszenia. Dane z ogłoszeń mają źródło `listing` i są przeliczane przy starcie i co 10 minut.
+- **Seria z e-ISBN:** opis serii wydawcy (ONIX `Collection`, z numerem części) trafia do serii wydania.
+- Widok serii oznacza numery z ogłoszeń przerywaną ramką i „?”; karta wydania podpisuje serię „z ogłoszeń” / „e-ISBN”.
+- Serie wydawnicze zapisane w BN jako cykle („Nowa Fantastyka”, „Sensacja - Fantastyka”, „… : fantasy adventure”) nie tworzą już osobnych cykli.
+- Na danych z 2026-11-08: numer tomu ma 126 dzieł zamiast 107.
+
 ## 2026-11-08 (18) — Rejestr e-ISBN jako źródło opisu książki
 
 - **e-ISBN** (e-isbn.pl, krajowy rejestr ISBN prowadzony przez Bibliotekę Narodową) jest pytany, gdy BN i Open Library nie znają numeru (także gdy Open Library ma awarię). Wydawcy rejestrują tam książkę przy nadaniu ISBN, często zanim BN ją skataloguje. Z rekordu ONIX brane są: tytuł, autor, wydawca (imprint), rok, język i oprawa. Przed Google Books; `BOOKFLIP_E_ISBN=0` wyłącza.

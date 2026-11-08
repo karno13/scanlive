@@ -10,6 +10,7 @@ import { looksLikeBundle } from './bundle-detection.mjs';
 import { operatorRejectedEditions } from './offer-assignment.mjs';
 import { titleConflict } from './title-consistency.mjs';
 import { notCatalogueMaterial } from './game-material.mjs';
+import { storeSeriesStatements } from './edition-series.mjs';
 const TRUSTED = new Set(['structured', 'labelled_description']);
 const REVIEW_ONLY = new Set(['unlabelled_description', 'ocr', 'uncertain', 'legacy']);
 
@@ -633,6 +634,9 @@ export class CatalogResolver {
       }
       // People, series and physical details from the BN MARC record just stored.
       enrichEdition(this.repository, edition.id, { now: this.now });
+      // The publisher's own series statement from the national ISBN registry.
+      if (selected.record.source === 'e_isbn' && selected.record.payload?.onix?.series?.length)
+        storeSeriesStatements(this.repository, edition.id, selected.record.payload.onix.series, 'e_isbn');
       const matchId = offerId ? stableId('resolver_match', offerId, edition.id) : null;
       if (offerId)
         this.repository.assignOfferToEdition(offerId, edition.id, {

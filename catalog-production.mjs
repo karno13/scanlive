@@ -5,6 +5,7 @@ import { findDuplicateWorkGroups } from './work-grouping.mjs';
 import { reviewAutomaticBundleMatches } from './bundle-detection.mjs';
 import { createSeedService } from './catalog-seeding.mjs';
 import { ensureStarterProfiles } from './starter-profiles.mjs';
+import { inferListingSeries } from './edition-series.mjs';
 
 function mergeAutomaticDuplicates(repository) {
   const manual = new Set(
@@ -73,6 +74,8 @@ export function createProductionCatalog({
     if (!upgrade.skipped) mergeAutomaticDuplicates(repository);
     reviewAutomaticBundleMatches(repository, { now });
     if (String(process.env.BOOKFLIP_STARTER_PROFILES ?? '1') !== '0') ensureStarterProfiles(repository);
+    // Cycle and volume from listing titles for works no bibliographic record describes.
+    inferListingSeries(repository);
   } catch (error) {
     console.error('BIBLIOGRAPHY_UPGRADE_FAILED', error?.message ?? error);
   }

@@ -11,6 +11,7 @@ import { decideIdentificationJob } from './catalog-api.mjs';
 import { persistMetadataResults } from './metadata-lookup.mjs';
 import { enrichEdition } from './catalog-bibliography.mjs';
 import { chooseAmongRecords } from './catalog-resolver.mjs';
+import { storeSeriesStatements } from './edition-series.mjs';
 
 const RECHECK_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const RETRY_SOON_MS = 24 * 60 * 60 * 1000;
@@ -347,6 +348,8 @@ export function upgradeOfferEdition(repository, editionId, metadata, { now = () 
         .prepare('INSERT OR IGNORE INTO external_record_links(external_record_id,work_id,edition_id,linked_at) VALUES(?,?,?,?)')
         .run(row.id, edition.work_id, edition.id, at);
     enrichEdition(repository, edition.id, { now });
+    if (record.source === 'e_isbn' && record.payload?.onix?.series?.length)
+      storeSeriesStatements(repository, edition.id, record.payload.onix.series, 'e_isbn');
     repository.database.prepare('UPDATE offer_editions SET upgraded_at=?, last_outcome=? WHERE edition_id=?').run(at, 'upgraded', edition.id);
   });
   return { upgraded: true, source: record.source };

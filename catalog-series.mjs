@@ -13,10 +13,10 @@ const UNIVERSES = [
   [/\bforgotten realms\b|\bdrizzt/, 'Forgotten Realms'],
 ];
 // Publisher lines and genre labels: numbered, but not a story cycle.
-const NOT_A_CYCLE =
-  /^(?:wielka kolekcja|kolekcja.*|czarna biblioteka|fantastyka|fantasy|sf|seria.*fantasy|biblioteka.*|blizzard legends)$/i;
+export const NOT_A_CYCLE =
+  /^(?:wielka kolekcja|kolekcja.*|czarna biblioteka|fantastyka|fantasy|sf|seria.*fantasy|biblioteka.*|blizzard legends|nowa fantastyka|sensacja.*fantastyka|.*fantasy adventure|fantasy adventure)$/i;
 // Brand words that are not a cycle on their own ("Discworld series t. 14" = the universe itself).
-const BRAND_ONLY = /^(?:discworld(?: series)?|swiat dysku|warhammer(?: 40[ .,]?000| fantasy| chronicles)?|world of warcraft|warcraft|dragonlance(?: saga)?|forgotten realms)$/;
+export const BRAND_ONLY = /^(?:discworld(?: series)?|swiat dysku|warhammer(?: 40[ .,]?000| fantasy| chronicles)?|world of warcraft|warcraft|dragonlance(?: saga)?|forgotten realms)$/;
 
 export function universeOf(text) {
   const folded = fold(text);
@@ -111,7 +111,7 @@ export function catalogSeries(repository) {
   const recordSeries = new Map();
   if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='edition_series'").get())
     for (const row of db
-      .prepare('SELECT e.work_id, s.name, s.kind, s.volume FROM edition_series s JOIN editions e ON e.id=s.edition_id ORDER BY e.created_at, s.position')
+      .prepare('SELECT e.work_id, s.name, s.kind, s.volume, s.source FROM edition_series s JOIN editions e ON e.id=s.edition_id ORDER BY e.created_at, s.position')
       .all()) {
       if (!recordSeries.has(row.work_id)) recordSeries.set(row.work_id, []);
       recordSeries.get(row.work_id).push(row);
@@ -132,20 +132,23 @@ export function catalogSeries(repository) {
       universeOf(phrase) ||
       (phrase ? phraseLabel(phrase, authorsOf.get(work.id)) : 'Poza seriami');
     const annotation = manual.get(work.id);
-    const recordCycle =
-      statements.find((entry) => entry.kind === 'cycle' && entry.volume != null) ||
-      statements.find((entry) => entry.kind === 'cycle') ||
-      null;
+    // BN files some publisher lines as series ("Nowa Fantastyka", "… : fantasy adventure"): not cycles.
+    const cycles = statements.filter((entry) => entry.kind === 'cycle' && !NOT_A_CYCLE.test(String(entry.name).trim()));
+    const recordCycle = cycles.find((entry) => entry.volume != null) || cycles[0] || null;
     // "Świat Dysku t. 14": the universe itself is numbered when no cycle is named.
-    const universeVolume = statements.find((entry) => entry.kind === 'universe' && entry.volume != null)?.volume ?? null;
+    const universeEntry = statements.find((entry) => entry.kind === 'universe' && entry.volume != null) ?? null;
+    const universeVolume = universeEntry?.volume ?? null;
+    const titleCycle = recordCycle ? null : titles.map(cycleFromTitle).find((item) => item?.cycle) ?? null;
     const parsed = recordCycle
-      ? { cycle: recordCycle.name, volume: recordCycle.volume ?? null }
-      : titles.map(cycleFromTitle).find((item) => item?.cycle) ||
-        (universeVolume != null ? { cycle: null, volume: universeVolume } : null) ||
+      ? { cycle: recordCycle.name, volume: recordCycle.volume ?? null, source: recordCycle.source }
+      : titleCycle ||
+        (universeVolume != null ? { cycle: null, volume: universeVolume, source: universeEntry.source } : null) ||
         titles.map(cycleFromTitle).find(Boolean) ||
         null;
     const cycle = annotation ? annotation.series : parsed?.cycle || null;
     const volume = annotation ? annotation.volume : parsed?.volume ?? null;
+    // Read from listing titles (edition-series.mjs), not from a bibliographic record: worth a look.
+    const guessed = !annotation && parsed?.source === 'listing';
     const years = (editionTitles.get(work.id) || []).map((edition) => edition.publication_year).filter(Boolean);
     if (!universes.has(universe)) universes.set(universe, []);
     universes.get(universe).push({
@@ -155,6 +158,7 @@ export function catalogSeries(repository) {
       cycle,
       volume,
       manual: Boolean(annotation),
+      guessed,
       universeManual: universeOverride.has(work.id),
       editions: Number(work.editions || 0),
       offers: Number(work.offers || 0),

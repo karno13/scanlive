@@ -44,7 +44,9 @@ export function parseOnixProduct(product) {
     .filter((block) => ['15', '02', '03'].includes(first(block, 'ProductIDType')))
     .map((block) => first(block, 'IDValue'))
     .filter(Boolean);
-  const detail = blocks(product, 'DescriptiveDetail')[0] ?? '';
+  const fullDetail = blocks(product, 'DescriptiveDetail')[0] ?? '';
+  // The series (<Collection>) has its own TitleDetail: read the book's title without it.
+  const detail = fullDetail.replace(/<Collection\b[\s\S]*?<\/Collection>/g, '');
   const titleDetail = blocks(detail, 'TitleDetail').find((block) => first(block, 'TitleType') === '01') ?? blocks(detail, 'TitleDetail')[0] ?? '';
   const element = blocks(titleDetail, 'TitleElement')[0] ?? '';
   const title = [first(element, 'TitlePrefix'), first(element, 'TitleWithoutPrefix') ?? first(element, 'TitleText')].filter(Boolean).join(' ');
@@ -57,7 +59,7 @@ export function parseOnixProduct(product) {
     .filter((block) => first(block, 'ContributorRole') === 'B06')
     .map(contributorName)
     .filter(Boolean);
-  const series = blocks(detail, 'Collection').map((block) => {
+  const series = blocks(fullDetail, 'Collection').map((block) => {
     const name = first(blocks(block, 'TitleElement')[0] ?? '', 'TitleText');
     const part = first(blocks(block, 'TitleElement')[0] ?? '', 'PartNumber');
     return name ? { name, part } : null;
