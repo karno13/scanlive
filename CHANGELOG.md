@@ -2,6 +2,10 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-08 (17) — Zestaw bez potwierdzania
+
+- „Zestaw” (Z) w weryfikacji działa od razu, bez okna potwierdzenia; komunikat ma „Cofnij”, a panel przechodzi do następnej oferty.
+
 ## 2026-11-08 (16) — Empik: tylko polskie książki, pełne wyniki; podręczniki do gier osobno
 
 - **Empik szuka w kategorii „Książki”** zamiast w całym sklepie: koniec figurek, gier wideo i „Książek obcojęzycznych”, których żadne polskie źródło nie rozpozna.

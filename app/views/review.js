@@ -1,7 +1,6 @@
 import { openDetailView } from '../core/detail-navigation.js';
 import {statusLabel} from '../core/ux.js';
 import { safeOfferHref } from '../core/formatters.js';
-import { confirmDialog } from '../core/dialogs.js';
 import { createReviewBulk } from './review-bulk.js';
 import { describeCandidate, differingFields, tidyOfferTitle, tidyWorkTitle, coverMarkup, isbnCover, parseBnPeople, cleanPublisher } from '../core/bibliography.js';
 // review workspace, preserving existing behavior while isolating its implementation.
@@ -565,23 +564,36 @@ function renderReviewDetail() {
     if (reviewDecisionPending) return;
     const current = state.selectedReviewId;
     const offerId = job.offerId;
-    if (!current || !offerId || !(await confirmDialog('Oznaczyć tę ofertę jako zestaw? Zniknie z weryfikacji pojedynczych książek.', { title: 'Oznaczanie jako zestaw', confirmLabel: 'Oznacz jako zestaw' }))) return;
+    if (!current || !offerId) return;
+    // No confirmation: one key / click, and the toast can undo it.
+    const position = filteredReviewOffers().findIndex((row) => row.id === current);
     const button = $('#markAsSet');
     button.disabled = true;
+    reviewDecisionPending = true;
     try {
       await json('/api/sets', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ offerId }),
       });
-      if (state.selectedReviewId === current) {
-        state.selectedReviewId = null;
-        state.reviewDetail = null;
-      }
-      await loadCatalogData();
-      toast('Zestaw zapisany. Książki dodasz w zakładce Zestawy.');
+      reviewDecisionPending = false;
+      if (state.selectedReviewId === current) await moveToNext(position);
+      else await loadCatalogData();
+      toast('Zestaw zapisany. Książki dodasz w zakładce Zestawy.', {
+        label: 'Cofnij',
+        onClick: async () => {
+          await json('/api/sets/' + encodeURIComponent(offerId), {
+            method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: '{}',
+          });
+          await loadCatalogData();
+          toast('Cofnięto — oferta wraca do identyfikacji.');
+        },
+        onError: () => toast('Nie udało się cofnąć oznaczenia zestawu.'),
+      });
     } catch (error) {
       toast('Nie udało się oznaczyć zestawu: ' + error.message);
       if (button.isConnected) button.disabled = false;
+    } finally {
+      reviewDecisionPending = false;
     }
   });
 
