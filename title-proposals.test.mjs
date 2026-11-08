@@ -8,6 +8,9 @@ import {
   rankCandidates,
   scoreCandidate,
   searchVariants,
+  derivativeMarker,
+  rescoreStoredProposals,
+  saveProposal,
 } from './title-proposals.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 
@@ -117,4 +120,27 @@ test('a source outage is not cached as "no proposal"', async () => {
   const result = await computeProposal(catalog, row);
   assert.equal(result.stored, false);
   assert.equal(jobsNeedingProposal(repository).length, 1);
+});
+
+test('a companion product is not the book it is about', () => {
+  const novel = { isbn: '9788382809411', title: 'Fourth wing = Czwarte skrzydło', authorText: 'Yarros, Rebecca', language: 'polski' };
+  assert.equal(derivativeMarker('Dziennik Fourth Wing. Czwarte Skrzydło', novel.title), 'dziennik');
+  assert.equal(derivativeMarker('Fourth Wing. Czwarte Skrzydło: Oficjalna kolorowanka z naklejkami', novel.title), 'kolorowanka');
+  assert.equal(derivativeMarker('Forgotten Realms Zapomniane Krainy Opis Świata dnd', 'Zapomniane Krainy'), 'opis swiata');
+  assert.equal(derivativeMarker('Dziennik Bridget Jones', 'Dziennik Bridget Jones'), null);
+  assert.ok(scoreCandidate('Dziennik Fourth Wing. Czwarte Skrzydło', novel) < 0.6);
+  assert.ok(scoreCandidate('Fourth Wing. Czwarte Skrzydło', novel) >= 0.85);
+});
+
+test('stored proposals are re-ranked with the current scoring without any lookup', () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  const offer = repository.upsertOffer({ source: 'Empik', normalizedUrl: 'https://www.empik.com/d', originalTitle: 'Dziennik Fourth Wing. Czwarte Skrzydło', currentPrice: 2999 });
+  const job = repository.putIdentificationJob({ offerId: offer.id, status: 'review_required' });
+  const novel = { isbn: '9788382809411', title: 'Fourth wing = Czwarte skrzydło', language: 'polski', score: 1 };
+  saveProposal(repository, { id: job.id, offer_id: offer.id }, { queries: ['x'], candidates: [novel], confidence: 'high' });
+  assert.equal(rescoreStoredProposals(repository), 1);
+  const stored = loadProposal(repository, job.id);
+  assert.notEqual(stored.confidence, 'high');
+  assert.ok(stored.candidates[0].score < 0.6);
+  assert.equal(rescoreStoredProposals(repository), 0, 'a second pass changes nothing');
 });

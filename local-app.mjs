@@ -11,7 +11,7 @@ import { blockedSources } from './source-blocks.mjs';
 import { reassignOffer, unassignOffer } from './offer-assignment.mjs';
 import { createAutoBackupScheduler } from './auto-backup.mjs';
 import { createScanScheduler, localScanRunner } from './scan-schedule.mjs';
-import { computeProposal, loadProposal, refreshProposals } from './title-proposals.mjs';
+import { computeProposal, loadProposal, refreshProposals, rescoreStoredProposals } from './title-proposals.mjs';
 import { historyBookLabels } from './history-brief.mjs';
 import { scanCancelled, awaitScan } from './scan-cancellation.mjs';
 import { createVintedDetailCache } from './vinted-detail-cache.mjs';
@@ -1449,6 +1449,12 @@ async function main() {
   });
   server.listen(port, '127.0.0.1', () => {
     if (enabled) scheduler.start();
+    try {
+      const catalog = getProductionCatalog();
+      if (catalog) rescoreStoredProposals(catalog.repository);
+    } catch (error) {
+      console.error('Przeliczenie propozycji: ' + error.message);
+    }
     if (String(process.env.BOOKFLIP_SCHEDULED_SCANS ?? '1') !== '0') scanScheduler.start();
     if (String(process.env.BOOKFLIP_BUYBACK_AUTO ?? '1') !== '0') getBuyback()?.startAuto();
     if (String(process.env.BOOKFLIP_CATALOG_SEEDS ?? '1') !== '0') getProductionCatalog()?.seeds?.start();

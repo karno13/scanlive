@@ -8,6 +8,9 @@ export function createReviewView({ state, $, $$, json, toast, money, date, escap
 // "Zaznacz wiele": one action for several offers (see review-bulk.js).
 const bulk = createReviewBulk({ state, $, json, toast, escapeHtml, loadCatalogData, filteredRows: () => filteredReviewOffers(), rerender: () => renderReview(), loadAllRows: loadAllReviewRows });
 function filteredReviewOffers() {
+  return collapseSameIsbn(sortedReviewOffers());
+}
+function sortedReviewOffers() {
   const query = $('#reviewSearch').value.trim().toLocaleLowerCase('pl'),
     source = $('#reviewSource').value,
     isbn = $('#reviewIsbn').value;
@@ -39,7 +42,7 @@ function filteredReviewOffers() {
   return rows.sort((a, b) =>
     $('#reviewSort').value === 'price'
       ? a.offer.currentPrice - b.offer.currentPrice
-      : String(b.offer.lastSeenAt).localeCompare(String(a.offer.lastSeenAt)),
+      : String(b.offer.firstSeenAt || b.offer.lastSeenAt).localeCompare(String(a.offer.firstSeenAt || a.offer.lastSeenAt)),
   );
 }
 
@@ -213,12 +216,22 @@ async function openSurePlan() {
   });
 }
 
+let loadingWholeQueue = false;
 function renderReview() {
   if (!state.history) return;
+  // Tabs, phrase groups and counts are only right on the whole queue (a few hundred rows).
+  if (state.activeView === 'review' && !loadingWholeQueue && state.catalogPages.jobs.offset < state.catalogPages.jobs.total) {
+    loadingWholeQueue = true;
+    void loadAllReviewRows().then((done) => { if (done) renderReview(); }).catch(() => {}).finally(() => { loadingWholeQueue = false; });
+  }
   renderTabs();
   const rows = filteredReviewOffers();
   const pending = state.catalogPages.jobs.total;
-  $('#reviewCount').textContent = rows.length === reviewOffers().length && reviewOffers().length >= pending ? `${pending} oczekujących` : `${rows.length} widocznych z ${pending} oczekujących`;
+  const covered = rows.reduce((sum, job) => sum + (job.sameIsbnCount || 1), 0);
+  const unfiltered = covered === reviewOffers().filter((job) => !state.skippedReviewIds.has(job.id)).length;
+  $('#reviewCount').textContent = unfiltered
+    ? `${pending} oczekujących${rows.length < covered ? ` · ${rows.length} decyzji` : ''}`
+    : `${covered} pasujących z ${pending} oczekujących`;
   $('#reviewNavCount').textContent = `${pending} do decyzji`;
   if (state.selectedReviewId && !rows.some((row) => row.id === state.selectedReviewId))
     state.selectedReviewId = null;
@@ -242,7 +255,7 @@ function renderReview() {
           lastGroup = group;
           const title = tidyOfferTitle(offer.title);
           const extra = bulk.itemExtras(job.id);
-          return `${header}<button class="review-item rv-item ${job.id === state.selectedReviewId ? 'active' : ''}${extra.className}" type="button" aria-current="${job.id === state.selectedReviewId ? 'true' : 'false'}"${extra.pressed} data-review-id="${escapeHtml(job.id)}">${extra.checkbox}${coverMarkup(offer.image, title, { size: 'sm', escapeHtml })}<span class="rv-item-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(offer.source)}"></span>${escapeHtml(offer.source)} · ${offer.observedIsbn ? `ISBN ${escapeHtml(offer.observedIsbn)}` : 'brak ISBN'}</small><small>${escapeHtml(job.result?.decision === 'not_found' ? 'ISBN nieznany źródłom' : statusLabel(job.status))}${job.lastError ? ' — pobieranie wymaga ponowienia' : ''}${proposalChip(job)}${offer.availability === 'not_seen' ? ' · <span class="proposal-chip is-stale">mogła zniknąć</span>' : ''}</small></span><span class="review-price">${money(offer.currentPrice)}</span></button>`;
+          return `${header}<button class="review-item rv-item ${job.id === state.selectedReviewId ? 'active' : ''}${extra.className}" type="button" aria-current="${job.id === state.selectedReviewId ? 'true' : 'false'}"${extra.pressed} data-review-id="${escapeHtml(job.id)}">${extra.checkbox}${coverMarkup(offer.image, title, { size: 'sm', escapeHtml })}<span class="rv-item-copy"><strong>${escapeHtml(title)}${job.sameIsbnCount > 1 ? ` <span class="rv-same-isbn" title="Tyle ofert ma ten ISBN; decyzja dla jednej obejmie pozostałe">×${job.sameIsbnCount}</span>` : ''}</strong><small><span class="source-dot" data-source="${escapeHtml(offer.source)}"></span>${escapeHtml(offer.source)} · ${offer.observedIsbn ? `ISBN ${escapeHtml(offer.observedIsbn)}` : 'brak ISBN'}</small><small>${escapeHtml(job.result?.decision === 'not_found' ? 'ISBN nieznany źródłom' : statusLabel(job.status))}${job.lastError ? ' — pobieranie wymaga ponowienia' : ''}${proposalChip(job)}${offer.availability === 'not_seen' ? ' · <span class="proposal-chip is-stale">mogła zniknąć</span>' : ''}</small></span><span class="review-price">${money(offer.currentPrice)}</span></button>`;
         })
         .join('')
     : '<div class="empty-detail"><h3>Brak pozycji</h3><p>Filtry nie zwracają ofert wymagających decyzji.</p></div>');
@@ -626,7 +639,14 @@ function renderLocalCandidates(box, localBox, items) {
         }),
       );
       renumberProposals(box);
+      const plan = localPreselection(items);
+      if (plan.note) localBox.querySelector('.rv-section-title').insertAdjacentHTML('afterend', `<p class="inline-note rv-cand-note${plan.tie ? ' is-tie' : ''}">${escapeHtml(plan.note)}</p>`);
+      // One clearly best book: its most used edition is chosen, so Enter alone confirms. Never
+      // when the operator typed an ISBN or already picked something.
+      if (plan.preselect && !$('#reviewIsbnCheckInput')?.value && !$('#reviewBookSearch')?.dataset.editionId && !box.querySelector('.rv-cand.is-chosen'))
+        localBox.querySelector('.rv-cand')?.click();
 }
+
 
 // Reasons for which no source gave a usable record for the offer's ISBN: the edition can be
 // created from the listing itself.
@@ -1028,4 +1048,49 @@ document.addEventListener('keydown', (event) => {
 });
 
 return { filteredReviewOffers, visibleCatalogRows, renderReview, normalizedIsbn, reviewCandidateMarkup, renderReviewDetail, renderReviewBookChoices, approveReview, decideReview };
+}
+
+/**
+ * Whether the first catalogue candidate is clear enough to preselect, and a note for the operator.
+ * Editions of one work share the work's score, so "tie" only counts between different works.
+ */
+export function localPreselection(items = []) {
+  const [first] = items;
+  if (!first) return { preselect: false, tie: false, note: '' };
+  const rivals = items.filter((item) => item.workId !== first.workId);
+  const bestRival = rivals.reduce((best, item) => Math.max(best, item.score), 0);
+  const editions = items.filter((item) => item.workId === first.workId).length;
+  const tie = rivals.length > 0 && first.score - bestRival < 0.03;
+  const preselect = !tie && first.score >= 0.85 && first.score - bestRival >= 0.06;
+  const note = tie
+    ? 'Różne książki z prawie tym samym wynikiem — porównaj okładki, autora i tom ze zdjęciem.'
+    : editions > 1
+      ? `${editions} wydania tej samej książki — ${preselect ? 'zaznaczono najczęściej używane; ' : ''}sprawdź wydawcę i okładkę.`
+      : '';
+  return { preselect, tie, note };
+}
+
+// Offers waiting only because their ISBN is not in the catalogue follow the first decision on
+// that ISBN automatically (requeueReviewsWithKnownIsbn), so the queue shows them once, with a count.
+const FOLLOWS_SAME_ISBN = ['isbn_not_found_in_metadata_sources', 'multiple_metadata_records', 'metadata_invalid_or_incomplete', 'metadata_isbn_mismatch'];
+export function collapseSameIsbn(rows) {
+  const firstByIsbn = new Map();
+  const out = [];
+  for (const job of rows) {
+    const isbn = String(job.offer?.observedIsbn || '').replace(/[^0-9X]/gi, '').toUpperCase();
+    const reason = [].concat(job.result?.reason ?? [])[0];
+    if (!isbn || !FOLLOWS_SAME_ISBN.includes(reason)) {
+      job.sameIsbnCount = 1;
+      out.push(job);
+      continue;
+    }
+    const first = firstByIsbn.get(isbn);
+    if (first) first.sameIsbnCount += 1;
+    else {
+      job.sameIsbnCount = 1;
+      firstByIsbn.set(isbn, job);
+      out.push(job);
+    }
+  }
+  return out;
 }

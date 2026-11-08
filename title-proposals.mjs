@@ -93,6 +93,19 @@ function candidateVolume(candidate) {
   return match ? Number(match[1]) : null;
 }
 
+// Words that make a listing a companion product of a book rather than the book: a journal, a
+// colouring book, a world guide or RPG handbook, merchandise. A candidate whose own title lacks
+// the same word is a different item ("Dziennik Fourth Wing" is not the novel "Fourth Wing").
+const DERIVATIVE =
+  /(?:^|\s)(dziennik|kolorowank[a-z]*|naklejk[a-z]*|notes|notatnik|planner|kalendarz[a-z]*|plakat[a-z]*|puzzle|zakladk[a-z]*|przewodnik[a-z]*|atlas|artbook|art of|opis swiata|podrecznik[a-z]*|handbook|dungeon master[a-z]*|bestiariusz|ksiega potworow|gra planszowa|karty do gry|figurk[a-z]*|kubek|brelok[a-z]*)(?=\s|$)/g;
+
+/** The companion-product word of `offerTitle` that `candidateTitle` lacks, or null. */
+export function derivativeMarker(offerTitle, candidateTitle = '') {
+  const candidate = ` ${fold(candidateTitle)} `;
+  for (const match of ` ${fold(offerTitle)} `.matchAll(DERIVATIVE)) if (!candidate.includes(` ${match[1]}`)) return match[1];
+  return null;
+}
+
 /** 0..1 confidence that `candidate` is the book named by `offerTitle`. */
 export function scoreCandidate(offerTitle, candidate) {
   const offer = new Set(titleTokens(offerTitle));
@@ -110,6 +123,7 @@ export function scoreCandidate(offerTitle, candidate) {
   const surnames = authorWords.slice(0, 2);
   if (surnames.some((word) => word.length > 3 && offer.has(word))) score = Math.min(1, score + 0.07);
   if (candidate.language && !/pol/i.test(candidate.language)) score *= 0.7;
+  if (derivativeMarker(offerTitle, candidate.title)) score *= 0.55;
   return Math.round(score * 100) / 100;
 }
 
@@ -221,4 +235,38 @@ export async function refreshProposals(catalog, { limit = 5, now, signal = null 
     else if (result.confidence === 'none') report.none += 1;
   }
   return report;
+}
+
+/**
+ * Re-ranks stored proposals of waiting offers with the current scoring, offline (no lookups):
+ * a scoring fix (e.g. companion products) reaches proposals computed before it. Returns the
+ * number of proposals whose ranking or confidence changed.
+ */
+export function rescoreStoredProposals(repository) {
+  const rows = repository.database
+    .prepare(
+      `SELECT p.job_id, p.candidates_json, p.confidence, p.best_score, o.original_title
+       FROM title_proposals p JOIN identification_jobs j ON j.id=p.job_id JOIN offers o ON o.id=j.offer_id
+       WHERE j.status='review_required'`,
+    )
+    .all();
+  const update = repository.database.prepare(
+    'UPDATE title_proposals SET candidates_json=?, best_isbn=?, best_score=?, confidence=? WHERE job_id=?',
+  );
+  let changed = 0;
+  for (const row of rows) {
+    let stored;
+    try {
+      stored = JSON.parse(row.candidates_json);
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(stored) || !stored.length) continue;
+    const { candidates, confidence } = rankCandidates(row.original_title, stored, { limit: stored.length });
+    const best = candidates[0] ?? null;
+    if (confidence === row.confidence && (best?.score ?? null) === row.best_score) continue;
+    update.run(JSON.stringify(candidates), best?.isbn ?? null, best?.score ?? null, confidence, row.job_id);
+    changed += 1;
+  }
+  return changed;
 }

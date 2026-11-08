@@ -224,9 +224,6 @@ function showView(name, options = {}) {
   if(['sets','settings'].includes(name)) $('#mobileMore')?.setAttribute('aria-current','page');
   else $('#mobileMore')?.removeAttribute('aria-current');
   if (name === 'review') { renderReview(); void tradingControls?.refreshDecisions(); }
-  // Tabs, phrase groups and counts are only right on the whole queue; it is a few hundred rows.
-  if (name === 'review' && state.catalogPages.jobs.offset < state.catalogPages.jobs.total)
-    void loadAllCatalogPages('jobs').then((done) => { if (done && state.activeView === 'review') renderReview(); }).catch(() => {});
   if (name === 'catalog') renderCatalog();
   if (name === 'offers') renderOffers();
   if (name === 'scanner') { renderScannerOffers(); void refreshScannerOffers(); }
@@ -550,6 +547,8 @@ async function loadCatalogStatus() {
       : !progress.pending && total ? `Zakończono · ${progress.review} do decyzji · ${progress.failed} błędów`
       : running ? 'Oczekuje na zadania' : 'Gotowe do uruchomienia';
 
+    // Nothing running: the panel shrinks to one line so the queue gets the screen.
+    $('.identification-dashboard')?.classList.toggle('is-idle', !active && !scheduler.stopping && !progress.pending);
     $('#catalogIncomplete').textContent = Number(identification.statuses?.review_required || 0);
     $('#settingsDatabaseCopy').textContent = state.catalog.enabled
       ? 'Baza lokalna jest dostepna.'

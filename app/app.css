@@ -3329,3 +3329,12 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
 .offer-gone{color:#966c23;font-weight:650}
 /* Live scan counters only next to a scan started in this session; the saved result panel covers the rest. */
 #scanProgressPanel[hidden]+.stats-grid{display:none}
+.rv-cand-note{margin:2px 0 8px;font-size:12px}.rv-cand-note.is-tie{color:#966c23;font-weight:600}
+.rv-same-isbn{display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:#e6efe9;color:#2c5c45;font-size:11px;font-weight:700}
+/* Idle identification: one line (title, state, buttons, details link) instead of a dashboard. */
+.identification-dashboard.is-idle>.identification-progress-caption,.identification-dashboard.is-idle>progress,.identification-dashboard.is-idle>.identification-metrics{display:none}
+.identification-dashboard.is-idle{padding-top:10px;padding-bottom:10px}
+.identification-dashboard.is-idle .identification-dashboard-heading h3{display:inline;margin-right:10px}
+.shortcut-help{position:relative}.shortcut-help>summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);list-style:none;padding:8px 10px;border:1px solid #d9e3dc;border-radius:7px;background:#fff}
+.shortcut-help>summary::-webkit-details-marker{display:none}
+.shortcut-help[open]>.shortcut-hint{position:absolute;right:0;top:calc(100% + 6px);z-index:20;display:flex;flex-wrap:wrap;gap:6px 12px;width:min(420px,80vw);padding:12px;background:#fff;border:1px solid #d9e3dc;border-radius:8px;box-shadow:0 8px 24px rgba(20,40,30,.12)}
