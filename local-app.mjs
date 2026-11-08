@@ -18,7 +18,7 @@ import { createVintedDetailCache } from './vinted-detail-cache.mjs';
 import { listOfferWorkspace, setOfferWorkspace, importOfferWorkspace } from './offer-workspace-api.mjs';
 import { listWorkSeries, updateWorkSeries } from './work-series-api.mjs';
 import { createScanDiagnostics, addScanEvent, scanProgress, scanTelemetry } from './scan-diagnostics.mjs';
-import { listOfferSets, markOfferAsSet, updateSetEdition, unmarkOfferSet } from './offer-sets.mjs';
+import { listOfferSets, markOfferAsSet, updateSetEdition, unmarkOfferSet, setCandidates } from './offer-sets.mjs';
 import { defaultCatalogPath } from './catalog-data-location.mjs';
 import { normalizeISBN } from './isbn-normalization.mjs';
 import { createServer } from 'node:http';
@@ -1100,19 +1100,27 @@ export function createLocalAppServer({
         if (typeof input?.offerId !== 'string' || !input.offerId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_OFFER_ID' }));
         return send(response, 200, JSON.stringify(markOfferAsSet(catalog.repository, input.offerId)));
       }
+      const setCandidatesPath = url.pathname.match(/^\/api\/sets\/([^/]+)\/candidates$/);
+      if (setCandidatesPath && request.method === 'GET') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(response, 200, JSON.stringify(setCandidates(catalog.repository, decodeURIComponent(setCandidatesPath[1]))));
+      }
       if (url.pathname.startsWith('/api/sets/') && ['POST','DELETE'].includes(request.method)) {
         const catalog = getProductionCatalog();
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const parts = url.pathname.split('/').map(decodeURIComponent);
-        if (parts.length === 4 && parts[3] === 'editions' && request.method === 'POST') {
+        // /api/sets/<offerId>[/editions[/<editionId>]]. (The parts used to be counted with the
+        // leading "/api/sets", so adding a book, removing one and unmarking a set never matched.)
+        const parts = url.pathname.slice('/api/sets/'.length).split('/').map(decodeURIComponent);
+        if (parts.length === 2 && parts[1] === 'editions' && request.method === 'POST') {
           const input = await readJson(request);
           if (typeof input?.editionId !== 'string' || !input.editionId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_EDITION_ID' }));
-          return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, parts[2], input.editionId, true)));
+          return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, parts[0], input.editionId, true)));
         }
-        if (parts.length === 5 && parts[3] === 'editions' && request.method === 'DELETE')
-          return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, parts[2], parts[4], false)));
-        if (parts.length === 3 && request.method === 'DELETE')
-          return send(response, 200, JSON.stringify(unmarkOfferSet(catalog.repository, parts[2])));
+        if (parts.length === 3 && parts[1] === 'editions' && request.method === 'DELETE')
+          return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, parts[0], parts[2], false)));
+        if (parts.length === 1 && parts[0] && request.method === 'DELETE')
+          return send(response, 200, JSON.stringify(unmarkOfferSet(catalog.repository, parts[0])));
       }
       if (request.method === 'GET' && url.pathname === '/api/identification-jobs') {
         const catalog = getProductionCatalog();

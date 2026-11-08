@@ -1,45 +1,83 @@
 import { openDetailView } from '../core/detail-navigation.js';
-import {money} from '../core/formatters.js';
-import {markDirty,confirmDiscard,hasUnsavedChanges,watchForm} from '../core/ux.js';
-import {mountSetTrading} from './set-trading.js';
+import { money, safeOfferHref } from '../core/formatters.js';
+import { confirmDiscard } from '../core/ux.js';
+import { mountSetTrading } from './set-trading.js';
 import { confirmDialog } from '../core/dialogs.js';
-// Workspace for marketplace offers containing multiple catalog editions.
+import { coverMarkup, tidyOfferTitle, tidyWorkTitle, isbnCover, parseBnPeople, cleanPublisher } from '../core/bibliography.js';
+
+// Sets: one marketplace offer that holds several books. Laid out like the review workspace: the
+// list with photos on the left; on the right the listing (photo, price, link to check what is
+// really in it), the books already in the set, suggestions from the catalogue (the works and
+// cycles the listing names), search, unrecognised items and the composition check.
+const TABS = [
+  ['', 'Wszystkie'],
+  ['empty', 'Do uzupełnienia'],
+  ['open', 'Niepotwierdzone'],
+  ['confirmed', 'Potwierdzone'],
+];
+const stateOf = (set) => (set.compositionConfirmed ? 'confirmed' : set.editions.length || set.unknownItems?.length ? 'open' : 'empty');
+const STATE_LABEL = { empty: 'pusty', open: 'skład do potwierdzenia', confirmed: 'skład potwierdzony' };
+const books = (count) =>
+  count === 1 ? '1 książka' : [2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100) ? `${count} książki` : `${count} książek`;
+const setsWord = (count) =>
+  count === 1 ? '1 zestaw' : [2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100) ? `${count} zestawy` : `${count} zestawów`;
+
 export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, onSelect = () => {} }) {
   let sets = [];
   let activeId = null;
+  let tab = '';
   let searchSerial = 0;
+  let suggestionSerial = 0;
   let editionSearchTimer = null;
   const request = (method, path, body) => json(path, {
     method, headers: { 'Content-Type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const safe = (value) => escapeHtml(String(value ?? ''));
-  const plural = (count) => count === 1 ? '1 książka' : `${count} książek`;
+  const active = () => sets.find((item) => item.offerId === activeId) || null;
+  const included = () => new Set((active()?.editions || []).map((item) => item.editionId));
+
+  function filtered() {
+    const needle = $('#setFilter').value.trim().toLocaleLowerCase('pl');
+    return sets.filter((item) => (!tab || stateOf(item) === tab) && `${item.title} ${item.source}`.toLocaleLowerCase('pl').includes(needle));
+  }
+
+  function renderTabs() {
+    const counts = Object.fromEntries(TABS.map(([key]) => [key, key ? sets.filter((item) => stateOf(item) === key).length : sets.length]));
+    $('#setTabs').innerHTML = TABS.map(([key, label]) =>
+      `<button type="button" class="rv-tab${key === tab ? ' is-active' : ''}" data-set-tab="${key}" aria-pressed="${key === tab}">${safe(label)} <span>${counts[key]}</span></button>`).join('');
+    $('#setTabs').querySelectorAll('[data-set-tab]').forEach((button) => button.addEventListener('click', () => {
+      tab = button.dataset.setTab;
+      renderTabs();
+      renderList();
+    }));
+  }
 
   function renderList() {
-    const needle = $('#setFilter').value.trim().toLocaleLowerCase('pl');
-    const rows = sets.filter(item => `${item.title} ${item.source}`.toLocaleLowerCase('pl').includes(needle));
-    $('#setTotal').textContent = pluralSets(sets.length);
-    $('#setList').innerHTML = rows.length ? rows.map(item => `
-      <button class="sets-list-item ${item.offerId === activeId ? 'active' : ''}" type="button"
-        data-set-id="${safe(item.offerId)}" aria-pressed="${item.offerId === activeId}">
-        <span class="sets-list-title">${safe(item.title)}</span>
-        <span class="sets-list-meta"><span>${safe(item.source)}</span><span>${plural(item.editions.length)}</span></span>
-      </button>`).join('') : '<p class="sets-empty">Brak zestawów pasujących do wyszukiwania.</p>';
-    $('#setList').querySelectorAll('[data-set-id]').forEach(button => {
-      button.addEventListener('click', () => selectSet(button.dataset.setId));
-    });
+    const rows = filtered();
+    $('#setTotal').textContent = setsWord(sets.length);
+    $('#setList').innerHTML = rows.length ? rows.map((row) => {
+      const title = tidyOfferTitle(row.title);
+      const count = row.editions.reduce((sum, item) => sum + (item.quantity || 1), 0) + (row.unknownItems || []).reduce((sum, item) => sum + item.quantity, 0);
+      const status = stateOf(row);
+      return `<button class="review-item rv-item ${row.offerId === activeId ? 'active' : ''}" type="button" data-set-id="${safe(row.offerId)}" aria-current="${row.offerId === activeId}" title="${safe(row.title)}">
+        ${coverMarkup(row.image, title, { size: 'sm', escapeHtml })}
+        <span class="rv-item-copy"><strong>${safe(title)}</strong>
+          <small><span class="source-dot" data-source="${safe(row.source)}"></span>${safe(row.source)} · ${count ? books(count) : 'brak książek'}</small>
+          <small><span class="proposal-chip is-${status === 'confirmed' ? 'high' : status === 'open' ? 'medium' : 'stale'}">${STATE_LABEL[status]}</span>${['not_seen', 'sold', 'unavailable'].includes(row.availability) ? ' · <span class="proposal-chip is-stale">mogła zniknąć</span>' : ''}</small></span>
+        <span class="review-price">${money(row.currentPrice)}</span></button>`;
+    }).join('') : '<div class="empty-detail"><h3>Brak zestawów</h3><p>Zmień filtr albo oznacz ofertę jako zestaw w weryfikacji (klawisz Z).</p></div>';
+    $('#setList').querySelectorAll('[data-set-id]').forEach((button) => button.addEventListener('click', () => selectSet(button.dataset.setId)));
   }
-  function pluralSets(count) { return count === 1 ? '1 zestaw' : `${count} zestawów`; }
 
   async function selectSet(id) {
-    if(id===activeId){openDetailView('sets');return;}
-    if(!await confirmDiscard())return;
+    if (id === activeId) { openDetailView('sets'); return; }
+    if (!await confirmDiscard()) return;
     openDetailView('sets');
     activeId = id;
     $('#setCurrent').value = id || '';
     renderList();
-    renderMembers();
+    renderDetail();
     onSelect();
   }
 
@@ -47,65 +85,175 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
     const response = await json('/api/sets');
     sets = response.items || [];
     const selected = preferred || activeId;
-    activeId = sets.some(item => item.offerId === selected) ? selected : sets[0]?.offerId || null;
-    $('#setCurrent').innerHTML = sets.map(item =>
-      `<option value="${safe(item.offerId)}">${safe(item.title)}</option>`).join('');
+    activeId = sets.some((item) => item.offerId === selected) ? selected : filtered()[0]?.offerId || sets[0]?.offerId || null;
+    $('#setCurrent').innerHTML = sets.map((item) => `<option value="${safe(item.offerId)}">${safe(item.title)}</option>`).join('');
     $('#setCurrent').value = activeId || '';
+    renderTabs();
     renderList();
-    renderMembers();
+    renderDetail();
     onSelect();
   }
 
-  function renderMembers() {
-    const active = sets.find(item => item.offerId === activeId);
-    $('#setSelectedTitle').textContent = active?.title || 'Wybierz zestaw z listy';
-    $('#setSelectedMeta').textContent = active ? `Cena pakietu: ${money(active.currentPrice)} · ${active.source} · ${active.compositionConfirmed?'Skład potwierdzony':'Skład niepotwierdzony / niepełny'}` : 'Zawartość zestawu pojawi się tutaj.';
-    const known=(active?.editions || []).reduce((sum,item)=>sum+(item.quantity||1),0),unknown=(active?.unknownItems || []).reduce((sum,item)=>sum+item.quantity,0);
-    $('#setSelectedCount').textContent = `${known+unknown} egz. · ${known} rozpoznanych`;
-    $('#setMemberHint').textContent = active?.editions.length ? 'Powiązane wydania z katalogu' : 'Brak przypisanych wydań';
-    const target = $('#setMembers');
-    if (!active) {
-      target.innerHTML = '<p class="sets-empty">Wybierz zestaw po lewej stronie lub utwórz nowy.</p>';
+  function editionCard(item, { action, member = false }) {
+    const title = tidyWorkTitle(item.workTitle || item.title);
+    const author = parseBnPeople([].concat(item.authors || []).join(' '), [].concat(item.authors || []))[0] || '';
+    const facts = [item.cycle ? item.cycle + (item.volume ? ' · t. ' + item.volume : '') : '', item.publicationYear, cleanPublisher(item.publisher || ''), item.isbn ? 'ISBN ' + item.isbn : '']
+      .filter(Boolean).map((text) => `<span class="fact">${safe(text)}</span>`).join('');
+    return `<li class="sets-card${member ? ' is-member' : ''}">${coverMarkup(item.cover || isbnCover(item.isbn), title, { size: 'sm', escapeHtml })}
+      <span class="rv-cand-body"><b>${safe(title)}</b>${author ? `<small>${safe(author)}</small>` : ''}<span class="rv-facts">${facts}</span></span>${action}</li>`;
+  }
+
+  function renderDetail() {
+    const set = active();
+    $('#setSelectedTitle').textContent = set ? tidyOfferTitle(set.title) : 'Wybierz zestaw z listy';
+    $('#setSelectedTitle').title = set?.title || '';
+    $('#setPrice').textContent = set ? money(set.currentPrice) : '';
+    const link = $('#setOfferLink');
+    link.hidden = !set;
+    if (set) link.href = safeOfferHref(set.url);
+    $('#setKicker').innerHTML = set
+      ? `<span class="source-chip" data-source="${safe(set.source)}">${safe(set.source)}</span>${set.lastSeenAt ? `<span>widziana ${safe(new Date(set.lastSeenAt).toLocaleDateString('pl-PL'))}</span>` : ''}${['not_seen', 'sold', 'unavailable'].includes(set.availability) ? '<span class="proposal-chip is-stale">mogła zniknąć</span>' : ''}`
+      : '';
+    document.querySelector('#view-sets .sets-search-panel').hidden = !set;
+    if (!set) {
+      $('#setSelectedMeta').textContent = 'Zawartość zestawu pojawi się tutaj.';
+      $('#setPhoto').innerHTML = '';
+      $('#setMembers').innerHTML = '<p class="sets-empty">Wybierz zestaw po lewej stronie.</p>';
+      for (const id of ['#setSuggestions', '#setUnknown', '#setActions', '#setTradingMount', '#setEditionResults']) $(id).innerHTML = '';
+      $('#setSelectedCount').textContent = '';
       return;
     }
-    const rows = active.editions.map((item, index) => `
-      <div class="sets-member">
-        <span class="sets-member-index" aria-hidden="true">${index + 1}</span>
-        <div class="sets-member-copy"><strong>${safe(item.workTitle)}</strong>
-          <small>${safe([item.title,item.isbn,item.publisher,item.publicationYear,item.language,item.binding].filter(Boolean).join(' · '))}</small>
-          <div class="set-member-values"><label>Liczba egzemplarzy<input data-member-quantity="${safe(item.editionId)}" type="number" min="1" max="10000" step="1" value="${item.quantity}"></label><label>Zakładana odsprzedaż / szt. (zł)<input data-member-resale="${safe(item.editionId)}" type="number" min="0" step="0.01" inputmode="decimal" value="${item.resalePrice??''}"></label><button type="button" class="button secondary" data-save-member="${safe(item.editionId)}">Zapisz pozycję</button></div></div>
-        <button class="button secondary" type="button" data-set-remove="${safe(item.editionId)}"
-          aria-label="Usuń ${safe(item.title)} z zestawu">Usuń</button>
-      </div>`).join('');
-    target.innerHTML = (rows || '<p class="sets-empty">Ten zestaw nie ma jeszcze książek. Wyszukaj wydanie poniżej i dodaj je jednym kliknięciem.</p>') +
-      '<div class="sets-footer"><button class="button secondary" type="button" id="setUnmark">Usuń oznaczenie zestawu</button></div>';
-    target.querySelectorAll('[data-save-member]').forEach(button=>button.addEventListener('click',async()=>{
-      const id=button.dataset.saveMember;
-      const quantity=target.querySelector('[data-member-quantity="'+CSS.escape(id)+'"]');const resale=target.querySelector('[data-member-resale="'+CSS.escape(id)+'"]');
-      button.disabled=true;
-      quantity.disabled=true;resale.disabled=true;
-      try{await request('PUT','/api/set-items/'+encodeURIComponent(active.offerId)+'/'+encodeURIComponent(id),{quantity:Number(quantity.value),resalePrice:resale.value.trim()===''?null:Number(resale.value)});button.saveBaseline();if(!hasUnsavedChanges())await refreshSets(active.offerId);toast('Zapisano ilość i cenę pozycji. Potwierdź skład po sprawdzeniu.');}
-      catch(error){toast('Nie zapisano. Podaj całkowitą ilość i poprawną cenę.');}finally{button.disabled=false;quantity.disabled=false;resale.disabled=false;}
+    const known = set.editions.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    const unknown = (set.unknownItems || []).reduce((sum, item) => sum + item.quantity, 0);
+    $('#setSelectedMeta').textContent = `${STATE_LABEL[stateOf(set)][0].toUpperCase()}${STATE_LABEL[stateOf(set)].slice(1)} · ${books(known + unknown)}${unknown ? ` (${unknown} nierozpoznanych)` : ''}`;
+    $('#setSelectedCount').textContent = set.editions.length ? `${known} egz. z katalogu` : '';
+    $('#setPhoto').innerHTML = `${coverMarkup(set.image, tidyOfferTitle(set.title), { size: 'xl', escapeHtml })}<figcaption>Zdjęcie z ogłoszenia · <a href="${safe(safeOfferHref(set.url))}" target="_blank" rel="noreferrer">pełna treść i więcej zdjęć w ogłoszeniu ↗</a></figcaption>`;
+    renderMembers(set);
+    renderUnknown(set);
+    renderActions(set);
+    $('#setEditionResults').innerHTML = '';
+    void renderSuggestions(set);
+    $('#setTradingMount').innerHTML = '';
+    mountSetTrading({ active: set, target: $('#setTradingMount'), json, refresh: refreshSets, toast });
+  }
+
+  function renderMembers(set) {
+    const target = $('#setMembers');
+    if (!set.editions.length) {
+      target.innerHTML = '<p class="sets-empty">Brak książek. Otwórz ogłoszenie, sprawdź, co jest w zestawie, i dodaj książki z propozycji albo z wyszukiwarki poniżej.</p>';
+      return;
+    }
+    target.innerHTML = '<ol class="sets-cards">' + set.editions.map((item) => editionCard(item, {
+      member: true,
+      action: `<span class="sets-card-actions"><label class="sets-qty"><span class="sr-only">Liczba egzemplarzy</span><input type="number" min="1" max="10000" step="1" value="${safe(item.quantity)}" data-member-quantity="${safe(item.editionId)}" aria-label="Liczba egzemplarzy: ${safe(item.title)}"> szt.</label>
+        <button class="link-button danger-text" type="button" data-set-remove="${safe(item.editionId)}" aria-label="Usuń ${safe(item.title)} z zestawu">Usuń</button></span>`,
+    })).join('') + '</ol>';
+    // The number of copies is saved as soon as it changes.
+    target.querySelectorAll('[data-member-quantity]').forEach((input) => input.addEventListener('change', async () => {
+      const item = set.editions.find((entry) => entry.editionId === input.dataset.memberQuantity);
+      const quantity = Number(input.value);
+      if (!Number.isSafeInteger(quantity) || quantity < 1) { input.value = item.quantity; return toast('Podaj liczbę egzemplarzy (1 lub więcej).'); }
+      input.disabled = true;
+      try {
+        await request('PUT', '/api/set-items/' + encodeURIComponent(set.offerId) + '/' + encodeURIComponent(item.editionId), { quantity, resalePrice: item.resalePrice ?? null });
+        await refreshSets(activeId);
+      } catch (error) {
+        toast('Nie zapisano liczby egzemplarzy: ' + error.message);
+        input.disabled = false;
+      }
     }));
-    target.querySelectorAll('[data-save-member]').forEach(button=>{
-      const id=button.dataset.saveMember;
-      const controls=[target.querySelector('[data-member-quantity="'+CSS.escape(id)+'"]'),target.querySelector('[data-member-resale="'+CSS.escape(id)+'"]')];
-      button.saveBaseline=watchForm('set-member:'+active.offerId+':'+id,controls);
-    });
-    mountSetTrading({active,target,json,refresh:refreshSets,toast,openOfferDrawer});
-    target.querySelectorAll('[data-set-remove]').forEach(button => button.addEventListener('click', async () => {
-      if(!await confirmDiscard())return;
+    target.querySelectorAll('[data-set-remove]').forEach((button) => button.addEventListener('click', async () => {
       button.disabled = true;
       try {
-        await request('DELETE', '/api/sets/' + encodeURIComponent(active.offerId) +
-          '/editions/' + encodeURIComponent(button.dataset.setRemove));
-        await refreshSets(active.offerId);
+        await request('DELETE', '/api/sets/' + encodeURIComponent(set.offerId) + '/editions/' + encodeURIComponent(button.dataset.setRemove));
+        await refreshSets(activeId);
       } catch (error) { button.disabled = false; toast(error.message); }
     }));
+  }
+
+  async function addEditions(ids) {
+    for (const editionId of ids) await request('POST', '/api/sets/' + encodeURIComponent(activeId) + '/editions', { editionId });
+    await refreshSets(activeId);
+  }
+
+  // What the listing itself names: works whose title it contains, the ISBN it shows, and the rest
+  // of the cycles those belong to (a set is usually a whole cycle).
+  async function renderSuggestions(set) {
+    const mount = $('#setSuggestions');
+    const serial = ++suggestionSerial;
+    mount.innerHTML = '';
+    let items = [];
+    try {
+      items = (await json('/api/sets/' + encodeURIComponent(set.offerId) + '/candidates')).items || [];
+    } catch {
+      return;
+    }
+    if (serial !== suggestionSerial || activeId !== set.offerId) return;
+    const have = included();
+    const fresh = items.filter((item) => !have.has(item.editionId));
+    if (!fresh.length) return;
+    mount.innerHTML = `<div class="rv-section-title"><h4>Propozycje z tytułu ogłoszenia</h4>${fresh.length > 1 ? `<button type="button" class="link-button" data-add-all>Dodaj wszystkie (${fresh.length})</button>` : ''}</div>
+      <ol class="sets-cards">${fresh.map((item) => editionCard(item, {
+        action: `<button type="button" class="button secondary compact" data-add-edition="${safe(item.editionId)}">Dodaj</button>`,
+      })).join('')}</ol>`;
+    wireAdd(mount);
+    mount.querySelector('[data-add-all]')?.addEventListener('click', async (event) => {
+      event.currentTarget.disabled = true;
+      try { await addEditions(fresh.map((item) => item.editionId)); toast(`Dodano ${books(fresh.length)}. Sprawdź z ogłoszeniem, czy to pełny skład.`); }
+      catch (error) { toast('Nie dodano wszystkich: ' + error.message); await refreshSets(activeId); }
+    });
+  }
+
+  function wireAdd(root) {
+    root.querySelectorAll('[data-add-edition]').forEach((button) => button.addEventListener('click', async () => {
+      if (!activeId) return toast('Najpierw wybierz zestaw.');
+      button.disabled = true;
+      try {
+        await request('POST', '/api/sets/' + encodeURIComponent(activeId) + '/editions', { editionId: button.dataset.addEdition });
+        button.textContent = 'Dodano';
+        await refreshSets(activeId);
+      } catch (error) { button.disabled = false; toast(error.message); }
+    }));
+  }
+
+  function renderUnknown(set) {
+    const mount = $('#setUnknown');
+    const canConfirm = set.editions.length > 0 && !(set.unknownItems || []).length;
+    mount.innerHTML = `<div class="rv-section-title"><h4>Nie ma w katalogu</h4><small>opisz książkę, której nie da się znaleźć</small></div>
+      ${(set.unknownItems || []).map((item) => `<div class="sets-unknown-row"><span>${safe(item.title)} · ${safe(item.quantity)} szt.</span><button type="button" class="link-button danger-text" data-unknown-remove="${safe(item.id)}">Usuń</button></div>`).join('')}
+      <form class="set-unknown-form"><input name="title" maxlength="300" required placeholder="Np. Gotrek i Felix: Zabójca demonów" aria-label="Opis nierozpoznanej książki"><input name="quantity" type="number" min="1" max="10000" step="1" value="1" aria-label="Liczba egzemplarzy"><button type="submit" class="button secondary compact">Dodaj</button></form>
+      <label class="sets-confirm"><input type="checkbox" data-set-confirm ${set.compositionConfirmed ? 'checked' : ''} ${canConfirm || set.compositionConfirmed ? '' : 'disabled'}> Skład sprawdzony z ogłoszeniem — kompletny</label>
+      ${canConfirm || set.compositionConfirmed ? '' : `<p class="inline-note">${set.editions.length ? 'Najpierw rozpoznaj albo usuń pozycje spoza katalogu.' : 'Dodaj książki, aby potwierdzić skład.'}</p>`}`;
+    mount.querySelectorAll('[data-unknown-remove]').forEach((button) => button.addEventListener('click', async () => {
+      button.disabled = true;
+      try { await request('DELETE', '/api/set-unknown/' + encodeURIComponent(set.offerId) + '/' + encodeURIComponent(button.dataset.unknownRemove)); await refreshSets(activeId); }
+      catch { button.disabled = false; toast('Nie usunięto pozycji. Spróbuj ponownie.'); }
+    }));
+    const form = mount.querySelector('form');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const title = form.elements.title.value.trim();
+      if (!title) return form.elements.title.focus();
+      form.querySelector('button').disabled = true;
+      try { await request('POST', '/api/set-unknown/' + encodeURIComponent(set.offerId), { title, quantity: Number(form.elements.quantity.value) }); await refreshSets(activeId); }
+      catch { form.querySelector('button').disabled = false; toast('Nie zapisano pozycji. Sprawdź opis i liczbę.'); }
+    });
+    mount.querySelector('[data-set-confirm]').addEventListener('change', async (event) => {
+      const box = event.currentTarget;
+      box.disabled = true;
+      try { await request('PUT', '/api/set-details/' + encodeURIComponent(set.offerId), { confirmed: box.checked }); await refreshSets(activeId); }
+      catch { box.checked = !box.checked; box.disabled = false; toast('Nie zapisano potwierdzenia składu.'); }
+    });
+  }
+
+  function renderActions(set) {
+    $('#setActions').innerHTML = `<div class="lean-review-primary-actions"><a class="button primary" href="${safe(safeOfferHref(set.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie ↗</a><button class="button secondary" type="button" id="setOfferDetails">Szczegóły oferty</button></div>
+      <div class="lean-review-secondary-actions"><button class="button ghost danger-text" type="button" id="setUnmark">To nie zestaw — wróć do weryfikacji</button></div>`;
+    $('#setOfferDetails').addEventListener('click', () => openOfferDrawer(set.offerId));
     $('#setUnmark').addEventListener('click', async () => {
-      if(!await confirmDiscard())return;
-      if (!(await confirmDialog('Usunąć oznaczenie zestawu? Oferta wróci do kolejki identyfikacji.', { title: 'Oznaczenie zestawu', confirmLabel: 'Usuń oznaczenie', danger: true }))) return;
-      try { await request('DELETE', '/api/sets/' + encodeURIComponent(active.offerId)); await refreshSets(); }
+      if (!await confirmDiscard()) return;
+      if (!(await confirmDialog('Usunąć oznaczenie zestawu? Oferta wróci do kolejki identyfikacji, a lista książek zestawu zostanie usunięta.', { title: 'Oznaczenie zestawu', confirmLabel: 'Usuń oznaczenie', danger: true }))) return;
+      try { await request('DELETE', '/api/sets/' + encodeURIComponent(set.offerId)); await refreshSets(); }
       catch (error) { toast(error.message); }
     });
   }
@@ -114,7 +262,7 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
     const query = $('#setOfferQuery').value.trim();
     if (!query) { $('#setFeedback').textContent = 'Wpisz tytuł lub ISBN oferty.'; return; }
     const found = await json('/api/offers?' + new URLSearchParams({ query, limit: '100' }));
-    $('#setOfferSelect').innerHTML = (found.items || []).map(row =>
+    $('#setOfferSelect').innerHTML = (found.items || []).map((row) =>
       `<option value="${safe(row.id)}">${safe(row.title)} — ${safe(row.source)}</option>`).join('');
     $('#setFeedback').textContent = `Znaleziono ${found.total} ofert.`;
   }
@@ -122,37 +270,28 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
   async function searchEditions() {
     const query = $('#setEditionQuery').value.trim();
     const output = $('#setEditionResults');
-    if (query.length < 2) { output.textContent = 'Wpisz co najmniej 2 znaki.'; return; }
+    if (query.length < 2) { output.innerHTML = '<p class="sets-empty">Wpisz co najmniej 2 znaki.</p>'; return; }
     const serial = ++searchSerial;
-    output.textContent = 'Wyszukiwanie w katalogu…';
+    output.innerHTML = '<p class="sets-empty">Szukam w katalogu…</p>';
     try {
-      const response = await json('/api/catalog/works?' + new URLSearchParams({ query, limit: '100' }));
+      const response = await json('/api/catalog/works?' + new URLSearchParams({ query, limit: '50' }));
       if (serial !== searchSerial || $('#setEditionQuery').value.trim() !== query) return;
-      const rows = (response.items || []).flatMap(work => (work.editions || []).map(edition =>
-        ({ id: edition.id, work: work.title, title: edition.title, publisher: [edition.publisher,edition.publicationYear,edition.language,edition.binding,...(edition.identifiers||[]).filter(item=>item.scheme.startsWith('isbn')).map(item=>item.value)].filter(Boolean).join(' · ') })));
-      const current = sets.find(item => item.offerId === activeId);
-      const included = new Set((current?.editions || []).map(item => item.editionId));
-      $('#setEditionSelect').innerHTML = rows.map(row => `<option value="${safe(row.id)}">${safe(row.title)}</option>`).join('');
-      output.innerHTML = rows.length ? rows.map(row => `
-        <div class="sets-result">
-          <div><strong>${safe(row.work)}</strong><small>${safe(row.title)}${row.publisher ? ' · ' + safe(row.publisher) : ''}</small></div>
-          <button type="button" class="button ${included.has(row.id) ? 'secondary' : 'primary'}"
-            data-add-edition="${safe(row.id)}" ${included.has(row.id) || !activeId ? 'disabled' : ''}>${included.has(row.id) ? 'Dodano' : 'Dodaj'}</button>
-        </div>`).join('') : '<p class="sets-empty">Nie znaleziono wydań. Spróbuj innego tytułu lub ISBN.</p>';
-      output.querySelectorAll('[data-add-edition]').forEach(button => button.addEventListener('click', async () => {
-        if (!activeId) return toast('Najpierw wybierz zestaw.');
-        if(!await confirmDiscard())return;
-        button.disabled = true;
-        try {
-          await request('POST', '/api/sets/' + encodeURIComponent(activeId) + '/editions', { editionId: button.dataset.addEdition });
-          button.textContent = 'Dodano';
-          await refreshSets(activeId);
-        } catch (error) { button.disabled = false; toast(error.message); }
-      }));
+      const rows = (response.items || []).flatMap((work) => (work.editions || []).map((edition) => ({
+        id: edition.id, title: edition.title, workTitle: work.title, authors: work.authors || [], publisher: edition.publisher,
+        publicationYear: edition.publicationYear, isbn: (edition.identifiers || []).find((item) => String(item.scheme).startsWith('isbn'))?.value || '',
+      })));
+      const have = included();
+      output.innerHTML = rows.length
+        ? '<ol class="sets-cards">' + rows.slice(0, 30).map((row) => editionCard({ ...row, editionId: row.id }, {
+          action: `<button type="button" class="button ${have.has(row.id) ? 'ghost' : 'secondary'} compact" data-add-edition="${safe(row.id)}" ${have.has(row.id) || !activeId ? 'disabled' : ''} title="${safe(row.title)}">${have.has(row.id) ? 'Dodano' : 'Dodaj'}</button>`,
+        })).join('') + '</ol>'
+        : '<p class="sets-empty">Nie znaleziono. Spróbuj innego tytułu albo dopisz książkę niżej, w „Nie ma w katalogu”.</p>';
+      wireAdd(output);
     } catch (error) {
-      if (serial === searchSerial && $('#setEditionQuery').value.trim() === query) output.textContent = 'Nie udało się wyszukać książek: ' + error.message;
+      if (serial === searchSerial) output.innerHTML = '<p class="sets-empty">Nie udało się wyszukać: ' + safe(error.message) + '</p>';
     }
   }
+
   function wire(id, callback) {
     $(id).addEventListener('click', async () => {
       const button = $(id);
@@ -164,7 +303,7 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
   wire('#setSearchOffers', searchOffers);
   wire('#setSearchEditions', searchEditions);
   wire('#setMarkOffer', async () => {
-    if(!await confirmDiscard())return;
+    if (!await confirmDiscard()) return;
     const offerId = $('#setOfferSelect').value;
     if (!offerId) return toast('Najpierw wyszukaj i wybierz ofertę.');
     await request('POST', '/api/sets', { offerId });
@@ -177,19 +316,14 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
   $('#setCurrent').addEventListener('change', () => selectSet($('#setCurrent').value));
   $('#setEditionQuery').addEventListener('input', () => {
     clearTimeout(editionSearchTimer);
-    const term = $('#setEditionQuery').value.trim();
-    if (term.length < 2) {
-      ++searchSerial;
-      $('#setEditionResults').textContent = 'Wpisz co najmniej 2 znaki.';
-      return;
-    }
+    if ($('#setEditionQuery').value.trim().length < 2) { ++searchSerial; $('#setEditionResults').innerHTML = ''; return; }
     editionSearchTimer = setTimeout(() => { void searchEditions(); }, 350);
   });
-  $('#setEditionQuery').addEventListener('keydown', event => {
+  $('#setEditionQuery').addEventListener('keydown', (event) => {
     if (event.key === 'Enter') { event.preventDefault(); clearTimeout(editionSearchTimer); void searchEditions(); }
   });
-  $('#setOfferQuery').addEventListener('keydown', event => {
-    if (event.key === 'Enter') { event.preventDefault(); void searchOffers().catch(error => toast(error.message)); }
+  $('#setOfferQuery').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); void searchOffers().catch((error) => toast(error.message)); }
   });
-  return { refreshSets, activeId: () => activeId };
+  return { refreshSets, activeId: () => activeId, refreshActive: () => refreshSets(activeId) };
 }

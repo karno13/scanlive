@@ -2,6 +2,14 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-08 (20) — Zestawy: działające dodawanie książek i widok jak w weryfikacji
+
+- **Błąd:** dodawanie książki do zestawu, usuwanie jej i zdejmowanie oznaczenia zestawu nigdy nie działały — serwer liczył części adresu `/api/sets/<id>/…` razem z prefiksem i żadna ścieżka nie pasowała (stąd 96 zestawów bez ani jednej książki; nie działało też „Cofnij” po oznaczeniu zestawu w weryfikacji). Naprawione, z testem HTTP.
+- **Link do ogłoszenia i potwierdzanie składu** były tylko w ukrytej sekcji trybu handlowego. Teraz są zawsze: „Ogłoszenie ↗” w nagłówku, pod zdjęciem i w przycisku „Otwórz ogłoszenie”; „Nie ma w katalogu” i „Skład sprawdzony z ogłoszeniem” w widoku zestawu. Tryb handlowy zachowuje tylko kalkulator kosztów pakietu.
+- **Układ jak w weryfikacji:** lista z miniaturami, ceną i stanem (pusty / skład do potwierdzenia / potwierdzony), zakładki według stanu; po prawej zdjęcie z ogłoszenia, cena, książki zestawu jako karty z okładkami (liczba sztuk zapisuje się od razu).
+- **Propozycje z tytułu ogłoszenia:** książki z katalogu, których tytuł ogłoszenie zawiera, wydanie z ISBN pokazanego w ogłoszeniu i pozostałe tomy cyklu („Przygody Gotreka i Felixa” → wszystkie tomy z katalogu w kolejności). Jedno wydanie na książkę; „Dodaj wszystkie”. Na danych z 2026-11-08: propozycje dla 77 z 96 zestawów.
+- „Świat Dysku” nie jest już traktowany jako słowo tytułu przy dopasowaniu do katalogu (jak Warhammer i Warcraft).
+
 ## 2026-11-08 (19) — Tomy i cykle dla książek spoza BN
 
 - **Cykl i tom z tytułów ogłoszeń** dla dzieł, których nie opisuje rekord BN (wydania z e-ISBN, Open Library, utworzone z ogłoszenia): „Duchy Gaunta. Tom 2. Komisarz Gaunt”, „Stacja Ocalenie - Dan Abnett … Duchy Gaunta tom 13”, „Kolor magii. Świat Dysku. Tom 1”. Z nazwy cyklu wypadają tytuł książki, autorzy (także współautorzy i tłumacze z katalogu), nazwy uniwersów i inicjały; zakresy („TOM 1-3”), połówki („Tom 1,5”) i numeracje kolekcji gazetowych są pomijane. Wygrywa cykl i numer, na który wskazuje najwięcej ogłoszeń (tytuł wydania liczy się podwójnie); remis co do numeru = brak numeru.

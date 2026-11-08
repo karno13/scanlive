@@ -12,7 +12,7 @@ const SELLER_NOISE = new Set([
   'oprawa', 'okladka', 'unikat', 'rzadkosc', 'kolekcjonerskie',
 ]);
 // Universe / brand names that appear on the cover but rarely in the catalogued title.
-const BRAND = new Set(['warhammer', '40000', '40k', 'warcraft', 'world', 'dragonlance', 'forgotten', 'realms']);
+const BRAND = new Set(['warhammer', '40000', '40k', 'warcraft', 'world', 'dragonlance', 'forgotten', 'realms', 'swiat', 'dysku', 'discworld']);
 
 export const fold = (value) =>
   String(value ?? '')
