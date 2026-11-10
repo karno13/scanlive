@@ -2,6 +2,12 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-10 (31) — Pomiar nisz
+
+- **Ustawienia → „Skuteczność zapytań i nisz”** ma tabelę profili skanu obok siebie: liczba ofert, mediana dostępnych, **odsetek sprzedanych w 14 dni**, **mediana ceny sprzedanych**, **liczba ofert powyżej 50 zł**. Te same trzy kolumny są przy każdej frazie i źródle. Ma to rozstrzygnąć po kilku tygodniach, czy zostać przy niszy, czy poszerzać zakres — wystarczy zapisać drugi profil (np. „Kryminał PRL”) i skanować oba.
+- „Sprzedane w 14 dni” to oferty, których strona pokazała „Sprzedane” najpóźniej 14 dni po pierwszym wykryciu. Liczone tylko wśród ofert widzianych po raz pierwszy co najmniej 14 dni temu, żeby nowa fraza nie wypadała gorzej tylko dlatego, że jest nowa. Mediana w SQL, w groszach.
+- Na danych z 2026-11-10: „Uniwersa” — 1209 ofert, mediana dostępnych 40 zł, 10 sprzedanych (mediana 104,50 zł), 491 powyżej 50 zł; „Autorzy i cykle” — 819 ofert, mediana 35 zł, 0 sprzedanych, 273 powyżej 50 zł. Odsetek sprzedanych w 14 dni pokaże się od ok. 15.11 — wszystkie oferty w bazie są młodsze niż 14 dni.
+
 ## 2026-11-10 (30) — Uniwersa w danych zamiast w kodzie
 
 - **Uniwersa do edycji (migracja 126).** Katalog → „Wydawcy i serie” ma sekcję „Uniwersa”: nazwa, inne zapisy (np. „Discworld; Discworld series”), serie wydawnicze związane z uniwersum („Black Library; Czarna Biblioteka”) oraz cykle i postacie, które je wskazują („Herezja Horusa; Drizzt”). Można dodać uniwersum (np. „Wiedźmin; The Witcher”), poprawić je, zmienić mu nazwę albo je usunąć; jeden zapis może należeć tylko do jednego uniwersum. Zmiana obowiązuje od razu dla tytułów czytanych od teraz.

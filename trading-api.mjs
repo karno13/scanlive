@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { deleteUniverse, listUniverses, saveUniverse } from './universes.mjs';
 import { recentRelistDecisions, undoRelist } from './offer-status.mjs';
+import { listScanProfiles } from './scan-profiles-api.mjs';
+import { groupedPriceStats } from './price-stats.mjs';
 import { readdir, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { backupCatalog } from './scripts/backup-catalog.mjs';
@@ -120,19 +122,60 @@ export function mergeCatalogWorks(repo,sourceId,targetId,confirm=false) {
   });
 }
 /** How well each search phrase performs: found offers, how many reached the catalogue, how many wait. */
-export function scanQueryStats(repo) {
-  const rows = repo.database
+// Niche measurement: how fast a phrase's offers sell and for how much. A sale counts "within 14
+// days" when the first check that found it sold came at most 14 days after it was first seen; the
+// share is taken over offers seen at least 14 days ago, so a new phrase is not judged too early.
+export const SOLD_WITHIN_DAYS = 14;
+export const EXPENSIVE_GROSZE = 5000;
+const SOLD_AT_SQL = `(SELECT min(h.observed_at) FROM offer_status_history h WHERE h.offer_id=o.id AND h.status='sold')`;
+function marketColumns() {
+  return `sum(o.first_seen_at <= ?) AS cohort,
+    sum(o.first_seen_at <= ? AND o.availability='sold' AND julianday(coalesce(${SOLD_AT_SQL}, o.availability_changed_at)) - julianday(o.first_seen_at) <= ${SOLD_WITHIN_DAYS}) AS soldFast,
+    sum(o.availability='sold') AS sold,
+    sum(o.currency='PLN' AND o.current_price > ${EXPENSIVE_GROSZE}) AS expensive`;
+}
+function marketFields(row, stats) {
+  const cohort = Number(row.cohort || 0);
+  return {
+    sold: Number(row.sold || 0),
+    soldMedian: stats?.soldMedian ?? null,
+    soldWithin14: Number(row.soldFast || 0),
+    soldWithin14Base: cohort,
+    soldWithin14Share: cohort ? Number(row.soldFast || 0) / cohort : null,
+    over50: Number(row.expensive || 0),
+  };
+}
+export function scanQueryStats(repo, at = Date.now()) {
+  const db = repo.database;
+  const cutoff = new Date(at - SOLD_WITHIN_DAYS * 86_400_000).toISOString();
+  const queries = `json_each(CASE WHEN json_valid(o.matched_queries_json) THEN o.matched_queries_json ELSE '[]' END) q`;
+  const rows = db
     .prepare(
       `SELECT q.value AS query, o.source AS source, count(*) AS offers,
          sum(EXISTS(SELECT 1 FROM offer_matches m WHERE m.offer_id=o.id AND m.status='active')) AS matched,
          sum(EXISTS(SELECT 1 FROM identification_jobs j WHERE j.offer_id=o.id AND j.status='review_required')) AS waiting,
          sum(o.observed_isbn IS NULL OR o.observed_isbn='') AS withoutIsbn,
-         max(o.last_seen_at) AS lastSeen
-       FROM offers o, json_each(CASE WHEN json_valid(o.matched_queries_json) THEN o.matched_queries_json ELSE '[]' END) q
+         max(o.last_seen_at) AS lastSeen, ${marketColumns()}
+       FROM offers o, ${queries}
        GROUP BY q.value, o.source ORDER BY offers DESC LIMIT 200`,
     )
-    .all();
+    .all(cutoff, cutoff);
+  const sep = String.fromCharCode(31);
+  const prices = groupedPriceStats(db, `SELECT o.id AS offer_id, q.value || char(31) || o.source AS grp FROM offers o, ${queries}`, [], 'grp');
+  // The same per saved scan profile (its phrases × its sources, each offer once): niches side by side.
+  const profiles = listScanProfiles(repo).map((profile) => {
+    const selected = `SELECT DISTINCT o.id AS offer_id, 'p' AS grp FROM offers o, ${queries}
+      WHERE lower(q.value) IN (SELECT lower(value) FROM json_each(?)) AND o.source IN (SELECT value FROM json_each(?))`;
+    const params = [JSON.stringify(profile.queries || []), JSON.stringify(profile.sources || [])];
+    const row = db
+      .prepare(`SELECT count(*) AS offers, ${marketColumns()} FROM offers o WHERE o.id IN (SELECT offer_id FROM (${selected}))`)
+      .get(cutoff, cutoff, ...params);
+    const stats = groupedPriceStats(db, selected, params, 'grp').p;
+    return { name: profile.name, queries: profile.queries, sources: profile.sources, offers: Number(row.offers || 0), live: stats?.live ?? 0, liveMedian: stats?.median ?? null, ...marketFields(row, stats) };
+  });
   return {
+    soldWithinDays: SOLD_WITHIN_DAYS,
+    expensiveGrosze: EXPENSIVE_GROSZE,
     items: rows.map((row) => ({
       query: String(row.query),
       source: row.source,
@@ -141,7 +184,9 @@ export function scanQueryStats(repo) {
       waiting: Number(row.waiting),
       withoutIsbn: Number(row.withoutIsbn),
       lastSeen: row.lastSeen,
+      ...marketFields(row, prices[String(row.query) + sep + row.source]),
     })),
+    profiles,
   };
 }
 /** Per phrase: offers ever found, listings first seen in the last `days`, and the newest one. */
