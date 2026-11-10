@@ -2,6 +2,17 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-10 (26) — Pełny zapis obserwacji oferty
+
+- **Stan egzemplarza (migracja 124).** Każda oferta ma teraz zapisany stan tak, jak podało go źródło („Bardzo dobry”, „Nowy z metką”, „Ze śladami użytkowania”), i jego klasę: nowa / bardzo dobra / dobra / zadowalająca / nieznana. Vinted podaje stan na liście wyników, więc ma go każda nowa oferta; dla ofert Allegro Lokalnie i Tezeusza stan jest raz przepisany z odczytanych wcześniej stron ogłoszeń. Na danych z 2026-11-10: 329 ofert dostało stan (bardzo dobra 161, dobra 69, nowa 24, nieznana 75 — „Używana”, „Produkt kolekcjonerski”).
+- **Opłata kupującego, sprzedawca, polubienia (Vinted).** Zapisywane z listy wyników: opłata za ochronę kupującego (np. 4,45 zł przy cenie 31,07 zł), identyfikator sprzedawcy i to, czy jest firmą, liczba polubień (aktualizowana przy każdym skanie).
+- **Opis, liczba zdjęć i data wystawienia (Vinted) bez dodatkowych zapytań.** Skan i tak otwiera stronę każdej nowej oferty Vinted, żeby sprawdzić język. Teraz zapisuje z niej też opis, liczbę zdjęć, stan i wiek ogłoszenia („Dodane 3 godz.” → przybliżona data wystawienia). Opis trafia do opisów ogłoszeń, więc oferta oznaczona później jako zestaw nie jest pobierana drugi raz.
+- **Empik: prawdziwa dostępność i sprzedawca.** Wcześniej każda oferta z Empiku była „dostępna”. Teraz liczy się stan z kafelka (wysyłka w 24 h, przedsprzedaż); niedostępny produkt nie jest zapisywany jako oferta. Zapisywany jest też sprzedawca: Empik albo sklep z Empik Marketplace (np. antykwariat) — przyda się do rozróżnienia nowych książek od używanych.
+- **Surowe dane ogłoszenia.** Przy pierwszym zapisie i przy każdej zmianie (polubienia i wiek ogłoszenia się nie liczą) zapisywany jest obiekt oferty z listy wyników i ze strony ogłoszenia, do 16 KB — żeby po zniknięciu ogłoszenia dało się odczytać pola, których dziś nie przewidujemy.
+- **Pominięte przed zapisem.** Panel „Przebieg skanu” pokazuje, ile ogłoszeń skan odrzucił i dlaczego: obcy język, brak podanego języka (Vinted), spoza tematu frazy, nie-książki. Liczby zapisują się w podsumowaniu skanu. Na przykładowej stronie Vinted „pratchett”: 66 zapisanych, 23 spoza tematu, 3 w obcym języku.
+- **Szczegóły oferty** pokazują stan, opłatę kupującego, sprzedawcę, liczbę zdjęć, datę wystawienia, polubienia i dostępność w sklepie — tylko to, co źródło podało.
+- **Czego źródła nie podają:** Vinted nie umieszcza na stronie kosztu dostawy (przeglądarka pobiera go osobno po załadowaniu strony) ani liczby wyświetleń; daty wystawienia nie podaje wprost, tylko „Dodane 3 godz.”. OLX i Allegro Lokalnie na liście wyników nie podają sprzedawcy.
+
 ## 2026-11-08 (25) — Książka zamiast wydania: dopasowanie, warianty cenowe, ceny całej książki
 
 - **Ceny całej książki.** Strona dzieła w Katalogu pokazuje teraz ceny wszystkich ofert ze wszystkich wydań: medianę, najniższą, liczbę dostępnych i sprzedanych, wykres odczytów cen w czasie i tabelę wariantów cenowych (`GET /api/catalog/works/:id/prices`). Wcześniej przy 10 wydaniach ceny rozkładały się na 10 osobnych kart po 1–3 oferty.

@@ -43,6 +43,8 @@ import { normalizeStoredPublishers } from './publisher-names.mjs';
 import { applyNameAliases, loadNameAliases } from './name-aliases.mjs';
 import { rejectRepeatsOfRejectedOffers, undoUnconfirmedRepeatRejections } from './rejected-offers.mjs';
 import { rejectForeignEditions } from './language-policy.mjs';
+import { backfillConditionsFromEnrichment, observationFields, saveRawSnapshot } from './offer-observations.mjs';
+import { saveOfferDescription } from './set-descriptions.mjs';
 
 function stableId(prefix, ...values) {
   return `${prefix}_${createHash('sha256').update(JSON.stringify(values)).digest('hex').slice(0, 32)}`;
@@ -89,6 +91,8 @@ export function createProductionCatalog({
     if (String(process.env.BOOKFLIP_STARTER_PROFILES ?? '1') !== '0') ensureStarterProfiles(repository);
     // Cycle and volume from listing titles for works no bibliographic record describes.
     inferListingSeries(repository);
+    // Once: condition of offers whose page was read before migration 124.
+    backfillConditionsFromEnrichment(repository, { now });
   } catch (error) {
     console.error('BIBLIOGRAPHY_UPGRADE_FAILED', error?.message ?? error);
   }
@@ -218,6 +222,7 @@ export function createProductionCatalog({
             language: offer.language ?? null,
             observedIsbn: offer.isbn ?? null,
             imageUrl: offer.image ?? offer.imageUrl ?? null,
+            ...observationFields(offer),
             matchedQueries: offer.matchedQueries ?? [],
             firstSeenAt: offer.firstSeenAt ?? at,
             lastSeenAt: offer.lastSeenAt ?? at,
@@ -229,6 +234,12 @@ export function createProductionCatalog({
           });
           if (price != null) repository.appendPriceObservation(stored.id, price, observedAt);
           report.offers += 1;
+          // The raw listing objects (result list, listing page) at first sight and when they change.
+          if (offer.rawListing && saveRawSnapshot(repository, stored.id, 'listing', offer.rawListing, at)) report.snapshots = (report.snapshots || 0) + 1;
+          if (offer.rawDetail && saveRawSnapshot(repository, stored.id, 'detail', offer.rawDetail, at)) report.snapshots = (report.snapshots || 0) + 1;
+          // The description read with the listing page also serves sets (no second read of the page).
+          if (typeof offer.listingDescription === 'string' && offer.listingDescription.trim())
+            saveOfferDescription(repository, stored.id, { text: offer.listingDescription.trim().slice(0, 8000), status: 'found' }, at);
 
           const evidence = extractOfferISBN(offer);
           let newEvidence = false;

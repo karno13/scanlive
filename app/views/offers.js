@@ -6,6 +6,23 @@ import { isWatchedOffer, mountOfferWorkspace, loadOfferWorkspace, allSavedOfferN
 import { confirmDialog, noticeDialog } from '../core/dialogs.js';
 import { coverMarkup, tidyOfferTitle } from '../core/bibliography.js';
 const tradingMode = () => document.body.classList.contains('trading-mode');
+// What the source said about the copy and the listing; only what it actually gave.
+const CONDITION_LABELS = { new: 'nowa', very_good: 'bardzo dobra', good: 'dobra', satisfactory: 'zadowalająca' };
+export function observationFacts(offer, { money, date, escapeHtml }) {
+  const facts = [];
+  if (offer.condition || CONDITION_LABELS[offer.conditionClass])
+    facts.push(['Stan', offer.condition || CONDITION_LABELS[offer.conditionClass]]);
+  if (offer.buyerFee != null) facts.push(['Opłata kupującego', money(offer.buyerFee)]);
+  if (offer.shippingCost != null) facts.push(['Dostawa', money(offer.shippingCost)]);
+  if (offer.sellerName || offer.sellerBusiness != null)
+    facts.push(['Sprzedawca', offer.sellerName || (offer.sellerBusiness ? 'firma' : 'osoba prywatna')]);
+  if (offer.photoCount != null) facts.push(['Zdjęcia', String(offer.photoCount)]);
+  if (offer.listedAt) facts.push(['Wystawiona', (offer.listedAtText ? 'ok. ' : '') + date(offer.listedAt)]);
+  if (offer.favouriteCount != null) facts.push(['Polubienia', String(offer.favouriteCount)]);
+  if (offer.sourceAvailability) facts.push(['Dostępność w sklepie', offer.sourceAvailability === 'PRE_SALE' ? 'przedsprzedaż' : offer.sourceAvailability === 'IN_24_H' ? 'wysyłka w 24 h' : offer.sourceAvailability]);
+  return facts.map(([label, value]) => `<span><b>${escapeHtml(label)}</b><small>${escapeHtml(value)}</small></span>`).join('');
+}
+
 // Titles that list several books ("A + B + C", "zestaw", "tomy 1-4"): the set action is offered first.
 function looksLikeSet(title) {
   const text = String(title ?? '').toLowerCase();
@@ -219,7 +236,7 @@ async function openOfferDrawer(id) {
       active = offer.matches.find((item) => item.status === 'active');
     if(serial!==drawerSerial) return;
     $('#offerDrawerContent').innerHTML =
-      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><p class="drawer-pills">${drawerPills(offer, active)}</p><h2>${escapeHtml(offer.title)}</h2><div class="detail-grid"><span><b>Cena</b><small>${money(offer.currentPrice)}</small></span><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span></div>${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}<button class="button secondary" type="button" id="drawerMarkSet" title="Jedno ogłoszenie, kilka książek: skład ustalisz w zakładce Zestawy">${looksLikeSet(offer.title) ? 'Oznacz jako zestaw' : 'To zestaw kilku książek'}</button></div>`;
+      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><p class="drawer-pills">${drawerPills(offer, active)}</p><h2>${escapeHtml(offer.title)}</h2><div class="detail-grid"><span><b>Cena</b><small>${money(offer.currentPrice)}</small></span><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span>${observationFacts(offer, { money, date, escapeHtml })}</div>${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}<button class="button secondary" type="button" id="drawerMarkSet" title="Jedno ogłoszenie, kilka książek: skład ustalisz w zakładce Zestawy">${looksLikeSet(offer.title) ? 'Oznacz jako zestaw' : 'To zestaw kilku książek'}</button></div>`;
     const primaryActions = $('#offerDrawerContent .detail-actions');
     $('#offerDrawerContent h2').after(primaryActions);
     await ensureWorkspaceLoaded();

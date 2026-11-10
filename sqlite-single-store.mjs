@@ -142,7 +142,7 @@ export function persistSqliteScanBatch(catalog, { offers, scanAt, state }) {
   return { saved: report.offers, newOffers };
 }
 
-export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], scanContext = null, scanState = null }) {
+export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], scanContext = null, scanState = null, rejected = null }) {
   const at = String(searchedAt);
   const db = catalog.repository.database;
   // During the scan offers are already saved: compare with the state from before the scan.
@@ -168,7 +168,10 @@ export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], sc
       else if (old.current_price !== offer.price) priceChanges++;
     } catch {}
   }
-  const lastScan = { at, found: offers.length, newOffers, priceChanges, errors, ...(scanContext ? {context:scanContext} : {}) };
+  // rejected: listings left out before saving, by reason ({language, language_unknown, topic, product}).
+  const lastScan = { at, found: offers.length, newOffers, priceChanges, errors,
+    ...(rejected && Object.keys(rejected).length ? { rejected } : {}),
+    ...(scanContext ? {context:scanContext} : {}) };
   const ingest = catalog.repository.transaction(() => {
     const report = catalog.ingestOffers(scanOffers, at, { scanSummary: lastScan });
     const membership = db.prepare('INSERT OR REPLACE INTO scan_offer_results VALUES(?,?,?,?)');

@@ -36,6 +36,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scanMarketplace } from './marketplaces.mjs';
 import { localSourceHosts } from './local-scan.mjs';
 import { readVintedLanguage } from './vinted-detail.mjs';
+import { listedAtFromAge } from './offer-observations.mjs';
 import { createProductionCatalog, productionCatalogEnabled } from './catalog-production.mjs';
 import {
   decideIdentificationJob,
@@ -220,6 +221,7 @@ export async function searchOffers(
           );
           let offers = scan.offers,
             diagnostic = scan.diagnostic;
+          const rejected = { ...scan.rejected };
           if (source === 'Vinted' && task.language === 'pl' && offers.length) {
             onProgress({ type: 'language-start', source, query, count: offers.length });
             const filtered = await filterVintedPolishOffers(
@@ -229,9 +231,11 @@ export async function searchOffers(
               languageCache,
               retryWait,
               signal,
+              now,
             );
             offers = filtered.offers;
             diagnostic = diagnostic || filtered.diagnostic;
+            for (const [reason, count] of Object.entries(filtered.rejected)) rejected[reason] = (rejected[reason] || 0) + count;
           }
           const status = diagnostic ? (offers.length ? 'partial' : 'unavailable') : 'ok';
           if (diagnostic?.blocked && !offers.length) blockedBy = diagnostic;
@@ -250,6 +254,7 @@ export async function searchOffers(
             offers,
             pagination: scan.pagination,
             pages: scan.pages,
+            ...(Object.keys(rejected).length ? { rejected } : {}),
             ...(diagnostic ? { diagnostic } : {}),
           });
           if (onOffers && offers.length) {
@@ -290,6 +295,10 @@ export async function searchOffers(
   const offers = [...offersByUrl.values()].sort(
     (a, b) => a.price - b.price || a.title.localeCompare(b.title, 'pl'),
   );
+  // Listings left out before saving, by reason (language, topic, product; Vinted: unknown language).
+  const rejected = {};
+  for (const row of results)
+    for (const [reason, count] of Object.entries(row.rejected || {})) rejected[reason] = (rejected[reason] || 0) + count;
   return {
     searchedAt: now().toISOString(),
     category: 'books',
@@ -301,6 +310,7 @@ export async function searchOffers(
       successful: results.filter((row) => row.status === 'ok').length,
       partial: results.filter((row) => row.status === 'partial').length,
       unavailable: results.filter((row) => row.status === 'unavailable').length,
+      rejected,
     },
     offers,
     results: results.map(({ offers, ...row }) => ({ ...row, count: offers.length })),
@@ -309,7 +319,8 @@ export async function searchOffers(
 async function scanAllPages(task, scanner, onProgress = () => {}, waiter = wait, signal = null) {
   const offers = [],
     seenPages = new Set(),
-    pages = [];
+    pages = [],
+    rejected = {};
   let current = { ...task },
     diagnostic = null;
   for (let pageIndex = 0; pageIndex < 50; pageIndex++) {
@@ -332,6 +343,7 @@ async function scanAllPages(task, scanner, onProgress = () => {}, waiter = wait,
     }
     const scan = read.value;
     offers.push(...scan.offers);
+    for (const [reason, count] of Object.entries(scan.rejected || {})) rejected[reason] = (rejected[reason] || 0) + count;
     pages.push({
       page: current.page,
       count: scan.offers.length,
@@ -356,6 +368,7 @@ async function scanAllPages(task, scanner, onProgress = () => {}, waiter = wait,
         ? { state: 'limit', nextPage: current.page }
         : pages.at(-1),
     pages,
+    rejected,
     diagnostic,
   };
 }
@@ -366,12 +379,13 @@ async function filterVintedPolishOffers(
   cache = new Map(),
   waiter = wait,
   signal = null,
+  now = () => new Date(),
 ) {
   offers = [...new Map(offers.map((offer) => [offer.url, offer])).values()];
   // At most two requests in flight, with one new Vinted request per second.
   // Cache hits require no network request and do not consume rate-limit slots.
   const accepted = new Array(offers.length);
-  let next = 0, checked = 0, unknown = 0, cached = 0;
+  let next = 0, checked = 0, unknown = 0, cached = 0, foreign = 0;
   let diagnostic = null, stopped = false, lastRequestAt = 0;
   let startGate = Promise.resolve();
 
@@ -427,8 +441,10 @@ async function filterVintedPolishOffers(
           ...offer,
           language: 'Polski',
           ...(detail.isbn ? { isbn: detail.isbn, isbnEvidence: 'Vinted — szczegóły oferty' } : {}),
+          ...vintedDetailFields(detail, now()),
         };
       else if (!detail.language) unknown++;
+      else foreign++;
       onProgress({
         type: 'language-progress',
         checked,
@@ -441,7 +457,24 @@ async function filterVintedPolishOffers(
   }
   await Promise.all(Array.from({ length: Math.min(2, offers.length) }, () => worker()));
   scanCancelled(signal);
-  return { offers: accepted.filter(Boolean), diagnostic };
+  const rejected = {};
+  if (foreign) rejected.language = foreign;
+  if (unknown) rejected.language_unknown = unknown;
+  return { offers: accepted.filter(Boolean), diagnostic, rejected };
+}
+// The listing page is read anyway for the language: keep what it says about the copy (description,
+// condition, photos, age) instead of reading it again later. Cached decisions carry none of these.
+function vintedDetailFields(detail, now = new Date()) {
+  const out = {};
+  if (typeof detail.description === 'string' && detail.description) out.listingDescription = detail.description.slice(0, 8000);
+  for (const field of ['conditionText', 'listedAtText', 'photoCount', 'favouriteCount', 'sellerId'])
+    if (detail[field] != null) out[field] = detail[field];
+  if (detail.listedAtText) {
+    const listedAt = listedAtFromAge(detail.listedAtText, now);
+    if (listedAt) out.listedAt = listedAt;
+  }
+  if (detail.rawDetail) out.rawDetail = detail.rawDetail;
+  return out;
 }
 
 export async function readJson(request) {
@@ -818,6 +851,7 @@ async function searchAndStore(
   const saved = await withHistoryWriteLock(async () => {
     scanCancelled(signal);
     return persistSqliteScan(catalog, { offers: result.offers, searchedAt: result.searchedAt, errors, scanState,
+      rejected: result.summary?.rejected,
       scanContext: { queries: input.queries, sources: input.sources, results: result.results } });
   });
   if (String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0' && shouldAutoResolve())

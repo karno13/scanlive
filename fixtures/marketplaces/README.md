@@ -7,7 +7,7 @@ Pliki `*.json` są odczytywane przez `marketplace-fixtures.test.mjs`. Testy dzia
 - `kind: "synthetic"` — zbudowany ręcznie przykład struktury HTML/JSON-LD. **Nie jest dowodem, że parser nadal działa na aktualnej stronie serwisu.**
 - `kind: "captured"` — fragment faktycznej strony z datą `capturedAt`, po ręcznej kontroli i anonimizacji `reviewedForPersonalData: true`.
 
-Obecne przykłady strukturalne OLX i Allegro Lokalnie są **syntetyczne**. W repozytorium nie ma jeszcze zweryfikowanych aktualnych przechwyceń HTML Vinted, OLX i Allegro. Nie można rzetelnie oznaczyć ich jako autentyczne bez dostępu do prawdziwego fragmentu strony.
+Przykłady OLX i Allegro Lokalnie są **syntetyczne**. `vinted-search-captured.json` i `empik-tiles-captured.json` to fragmenty prawdziwych stron z 2026-11-10 (pojedyncze zapytania przez bramkę): numery ogłoszeń, identyfikatory sprzedawców i zdjęć Vinted zastąpione zmyślonymi. Strona ogłoszenia Vinted w tym samym kształcie: `fixtures/details/vinted-item-captured.html` (język zmieniony na „Polski”, opis zmyślony).
 
 ## Dodawanie autentycznej próbki
 

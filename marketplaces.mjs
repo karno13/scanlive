@@ -3,6 +3,7 @@ import { queryText, matchesTopic, excludesProduct } from './search-policy.mjs';
 import { bibliographicMetadata, extractOfferISBN } from './isbn.mjs';
 import { createHash } from 'node:crypto';
 import { safeImageUrl } from './offer-images.mjs';
+import { grosze, observationFields } from './offer-observations.mjs';
 import { setTimeout as wait } from 'node:timers/promises';
 import {
   parseVinted,
@@ -46,15 +47,27 @@ export function isPolishBook(title, metadata) {
     return true;
   return true; // A title alone cannot establish a foreign edition.
 }
-export function acceptsBook(task, title, metadata) {
-  if (task.language === 'pl' && !isPolishBook(title, metadata)) return false;
-  if (excludesProduct(title)) return false;
+/** Why a listing is left out before it is saved: 'language', 'product' (not a book) or 'topic'; null when kept. */
+export function rejectionReason(task, title, metadata) {
+  if (task.language === 'pl' && !isPolishBook(title, metadata)) return 'language';
+  if (excludesProduct(title)) return 'product';
   // Empik searches series and descriptions inside its book category: a Black Library novel
   // ("Kosmiczny Wilk. Tom 1") found for "warhammer" rarely names the universe in its title.
   // Its own fantasy / SF genre is trusted; other genres must still name the topic.
-  if (task.source === 'Empik' && /^Książki\/Fantastyka/i.test(String(metadata?.category ?? ''))) return true;
-  if (!matchesTopic(task, title)) return false;
-  return true; // Matching query + product exclusions; no mandatory generic book keyword.
+  if (task.source === 'Empik' && /^Książki\/Fantastyka/i.test(String(metadata?.category ?? ''))) return null;
+  if (!matchesTopic(task, title)) return 'topic';
+  return null; // Matching query + product exclusions; no mandatory generic book keyword.
+}
+export function acceptsBook(task, title, metadata) {
+  return rejectionReason(task, title, metadata) === null;
+}
+// Availability as Empik tiles (data-availabilityType) and schema.org write it: true / false / null (not said).
+export function sourceAvailable(code) {
+  const text = String(code || '');
+  if (!text) return null;
+  if (/UNAVAILABLE|NOT_AVAILABLE|OUT_OF_STOCK|OutOfStock|SOLD_OUT|SoldOut|Discontinued|NOTIFY|ARCHIV/i.test(text)) return false;
+  if (/^IN_|AVAILABLE|PRE_SALE|PreOrder|PreSale|InStock|LimitedAvailability|OnlineOnly|InStoreOnly/i.test(text)) return true;
+  return null;
 }
 export function searchUrl(task) {
   if (!sources[task.source] || task.host !== sources[task.source].host)
@@ -63,6 +76,8 @@ export function searchUrl(task) {
   if (task.source === 'Vinted') {
     const u = new URL('https://www.vinted.pl/catalog/2312-books');
     u.searchParams.set('search_text', query);
+    // Quick scan: only the newest listings (one page), see scan mode 'newest'.
+    if (task.order === 'newest') u.searchParams.set('order', 'newest_first');
     if (task.paginationVersion === 1) {
       if (!Number.isInteger(task.page) || task.page < 1 || task.page > 10000)
         throw Error('INVALID_VINTED_PAGE');
@@ -248,9 +263,20 @@ export async function readSourceHtml(
   }
   throw Error('SOURCE_REDIRECT_LIMIT');
 }
-export function parseMarketplace(html, task, observedAt = new Date().toISOString(), limit = 20) {
+export function parseMarketplace(html, task, observedAt = new Date().toISOString(), limit = 20, rejected = {}) {
   searchUrl(task);
-  const book = { accept: (title, metadata) => acceptsBook(task, title, metadata) };
+  // Listings left out before saving are counted by reason, for the scan summary.
+  const reject = (reason) => {
+    rejected[reason] = (rejected[reason] || 0) + 1;
+  };
+  const book = {
+    accept: (title, metadata) => {
+      const reason = rejectionReason(task, title, metadata);
+      if (reason) reject(reason);
+      return reason === null;
+    },
+    reject,
+  };
   let rows;
   try {
     if (task.source === 'Vinted') rows = parseVinted(html, book, observedAt);
@@ -304,8 +330,11 @@ export function parseMarketplace(html, task, observedAt = new Date().toISOString
     seen.add(u.href);
     const price = Math.round(row.price * 100);
     if (!Number.isSafeInteger(price) || price <= 0 || price > 100000000) continue;
+    const buyerFee = grosze(row.buyerFee);
     out.push({
       ...bibliographicMetadata(row),
+      ...observationFields({ ...row, buyerFee }),
+      ...(row.raw && typeof row.raw === 'object' ? { rawListing: row.raw } : {}),
       title: row.title.slice(0, 500),
       url: u.href,
       price,
@@ -423,10 +452,32 @@ function parseEmpikCards(html, add) {
     const imageTag = [...segment.matchAll(/<img\b([^>]*)>/gi)].find((match) =>
       safeImageUrl(attribute(match[1], 'lazy-img') || attribute(match[1], 'src')),
     );
+    // Availability of this tile ("IN_24_H", "PRE_SALE"…) and who sells it: Empik itself (merchant 0)
+    // or a marketplace shop, often an antiquarian bookshop with second-hand copies.
+    const availabilityTag = [...segment.matchAll(/<div\b([^>]*)>/gi)].find((match) =>
+        attribute(match[1], 'class').split(/\s+/).includes('info__availability'),
+      ),
+      availabilityType = attribute(availabilityTag?.[1], 'data-availabilityType'),
+      merchantId = attribute(attrs, 'data-merchant-id'),
+      merchantName = textOnly(attribute(attrs, 'data-merchant-name'));
     add(title, rawUrl, price, currency, {
       isbn: attribute(attrs, 'data-product-ean') || attribute(attrs, 'data-ean'),
       category: attribute(attrs, 'data-product-category'),
       image: imageTag && (attribute(imageTag[1], 'lazy-img') || attribute(imageTag[1], 'src')),
+      availability: availabilityType,
+      sellerId: /^\d{1,20}$/.test(merchantId) ? merchantId : null,
+      sellerName: merchantName || null,
+      raw: {
+        productId,
+        availabilityType: availabilityType || null,
+        delivery: attribute(attrs, 'data-delivery') || null,
+        merchantId: merchantId || null,
+        merchantName: merchantName || null,
+        outlet: /\bribbon--outlet\b/.test(segment),
+        category: attribute(attrs, 'data-product-category') || null,
+        price: declared || price,
+        discount: attribute(attrs, 'data-product-discount') || null,
+      },
     });
   }
   return true;
@@ -466,11 +517,19 @@ function parseBookstore(html, book, source) {
     seen.add(url.href);
     const isbn = extractOfferISBN(metadata).isbn;
     const image = safeImageUrl(metadata.image);
+    // The shop's own availability when it states one; a shop listing without it is taken as on sale.
+    const availabilityCode = typeof metadata.availability === 'string' ? metadata.availability.replace(/^https?:\/\/schema\.org\//, '') : '';
+    const available = sourceAvailable(availabilityCode);
     rows.push({
       title,
       url: url.href,
       price: amount,
-      available: true,
+      available: available !== false,
+      ...(available === null ? {} : { availabilityKnown: true }),
+      ...(availabilityCode ? { sourceAvailability: availabilityCode.slice(0, 100) } : {}),
+      ...(metadata.sellerId ? { sellerId: metadata.sellerId, sellerBusiness: true } : {}),
+      ...(metadata.sellerName ? { sellerName: metadata.sellerName } : {}),
+      ...(metadata.raw ? { raw: metadata.raw } : {}),
       ...(isbn ? { isbn } : {}),
       ...(image ? { image } : {}),
     });
@@ -539,7 +598,7 @@ function parseBookstore(html, book, source) {
     const price = offer.price ?? offer.lowPrice,
       currency = offer.priceCurrency || 'PLN';
     if (offer.lowPrice != null && offer.price == null) continue;
-    add(p.name || p.title, offer.url || p.url || p['@id'], price, currency, p);
+    add(p.name || p.title, offer.url || p.url || p['@id'], price, currency, { ...p, availability: offer.availability });
   }
   if (['Allegro', 'Empik'].includes(source)) {
     if (!products.length) throw Error('UNRECOGNIZED_MARKETPLACE_DATA');
@@ -708,13 +767,15 @@ export function marketplacePageInfo(html, task, offers) {
 export async function scanMarketplace(task, options = {}) {
   const html = await readSourceHtml(searchUrl(task), { ...options, source: task.source }),
     paginated = task.paginationVersion === 1;
-  const offers = parseMarketplace(html, task, new Date().toISOString(), paginated ? 5001 : 20);
+  const rejected = {};
+  const offers = parseMarketplace(html, task, new Date().toISOString(), paginated ? 5001 : 20, rejected);
   if (offers.length > 5000) throw Error('MARKETPLACE_PAGE_TOO_LARGE');
   const pagination = paginated
     ? { ...marketplacePageInfo(html, task, offers), total: offers.length }
     : undefined;
   return {
     offers,
+    rejected,
     pagination,
     coverage: paginated
       ? `${task.source}: strona ${task.page}, ${offers.length} pasujących wpisów. Cała odczytana strona zapisywana partiami. ${pagination.state === 'end' ? 'Źródło wskazało koniec wyników.' : pagination.state === 'more' ? 'Potwierdzono kolejną stronę.' : 'Nie rozpoznano kolejnej strony; zakres niepełny.'} Dostępność, wydanie i koszty wymagają sprawdzenia. Zmiany kolejności mogą powodować pominięcia.`

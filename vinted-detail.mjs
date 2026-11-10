@@ -96,6 +96,72 @@ function languageFromCandidates(candidates) {
   }
   return null;
 }
+function arrayAt(text, start) {
+  let depth = 0,
+    inString = false,
+    escaped = false;
+  for (let i = start; i < text.length && i < start + 200000; i++) {
+    const c = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') inString = true;
+    else if (c === '[' || c === '{') depth++;
+    else if ((c === ']' || c === '}') && --depth === 0)
+      try {
+        return JSON.parse(text.slice(start, i + 1));
+      } catch {
+        return null;
+      }
+  }
+  return null;
+}
+function sectionValue(data, code) {
+  const match = new RegExp('\\{\\s*"code"\\s*:\\s*"' + code + '"').exec(data);
+  const section = match ? objectAt(data, match.index) : null;
+  const value = section?.data?.value;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+// What the listing page adds to the result card: condition, how long ago it was listed, the photos,
+// likes, the seller. All read from blocks tied to this item id; the shipping price is not in the
+// page (the browser asks for it separately) and neither is the number of views.
+function detailObservation(data, id, candidates) {
+  const out = {};
+  const condition = sectionValue(data, 'status');
+  if (condition) out.conditionText = condition;
+  const age = sectionValue(data, 'upload_date');
+  if (age) out.listedAtText = age.slice(0, 60);
+  const marker = '"item_id":"' + id + '"';
+  let photos = null;
+  for (let at = data.indexOf(marker); at >= 0 && photos === null; at = data.indexOf(marker, at + marker.length)) {
+    const near = data.slice(at, at + 4000).search(/"photos"\s*:\s*\[/);
+    if (near < 0) continue;
+    const start = data.indexOf('[', at + near);
+    const list = arrayAt(data, start);
+    if (Array.isArray(list)) photos = list;
+  }
+  if (photos) out.photoCount = new Set(photos.map((photo, index) => photo?.id ?? photo?.url ?? index)).size;
+  for (const m of data.matchAll(/"favourite_count"\s*:\s*(\d+)/g)) {
+    const start = data.lastIndexOf('{', m.index);
+    const node = start >= 0 ? objectAt(data, start) : null;
+    if (node && String(node.item_id) === id) {
+      out.favouriteCount = Number(m[1]);
+      break;
+    }
+  }
+  const item = candidates.find((node) => node && String(node.id ?? node.itemId ?? node.item_id) === id && node.seller_id != null);
+  if (item) out.sellerId = String(item.seller_id);
+  out.rawDetail = {
+    item: candidates.find((node) => node && String(node.id ?? node.itemId ?? node.item_id) === id) || null,
+    condition,
+    listedAge: age,
+    photos,
+  };
+  return out;
+}
 // Read only the requested item, never recommendation cards or the full page.
 // Never read ISBN from recommendations: require exact item ID or an exact item URL.
 export function parseVintedDetail(html, url) {
@@ -168,6 +234,7 @@ export function parseVintedDetail(html, url) {
     }
   const evidence = extractOfferISBN({ parameters: candidates });
   const language = languageFromCandidates(candidates);
+  const observation = identityMatched ? detailObservation(data, id, candidates) : {};
   // The seller's description of this item (JSON-LD Product or the item object): for a set it lists
   // the books, one per line ("Blask fantastyczny", "Trzy wiedźmy", "Straż! Straż!").
   const description = identityMatched
@@ -187,6 +254,7 @@ export function parseVintedDetail(html, url) {
           ? 'found'
           : evidence.status,
     language,
+    ...observation,
     languageStatus: !identityMatched
       ? 'schema_unrecognized'
       : language

@@ -32,6 +32,15 @@ function baseOffer(b, title, url, source, price, currency, condition, checked) {
     available: true,
   };
 }
+// schema.org itemCondition as the words a listing would use; null when the source gives none.
+function conditionLabel(value) {
+  const text = String(value || '');
+  if (/NewCondition/.test(text)) return 'Nowy';
+  if (/UsedCondition/.test(text)) return 'Używany';
+  if (/DamagedCondition/.test(text)) return 'Uszkodzony';
+  if (/RefurbishedCondition/.test(text)) return 'Odnowiony';
+  return null;
+}
 function parseAllegroListing(html, book, checked) {
   const products = [];
   let listing = false;
@@ -97,6 +106,8 @@ function parseAllegroListing(html, book, checked) {
         availability,
       );
       offer.image = typeof product.image === 'string' ? product.image : product.image?.url || null;
+      offer.conditionText = conditionLabel(data.itemCondition || product.itemCondition);
+      offer.raw = { ...product, offers: data };
       offers.push(offer);
     }
   return [...new Map(offers.map((offer) => [offer.url, offer])).values()];
@@ -187,8 +198,10 @@ function parseVinted(html, b, checked) {
       true,
     );
     if (!o) continue;
-    if (/magyar|hungarian|rész|français|francais|deutsch|german|italiano|espa[nñ]ol/i.test(p.title))
+    if (/magyar|hungarian|rész|français|francais|deutsch|german|italiano|espa[nñ]ol/i.test(p.title)) {
+      b.reject?.('language');
       continue;
+    }
     const fee = p.serviceFee?.amount;
     const feeCurrency = p.serviceFee?.currencyCode;
     if (fee != null && feeCurrency === currency && Number.isFinite(Number(fee)) && Number(fee) >= 0)
@@ -196,6 +209,12 @@ function parseVinted(html, b, checked) {
     o.languageVerified = false;
     o.available = p.isSold !== true && p.isClosed !== true;
     o.image = p.thumbnailUrl || p.photos?.[0]?.url || p.photo?.url || null;
+    // What the result card says about the copy and the seller; the listing page adds the rest.
+    if (state) o.conditionText = state;
+    if (p.user?.id != null) o.sellerId = String(p.user.id);
+    if (typeof p.user?.isBusiness === 'boolean') o.sellerBusiness = p.user.isBusiness;
+    if (Number.isSafeInteger(p.favouriteCount)) o.favouriteCount = p.favouriteCount;
+    o.raw = p;
     out.push(o);
   }
   return Array.from(new Map(out.map((o) => [o.id, o])).values());
@@ -226,6 +245,8 @@ function parseOlx(html, b, checked) {
         if (r) {
           const image = Array.isArray(o.image) ? o.image[0] : o.image;
           r.image = typeof image === 'string' ? image : image?.url || null;
+          r.conditionText = conditionLabel(o.itemCondition);
+          r.raw = o;
           out.push(r);
         }
       }

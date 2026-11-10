@@ -69,6 +69,20 @@ function offer(row) {
       lastSeenAt: row.last_seen_at,
       seenCount: row.seen_count,
       image: row.image_url ? proxiedImage(row.image_url) : null,
+      // What the source said about the copy and the listing (migration 124); null when it said nothing.
+      condition: row.condition_text ?? null,
+      conditionClass: row.condition_class ?? null,
+      buyerFee: row.buyer_fee ?? null,
+      shippingCost: row.shipping_cost ?? null,
+      sellerId: row.seller_id ?? null,
+      sellerName: row.seller_name ?? null,
+      sellerBusiness: row.seller_business == null ? null : row.seller_business === 1,
+      photoCount: row.photo_count ?? null,
+      listedAt: row.listed_at ?? null,
+      listedAtText: row.listed_at_text ?? null,
+      favouriteCount: row.favourite_count ?? null,
+      viewCount: row.view_count ?? null,
+      sourceAvailability: row.source_availability ?? null,
     }
   );
 }

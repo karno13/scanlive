@@ -1,0 +1,26 @@
+{
+  "kind": "captured",
+  "source": "Vinted",
+  "host": "www.vinted.pl",
+  "searchQuery": "pratchett",
+  "category": "pratchett",
+  "capturedAt": "2026-11-10T09:30:00.000Z",
+  "sanitized": true,
+  "reviewedForPersonalData": true,
+  "note": "Three productItem objects from https://www.vinted.pl/catalog/2312-books?search_text=pratchett&order=newest_first. Item numbers, seller ids and photo addresses replaced; titles, prices, fees and conditions as captured.",
+  "html": "<script>self.__next_f.push([1,\"{\\\"productItem\\\":{\\\"id\\\":9000000001,\\\"title\\\":\\\"Kolor magii - Terry Pratchett\\\",\\\"url\\\":\\\"/items/9000000001-kolor-magii-terry-pratchett\\\",\\\"favouriteCount\\\":3,\\\"priceWithDiscount\\\":null,\\\"price\\\":{\\\"amount\\\":\\\"15.00\\\",\\\"currencyCode\\\":\\\"PLN\\\"},\\\"serviceFee\\\":{\\\"amount\\\":\\\"3.65\\\",\\\"currencyCode\\\":\\\"PLN\\\"},\\\"totalItemPrice\\\":{\\\"amount\\\":\\\"18.65\\\",\\\"currencyCode\\\":\\\"PLN\\\"},\\\"isPromoted\\\":false,\\\"isFavourite\\\":false,\\\"thumbnailUrl\\\":\\\"https://images1.vinted.net/t/fixture_photo_1/f800/fixture.webp?s=fixture\\\",\\\"dominantColor\\\":\\\"#E0D8D1\\\",\\\"user\\\":{\\\"id\\\":1000001,\\\"photo\\\":null,\\\"thumbnailUrl\\\":null,\\\"isBusiness\\\":false},\\\"photos\\\":[{\\\"url\\\":\\\"https://images1.vinted.net/t/fixture_photo_2/f800/fixture.webp?s=fixture\\\",\\\"isMain\\\":true,\\\"imageNo\\\":1}],\\\"itemBox\\\":{\\\"firstLine\\\":\\\"Kolor magii - Terry Pratchett\\\",\\\"secondLine\\\":\\\"Bardzo dobry\\\",\\\"exposure\\\":\\\"$undefined\\\",\\\"exposures\\\":[],\\\"ffExposures\\\":[],\\\"accessibilityLabel\\\":\\\"Kolor magii - Terry Pratchett, Stan: Bardzo dobry, 15.00 zł, 18.65 zł\\\",\\\"badge\\\":\\\"$undefined\\\",\\\"actions\\\":\\\"$undefined\\\",\\\"itemId\\\":\\\"9000000001\\\"}}}\\n{\\\"productItem\\\":{\\\"id\\\":9000000002,\\\"title\\\":\\\"-Faust- Erik - Terry Pratchett\\\",\\\"url\\\":\\\"/items/9000000002-faust-erik-terry-pratchett\\\",\\\"favouriteCount\\\":1,\\\"priceWithDiscount\\\":null,\\\"price\\\":{\\\"amount\\\":\\\"31.07\\\",\\\"currencyCode\\\":\\\"PLN\\\"},\\\"serviceFee\\\":{\\\"amount\\\":\\\"4.45\\\",\\\"currencyCode\\\":\\\"PLN\\\"},\\\"totalItemPrice\\\":{\\\"amount\\\":\\\"35.52\\\",\\\"currencyCode\\\":\\\"PLN\\\"},\\\"isPromoted\\\":false,\\\"isFavourite\\\":false,\\\"thumbnailUrl\\\":\\\"https://images1.vinted.net/t/fixture_photo_3/f800/fixture.webp?s=fixture\\\",\\\"dominantColor\\\":\\\"#DEDDD9\\\",\\\"user\\\":{\\\"id\\\":1000002,\\\"photo\\\":null,\\\"thumbnailUrl\\\":null,\\\"isBusiness\\\":false},\\\"photos\\\":[{\\\"url\\\":\\\"https://images1.vinted.net/t/fixture_photo_4/f800/fixture.webp?s=fixture\\\",\\\"isMain\\\":true,\\\"imageNo\\\":1}],\\\"itemBox\\\":{\\\"firstLine\\\":\\\"-Faust- Erik - Terry Pratchett\\\",\\\"secondLine\\\":\\\"Bardzo dobry\\\",\\\"exposure\\\":\\\"$undefined\\\",\\\"exposures\\\":[],\\\"ffExposures\\\":[],\\\"accessibilityLabel\\\":\\\"-Faust- Erik - Terry Pratchett, Stan: Bardzo dobry, 31.07 zł, 35.52 zł\\\",\\\"badge\\\":\\\"$undefined\\\",\\\"actions\\\":\\\"$undefined\\\",\\\"itemId\\\":\\\"9000000002\\\"}}}\\n{\\\"productItem\\\":{\\\"id\\\":9000000003,\\\"title\\\":\\\"Wyprawa czarownic (Świat Dysku, #12) - Terry Pratchett\\\",\\\"url\\\":\\\"/items/9000000003-wyprawa-czarownic-swiat-dysku-12-terry-pratchett\\\",\\\"favouriteCount\\\":2,\\\"priceWithDiscount\\\":null,\\\"price\\\":{\\\"amount\\\":\\\"30.00\\\",\\\"currencyCode\\\":\\\"PLN\\\"},\\\"serviceFee\\\":{\\\"amount\\\":\\\"4.40\\\",\\\"currencyCode\\\":\\\"PLN\\\"},\\\"totalItemPrice\\\":{\\\"amount\\\":\\\"34.40\\\",\\\"currencyCode\\\":\\\"PLN\\\"},\\\"isPromoted\\\":false,\\\"isFavourite\\\":false,\\\"thumbnailUrl\\\":\\\"https://images1.vinted.net/t/fixture_photo_5/f800/fixture.webp?s=fixture\\\",\\\"dominantColor\\\":\\\"#C9D7D6\\\",\\\"user\\\":{\\\"id\\\":1000003,\\\"photo\\\":null,\\\"thumbnailUrl\\\":null,\\\"isBusiness\\\":false},\\\"photos\\\":[{\\\"url\\\":\\\"https://images1.vinted.net/t/fixture_photo_6/f800/fixture.webp?s=fixture\\\",\\\"isMain\\\":true,\\\"imageNo\\\":1}],\\\"itemBox\\\":{\\\"firstLine\\\":\\\"Wyprawa czarownic (Świat Dysku, #12) - Terry Pratchett\\\",\\\"secondLine\\\":\\\"Dobry\\\",\\\"exposure\\\":\\\"$undefined\\\",\\\"exposures\\\":[],\\\"ffExposures\\\":[],\\\"accessibilityLabel\\\":\\\"Wyprawa czarownic (Świat Dysku, #12) - Terry Pratchett, Stan: Dobry, 30.00 zł, 34.40 zł\\\",\\\"badge\\\":\\\"$undefined\\\",\\\"actions\\\":\\\"$undefined\\\",\\\"itemId\\\":\\\"9000000003\\\"}}}\"])</script>",
+  "expected": [
+    {
+      "url": "https://www.vinted.pl/items/9000000001-kolor-magii-terry-pratchett",
+      "price": 1500
+    },
+    {
+      "url": "https://www.vinted.pl/items/9000000002-faust-erik-terry-pratchett",
+      "price": 3107
+    },
+    {
+      "url": "https://www.vinted.pl/items/9000000003-wyprawa-czarownic-swiat-dysku-12-terry-pratchett",
+      "price": 3000
+    }
+  ]
+}

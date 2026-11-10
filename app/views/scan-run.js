@@ -22,6 +22,12 @@ export function sourceState(row = {}) {
   return { label: 'nie działa', tone: 'error' };
 }
 
+export const REJECTION_LABELS = {
+  language: 'w obcym języku',
+  language_unknown: 'bez podanego języka (Vinted)',
+  topic: 'spoza tematu frazy',
+  product: 'to nie książki (gry, figurki…)',
+};
 const minutes = (seconds) => (!Number.isFinite(seconds) ? '—' : seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${String(seconds % 60).padStart(2, '0')} s`);
 const when = (value) => (value ? new Date(value).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 
@@ -102,10 +108,17 @@ export function createScanRun({ $ }) {
     const byCode = new Map();
     for (const [name, row] of entries) if (row.lastError) byCode.set(row.lastError, [...(byCode.get(row.lastError) || []), name]);
     const dead = entries.filter(([, row]) => sourceState(row).label === 'nie działa').map(([name]) => name);
-    $('#scanRunAdvice').innerHTML = running || !byCode.size
+    // Listings the scan left out before saving them, by reason.
+    const rejected = Object.entries(data.summary?.rejected || {}).filter(([, count]) => Number(count) > 0);
+    const rejectedLine = running || !rejected.length
+      ? ''
+      : `<p class="scan-run-rejected"><b>Pominięte przed zapisem:</b> ${rejected
+          .map(([reason, count]) => `${Number(count)} ${escapeHtml(REJECTION_LABELS[reason] || reason)}`)
+          .join(' · ')}</p>`;
+    $('#scanRunAdvice').innerHTML = rejectedLine + (running || !byCode.size
       ? ''
       : [...byCode].map(([code, names]) => `<p><b>${escapeHtml(names.join(', '))}:</b> ${escapeHtml(SOURCE_PROBLEMS[code]?.[1] || 'Źródło zgłosiło nieznany błąd.')}${TRANSIENT_CODES.has(code) ? '' : ' <small>(„Ponów chwilowe błędy” pomija ten problem)</small>'}</p>`).join('') +
-        (dead.length ? `<button type="button" class="button secondary compact" id="scanRunUncheck">Odznacz niedziałające źródła (${escapeHtml(dead.join(', '))})</button>` : '');
+        (dead.length ? `<button type="button" class="button secondary compact" id="scanRunUncheck">Odznacz niedziałające źródła (${escapeHtml(dead.join(', '))})</button>` : ''));
     $('#scanRunUncheck')?.addEventListener('click', () => {
       for (const input of document.querySelectorAll('#sourceGrid input'))
         if (dead.includes(input.value) && input.checked) {

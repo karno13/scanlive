@@ -15,12 +15,13 @@
 | Katalog: dzieła i duplikaty | `work-grouping.mjs`, `app/views/duplicates.js`, `app/views/catalog-names.js` (wydawcy i serie) |
 | Katalog: wydania i ceny książki | `edition-variants.mjs` (warianty cenowe, „Wydanie nieustalone”, wybór wydania z ogłoszenia), `app/views/work-prices.js` |
 | Zestawy | `offer-sets.mjs`, `set-descriptions.mjs` (skład z opisu ogłoszenia), `app/views/sets.js` |
+| Obserwacje ofert | `offer-observations.mjs` (stan egzemplarza i jego klasa, opłata kupującego, sprzedawca, zdjęcia, data wystawienia, polubienia, surowe obiekty ogłoszenia w `offer_raw_snapshots`) |
 | Oferty | `app/views/offers.js`, `app/views/offer-groups.js` („Wg książki”, `GET /api/offer-groups`) |
 | Skaner: harmonogram i jakość | `scan-schedule.mjs`, `offer-availability.mjs`, `app/views/scan-schedule.js` |
 | Zdjęcia i okładki | `offer-images.mjs` (walidacja URL, proxy `/api/image` z cache, `og:image`), `app/core/bibliography.js` (czyste etykiety BN, okładki) |
 | Pulpit i paleta | `catalog-insights.mjs` (`/api/catalog/insights`), `app/views/dashboard.js`, `app/views/palette.js`, `app/core/preferences.js` |
 | Trwały katalog danych / backup | `catalog-data-location.mjs`, `scripts/backup-catalog.mjs` |
-| Migracje — zachować | `migrations/001_catalog.sql` … `007_offer_sets.sql`, `099`–`123`; nowa migracja = kolejny numer, nigdy edycja istniejącej |
+| Migracje — zachować | `migrations/001_catalog.sql` … `007_offer_sets.sql`, `099`–`124`; nowa migracja = kolejny numer, nigdy edycja istniejącej |
 | Testy Node | `*.test.mjs`, `test/*.test.js`, `scripts/run-tests.mjs`, `.github/workflows/scanner-tests.yml` |
 | Test startu interfejsu | `scripts/browser-smoke.mjs` (włącza tryb handlu w `localStorage`, bo sprawdza kalkulator i cenę docelową), `.github/workflows/browser-smoke.yml` |
 | Publiczne demo | Osobna gałąź `gh-pages` — bez produkcyjnego API |

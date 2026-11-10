@@ -282,6 +282,7 @@ export class SqliteCatalogRepository extends CatalogRepository {
           at,
           id,
         );
+      this.#writeObservation(id, input);
       return {
         ...this.database.prepare('SELECT * FROM offers WHERE id=?').get(id),
         created: false,
@@ -312,7 +313,40 @@ export class SqliteCatalogRepository extends CatalogRepository {
         at,
         at,
       );
+    this.#writeObservation(id, input);
     return { ...this.database.prepare('SELECT * FROM offers WHERE id=?').get(id), created: true };
+  }
+
+  // Observation columns (migration 124). A value the source did not give this time keeps the
+  // stored one; counts (likes) and the source's availability code follow the latest reading.
+  #writeObservation(id, input) {
+    const columns = {
+      conditionText: 'condition_text',
+      conditionClass: 'condition_class',
+      buyerFee: 'buyer_fee',
+      shippingCost: 'shipping_cost',
+      sellerId: 'seller_id',
+      sellerName: 'seller_name',
+      sellerBusiness: 'seller_business',
+      photoCount: 'photo_count',
+      listedAt: 'listed_at',
+      listedAtText: 'listed_at_text',
+      favouriteCount: 'favourite_count',
+      viewCount: 'view_count',
+      sourceAvailability: 'source_availability',
+    };
+    // The first approximate listing date is the closest one: later readings ("2 tyg.") are coarser.
+    const keepFirst = new Set(['listed_at', 'listed_at_text']);
+    const sets = [],
+      values = [];
+    for (const [field, column] of Object.entries(columns)) {
+      if (input[field] == null) continue;
+      const value = typeof input[field] === 'boolean' ? Number(input[field]) : input[field];
+      sets.push(keepFirst.has(column) ? `${column}=COALESCE(${column},?)` : `${column}=?`);
+      values.push(value);
+    }
+    if (!sets.length) return;
+    this.database.prepare(`UPDATE offers SET ${sets.join(',')} WHERE id=?`).run(...values, id);
   }
 
   appendPriceObservation(offerId, price, observedAt) {

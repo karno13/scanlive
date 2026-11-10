@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readSourceHtml } from './marketplaces.mjs';
 import { DETAIL_SOURCES, parseProductDetail, empikCategories } from './source-details.mjs';
+import { conditionClass } from './offer-observations.mjs';
 
 const MAX_ATTEMPTS = 3;
 const RETRY_AFTER_MS = 60 * 60 * 1000;
@@ -101,6 +102,11 @@ export async function enrichOffers(
     report.checked += 1;
     const detail = parseProductDetail(html);
     const facts = { ...detail, isbn: undefined };
+    // The page's condition ("bardzo dobry") is more precise than the result card's "Używany".
+    if (detail.condition)
+      repository.database
+        .prepare("UPDATE offers SET condition_text=?, condition_class=? WHERE id=? AND (condition_text IS NULL OR coalesce(condition_class,'unknown')='unknown')")
+        .run(String(detail.condition).trim().slice(0, 200), conditionClass(detail.condition), offer.id);
     if (offer.source === 'Empik') {
       const categories = empikCategories(html);
       facts.category = categories.join(' / ') || null;
