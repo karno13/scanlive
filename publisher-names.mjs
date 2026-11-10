@@ -74,6 +74,8 @@ export function normalizePublisher(value) {
  * Re-spells stored publishers once per start (cheap: one pass over editions). Editions the
  * operator edited by hand keep their spelling.
  */
+// Bump when the spelling rules above change: stored publishers are re-spelled once more at start-up.
+export const PUBLISHER_RULES_VERSION = 1;
 export function normalizeStoredPublishers(repository, { now = () => new Date() } = {}) {
   const db = repository.database;
   const rows = db.prepare("SELECT id, publisher FROM editions WHERE publisher IS NOT NULL AND coalesce(verification_status,'')<>'manual'").all();

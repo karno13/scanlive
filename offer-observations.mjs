@@ -1,3 +1,4 @@
+// @ts-check
 // Everything a source tells about one listing besides title and price: the copy's condition, the
 // buyer's fee, the seller, the description and photos, when it was listed and how many people
 // liked it. A listing that disappears cannot be read again, so these are saved at first sight and
@@ -31,6 +32,7 @@ export function conditionClass(text) {
   return 'unknown';
 }
 
+/** @type {Array<[RegExp, number]>} */
 const AGE_UNITS = [
   [/^(?:sek|s\b)/, 1000],
   [/^min/, 60_000],

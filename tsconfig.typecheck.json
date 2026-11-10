@@ -1,0 +1,17 @@
+{
+  "//": "Type checking without a build step: JSDoc types, only files that start with // @ts-check (the offer path and the repository). npm run typecheck.",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "skipLibCheck": true
+  },
+  "files": ["offer-ingest.mjs", "offer-observations.mjs", "sqlite-catalog-repository.mjs", "offer-identity.mjs"]
+}

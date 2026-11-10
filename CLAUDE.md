@@ -7,7 +7,7 @@ Current focus: scanner, catalogue, verification (trading features are parked) �
 ## Commands
 
 - `npm test` — all tests (isolated temp data dir, never the user's DB). One file: `npm test -- rejected-offers.test.mjs`.
-- `npm run lint` · `npm run check:syntax` · `npm run format:check` (needs `npm install` once; do not commit a `package-lock.json`).
+- `npm run lint` · `npm run check:syntax` · `npm run typecheck` (JSDoc types of the offer path and the repository, files with `// @ts-check`) · `npm run format:check` (needs `npm install` once; do not commit a `package-lock.json`).
 - UI smoke: `node scripts/browser-smoke.mjs` (needs `npm install --no-save --no-package-lock playwright@1.55.1` and `npx playwright install chromium`).
 - Shell: Git Bash / PowerShell on Windows; **no Python** — write helper scripts in Node.
 
@@ -15,16 +15,16 @@ Current focus: scanner, catalogue, verification (trading features are parked) �
 
 Full table: `docs/REPOSITORY-MAP.md`. The short version:
 
-- `local-app.mjs` — HTTP server, router (one long `if` chain in `createLocalAppServer`), background jobs (`schedule*` functions run after each identification pass). Smaller routes live in `trading-api.mjs` → `tradingRoute`; a new path there must also be added to the prefix regex in `local-app.mjs` that forwards to it.
+- `local-app.mjs` — HTTP server: route table `localRoutes` in `createLocalAppServer` (`router.mjs`: `.add(method, '/api/x/:id', handler)`, first match wins, params already decoded), background jobs (`schedule*` functions run after each identification pass). Smaller routes live in the `tradingRoutes` table of `trading-api.mjs`; requests whose path that table knows are forwarded to it automatically.
 - `catalog-api.mjs` — read models for lists (works, offers, offer groups, review queue, buckets).
-- `catalog-production.mjs` — opens the DB; **start-up repairs** (dedupe, publisher names, aliases, auto-rejections) run here on every launch.
+- `catalog-production.mjs` — opens the DB and runs `startup-jobs.mjs`: data repairs are **one-time jobs** with a flag in `app_preferences` (`runOnce`, versioned key when rules can change); only in-memory loads and series aliases run every start. Scanned offers enter through `offer-ingest.mjs` (`ScannedOffer`, one shape).
 - `catalog-resolver.mjs` + `identification-worker.mjs` — ISBN → edition; `metadata-sources/*` adapters.
 - `marketplaces.mjs` — source adapters and `readSourceHtml`; every marketplace request goes through `marketplace-gate.mjs` (per-source adaptive pacing). Never add a request path that bypasses it.
 - Frontend: `app/index.html`, `app/app.js` (shell, tabs, wiring), `app/views/<area>.js`, `app/core/*` (api, formatters, prefs). `app/app.css` is large and layered: later rules override earlier ones — append, and check the end of the file before adding a selector.
 
 ## Rules
 
-- **Migrations are immutable** (`migrations/NNN_*.sql`, checksums stored in user DBs). New schema = next number (currently 126 is the last).
+- **Migrations are immutable** (`migrations/NNN_*.sql`, checksums stored in user DBs). New schema = next number (currently 128 is the last).
 - Automatic decisions must be reversible and visible in „Ostatnie decyzje” (write a `review_decisions` row with a `created_by` marker); manual assignments and sets always win over automation.
 - Never touch the user's DB (`%LOCALAPPDATA%\BookFlip\data`). To measure on real data, copy it: `node scripts/backup-catalog.mjs <scratch>/copy.sqlite`.
 - Trading UI is hidden unless `body.trading-mode` (localStorage `bookflip.tradingMode=1`).

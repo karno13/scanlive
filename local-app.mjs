@@ -1,5 +1,6 @@
 import { tailscaleAccessFromEnv, validateBookflipRequest } from './tailscale-access.mjs';
-import { tradingRoute } from './trading-api.mjs';
+import { tradingRoutes } from './trading-api.mjs';
+import { createRouter } from './router.mjs';
 import { listScanProfiles, putScanProfile, deleteScanProfile } from './scan-profiles-api.mjs';
 import { createSqliteVintedDetailCache } from './vinted-detail-sqlite-cache.mjs';
 import { publicAssetPath } from './static-asset-path.mjs';
@@ -890,649 +891,646 @@ export function createLocalAppServer({
   let scanInFlight = false;
   let scanAbortController = null;
   let currentScan = null;
+  // Every route of the local server, in the order they are tried (router.mjs). Handlers get the
+  // request, the response, the parsed URL and the URL-decoded path parameters.
+  const localRoutes = createRouter()
+    .add('GET', '/api/image', async ({ request, response, url, params }) => {
+      try {
+        const image = await fetchCachedImage(url.searchParams.get('u'), {
+          cacheDirectory: join(runtimeDataDirectory, 'image-cache'),
+        });
+        response.writeHead(200, {
+          'Content-Type': image.type,
+          'Cache-Control': 'private, max-age=31536000, immutable',
+          'X-Content-Type-Options': 'nosniff',
+          'Referrer-Policy': 'no-referrer',
+          'Content-Security-Policy': "default-src 'none'",
+        });
+        return response.end(image.body);
+      } catch (error) {
+        return send(response, error.statusCode || 502, JSON.stringify({ error: error.message }));
+      }
+    })
+    .add('GET', '/api/offers/:id/image', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const imageUrl = await offerImageUrl(catalog.repository, params.id);
+      if (!imageUrl) return send(response, 404, JSON.stringify({ error: 'IMAGE_NOT_FOUND' }));
+      response.writeHead(302, { Location: proxiedImage(imageUrl), 'Cache-Control': 'no-store' });
+      return response.end();
+    })
+    .add('*', '/api/buyback/*', async ({ request, response, url, params }) => {
+      const buyback = getBuyback();
+      if (!buyback) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      if (request.method === 'GET' && url.pathname === '/api/buyback/quotes')
+        return send(response, 200, JSON.stringify({ quotes: buyback.many((url.searchParams.get('isbn') || '').split(',').slice(0, 200)) }));
+      if (request.method === 'GET' && url.pathname === '/api/buyback/batch')
+        return send(response, 200, JSON.stringify(buyback.status()));
+      if (request.method === 'POST' && url.pathname === '/api/buyback/batch')
+        return send(response, 202, JSON.stringify(buyback.start()));
+      if (request.method === 'PUT' && url.pathname === '/api/buyback/auto') {
+        const input = await readJson(request);
+        return send(response, 200, JSON.stringify(buyback.setAuto(input?.enabled === true)));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/buyback/batch/cancel')
+        return send(response, 202, JSON.stringify(buyback.cancel()));
+      if (request.method === 'POST' && url.pathname === '/api/buyback/check') {
+        const input = await readJson(request);
+        try {
+          return send(response, 200, JSON.stringify(await buyback.check(input?.isbn, { force: input?.force === true })));
+        } catch (error) {
+          return send(response, error.status || 502, JSON.stringify({ error: error.message }));
+        }
+      }
+      return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
+    })
+    .add('*', '/api/images/backfill/*', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      imageBackfill ||= createImageBackfill(catalog.repository);
+      if (request.method === 'GET' && url.pathname === '/api/images/backfill')
+        return send(response, 200, JSON.stringify(imageBackfill.status()));
+      if (request.method === 'POST')
+        return send(response, 202, JSON.stringify(url.pathname.endsWith('/cancel') ? imageBackfill.cancel() : imageBackfill.start()));
+      return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
+    })
+    // Smaller routes live in trading-api.mjs; its route table says which paths are its own.
+    .add('GET', '/api/scan/diagnostics', async ({ request, response, url, params }) => {
+      const scan = currentScan || await readScanStatus();
+      return send(response, 200, JSON.stringify({ ...scan, progress: scanProgress(scan.diagnostics), telemetry: scanTelemetry(scan.diagnostics, { running: scan.status === 'running' }) }));
+    })
+    .add('GET', '/api/scan/status', async ({ request, response, url, params }) => {
+      return send(response, 200, JSON.stringify(currentScan || await readScanStatus()));
+    })
+    .add('PUT', '/api/catalog/universe/:id', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const id = params.id;
+      return send(response, 200, JSON.stringify(setWorkUniverse(catalog.repository, id, await readJson(request))));
+    })
+    // Catalogue seeding from BN: the list, a new seed, a seed's status, removing one.
+    .add(['GET', 'POST'], '/api/catalog/seeds', async ({ request, response }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog?.seeds) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      if (request.method === 'GET') return send(response, 200, JSON.stringify(catalog.seeds.list()));
+      return send(response, 201, JSON.stringify(catalog.seeds.add(await readJson(request))));
+    })
+    .add(['PUT', 'DELETE'], '/api/catalog/seeds/:id', async ({ request, response, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog?.seeds) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      if (request.method === 'DELETE') return send(response, 200, JSON.stringify(catalog.seeds.remove(params.id)));
+      return send(response, 200, JSON.stringify(catalog.seeds.setStatus(params.id, (await readJson(request))?.status)));
+    })
+    .add('GET', '/api/catalog/persons', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify({ items: catalogPersons(catalog.repository, { query: url.searchParams.get('q') || '', limit: url.searchParams.get('limit') || 200 }) }));
+    })
+    .add('GET', '/api/catalog/persons/:id', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify(personWorks(catalog.repository, params.id)));
+    })
+    .add('GET', '/api/catalog/series-tree', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify({ universes: catalogSeries(catalog.repository) }));
+    })
+    .add('*', '/api/catalog/series-definition', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      if (request.method === 'GET') return send(response, 200, JSON.stringify(getSeriesDefinition(catalog.repository, url.searchParams.get('name') || '')));
+      if (request.method === 'PUT') return send(response, 200, JSON.stringify(saveSeriesDefinition(catalog.repository, await readJson(request))));
+      return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
+    })
+    .add('GET', '/api/catalog/insights', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify(catalogInsights(catalog.repository)));
+    })
+    .add('GET', '/api/catalog/summary', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify(catalog.repository.counts()));
+    })
+    .add('GET', '/api/scan-profiles', async ({ request, response, url, params }) => {
+      const catalog=getProductionCatalog();
+      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+      return send(response,200,JSON.stringify({items:listScanProfiles(catalog.repository)}));
+    })
+    .add('POST', '/api/scan-profiles/import', async ({ request, response, url, params }) => {
+      const catalog=getProductionCatalog();
+      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+      const input=await readJson(request);
+      return send(response,200,JSON.stringify(putScanProfile(catalog.repository,input?.name,input,{onlyIfAbsent:true})));
+    })
+    .add('POST', '/api/scan-profiles', async ({ request, response, url, params }) => {
+      const catalog=getProductionCatalog();
+      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+      const input=await readJson(request);
+      const result=putScanProfile(catalog.repository,input?.name,input,{onlyIfAbsent:true});
+      return send(response,result.created?201:409,JSON.stringify(result.created?result:{error:'PROFILE_ALREADY_EXISTS'}));
+    })
+    .add(['PUT', 'DELETE'], '/api/scan-profiles/:name', async ({ request, response, url, params }) => {
+      const catalog=getProductionCatalog();
+      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+      const name=params.name;
+      if (request.method === 'DELETE')
+        return send(response,200,JSON.stringify(deleteScanProfile(catalog.repository,name)));
+      const input=await readJson(request);
+      return send(response,200,JSON.stringify(putScanProfile(catalog.repository,name,input)));
+    })
+    .add('GET', '/api/sources', async ({ request, response, url, params }) => {
+      return send(response, 200, JSON.stringify({ sources: Object.keys(localSourceHosts), blocked: (() => { try { const catalog = getProductionCatalog(); return catalog ? blockedSources(catalog.repository) : {}; } catch { return {}; } })() }));
+    })
+    .add('GET', '/api/history/brief', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify(historyBookLabels(catalog.repository)));
+    })
+    .add('GET', '/api/history', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) throw Error('SQLITE_HISTORY_REQUIRES_CATALOG');
+      return send(response, 200, JSON.stringify(catalogHistorySnapshot(catalog.repository)));
+    })
+    .add('GET', '/api/book', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const bookId = url.searchParams.get('id');
+      if (!bookId || bookId.length > 200)
+        return send(response, 404, JSON.stringify({ error: 'BOOK_NOT_FOUND' }));
+      const history = sqliteHistoryModel(catalog.repository, { bookId });
+      const data = bookHistory(history, bookId);
+      return data
+        ? send(response, 200, JSON.stringify(data))
+        : send(response, 404, JSON.stringify({ error: 'BOOK_NOT_FOUND' }));
+    })
+    .add('POST', '/api/catalog', async ({ request, response, url, params }) => {
+      storageMode();
+      const input = await readJson(request);
+      const catalog = getProductionCatalog();
+      if (!catalog) throw Error('SQLITE_STORAGE_REQUIRES_CATALOG');
+      const created = await withHistoryWriteLock(async () => createSqliteBook(catalog, input));
+      return send(
+        response,
+        created.created ? 201 : 200,
+        JSON.stringify({
+          book: created.book,
+          editionId: created.editionId,
+          catalog: url.searchParams.get('compact') === '1'
+            ? historyBookLabels(catalog.repository)
+            : catalogHistorySnapshot(catalog.repository),
+          catalogSync: { mode: 'sqlite' },
+        }),
+      );
+    })
+    .add('POST', '/api/identification/control', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog || !identificationControl) return send(response, 503, JSON.stringify({ error: 'IDENTIFICATION_UNAVAILABLE' }));
+      const { action, retryUnresolved = false } = await readJson(request);
+      let retried = null;
+      if (action === 'start') {
+        if (retryUnresolved)
+          retried = retryIdentificationJobs(catalog.repository, 'unresolved');
+        const startedAt = new Date().toISOString();
+        catalog.beginIdentificationRun(startedAt);
+        identificationControl.start({ newRun: true, startedAt });
+        void identificationControl.tick();
+      }
+      else if (action === 'stop') identificationControl.pause();
+      else return send(response, 400, JSON.stringify({ error: 'INVALID_IDENTIFICATION_ACTION' }));
+      return send(response, 200, JSON.stringify({ ...identificationControl.status(), retried }));
+    })
+    .add('GET', '/api/catalog/status', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      const scheduler = identificationControl?.status() ?? { available: false };
+      return send(response, 200, JSON.stringify(catalog ? { ...catalog.status({ runStartedAt: scheduler.runStartedAt }), scheduler } : { enabled: false }));
+    })
+    .add('GET', '/api/catalog/series', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify({ items: listWorkSeries(catalog.repository) }));
+    })
+    .add('PUT', '/api/catalog/series/:id', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const id = params.id;
+      const data = await readJson(request);
+      return send(response, 200, JSON.stringify(updateWorkSeries(catalog.repository, id, data)));
+    })
+    .add('GET', '/api/catalog/works', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(
+        response,
+        200,
+        JSON.stringify(
+          listCatalogWorks(catalog.repository, Object.fromEntries(url.searchParams)),
+        ),
+      );
+    })
+    // Prices of a book over all its editions, and its price variants.
+    .add('GET', '/api/catalog/works/:id/prices', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const data = workPriceOverview(catalog.repository, params.id);
+      return data ? send(response, 200, JSON.stringify(data)) : send(response, 404, JSON.stringify({ error: 'WORK_NOT_FOUND' }));
+    })
+    .add('POST', '/api/catalog/works/:id/variants/merge', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      return send(response, 200, JSON.stringify(mergeVariants(catalog.repository, params.id, String(input?.from ?? ''), String(input?.to ?? ''))));
+    })
+    .add('PUT', '/api/catalog/editions/:id/variant', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      return send(response, 200, JSON.stringify(setEditionVariant(catalog.repository, params.id, input?.variantKey ?? null)));
+    })
+    .add('GET', '/api/catalog/works/:id', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog(),
+        id = params.id;
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const data = getCatalogWork(catalog.repository, id);
+      return data
+        ? send(response, 200, JSON.stringify(data))
+        : send(response, 404, JSON.stringify({ error: 'WORK_NOT_FOUND' }));
+    })
+    .add('GET', '/api/catalog/editions/:id', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog(),
+        id = params.id;
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const data = getCatalogEdition(catalog.repository, id);
+      return data
+        ? send(response, 200, JSON.stringify(data))
+        : send(response, 404, JSON.stringify({ error: 'EDITION_NOT_FOUND' }));
+    })
+    .add('GET', '/api/offer-workspace', async ({ request, response, url, params }) => {
+      const catalog=getProductionCatalog();
+      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+      return send(response,200,JSON.stringify({items:listOfferWorkspace(catalog.repository)}));
+    })
+    .add('POST', '/api/offer-workspace/import', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error:'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      return send(response, 200, JSON.stringify(importOfferWorkspace(catalog.repository, input?.entries)));
+    })
+    .add('PUT', '/api/offer-workspace/:id', async ({ request, response, url, params }) => {
+      const catalog=getProductionCatalog();
+      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
+      const id=params.id;
+      const input=await readJson(request);
+      return send(response,200,JSON.stringify(setOfferWorkspace(catalog.repository,id,input)));
+    })
+    // Oferty → "Wg książki": one row per edition with its listings' count and price range.
+    .add('GET', '/api/offer-groups', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify(listCatalogOfferGroups(catalog.repository, Object.fromEntries(url.searchParams))));
+    })
+    .add('GET', '/api/offers', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(
+        response,
+        200,
+        JSON.stringify(
+          listCatalogOffers(catalog.repository, Object.fromEntries(url.searchParams)),
+        ),
+      );
+    })
+    // Operator changes or removes an offer's edition (catalogue and offer panel).
+    .add(['PUT', 'DELETE'], '/api/offers/:id/assignment', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const offerId = params.id;
+      const input = await readJson(request);
+      // A book without a named edition: the edition the listing points at, or its unknown edition.
+      const editionId = request.method === 'PUT' && !input?.editionId && input?.workId
+        ? catalog.repository.transaction(() => editionForWorkAssignment(catalog.repository, String(input.workId), offerId).editionId)
+        : input?.editionId;
+      const result = request.method === 'PUT'
+        ? reassignOffer(catalog.repository, offerId, editionId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null })
+        : unassignOffer(catalog.repository, offerId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null });
+      return send(response, 200, JSON.stringify(result));
+    })
+    .add('GET', '/api/offers/:id', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog(),
+        id = params.id;
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const data = getCatalogOffer(catalog.repository, id);
+      return data
+        ? send(response, 200, JSON.stringify(data))
+        : send(response, 404, JSON.stringify({ error: 'OFFER_NOT_FOUND' }));
+    })
+    .add('POST', '/api/identification/retry', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      const result = retryIdentificationJobs(catalog.repository, input?.mode);
+      if (result.queued > 0 && identificationControl) {
+        identificationControl.start();
+        void identificationControl.tick();
+      }
+      return send(response, 200, JSON.stringify(result));
+    })
+    .add('GET', '/api/sets', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify({ items: listOfferSets(catalog.repository) }));
+    })
+    .add('POST', '/api/sets', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      if (typeof input?.offerId !== 'string' || !input.offerId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_OFFER_ID' }));
+      return send(response, 200, JSON.stringify(markOfferAsSet(catalog.repository, input.offerId)));
+    })
+    // GET: suggestions from the listing title; POST {text}: books named in a pasted description.
+    .add(['GET', 'POST'], '/api/sets/:offerId/candidates', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = request.method === 'POST' ? await readJson(request) : {};
+      const text = typeof input?.text === 'string' ? input.text.slice(0, 20000) : '';
+      return send(response, 200, JSON.stringify(setCandidates(catalog.repository, params.offerId, { text })));
+    })
+    .add('GET', '/api/sets-cycle-volumes', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify(cycleVolumeEditions(catalog.repository, url.searchParams.get('name') || '', url.searchParams.get('from'), url.searchParams.get('to'))));
+    })
+    // A set's books: add one, remove one; or unmark the set. (The path used to be split by hand:
+    // counted with the leading "/api/sets", adding a book, removing one and unmarking never matched.)
+    .add('POST', '/api/sets/:offerId/editions', async ({ request, response, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      if (typeof input?.editionId !== 'string' || !input.editionId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_EDITION_ID' }));
+      return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, params.offerId, input.editionId, true)));
+    })
+    .add('DELETE', '/api/sets/:offerId/editions/:editionId', async ({ response, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, params.offerId, params.editionId, false)));
+    })
+    .add('DELETE', '/api/sets/:offerId', async ({ response, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify(unmarkOfferSet(catalog.repository, params.offerId)));
+    })
+    .add('GET', '/api/identification-jobs', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(
+        response,
+        200,
+        JSON.stringify(
+          listIdentificationJobs(catalog.repository, Object.fromEntries(url.searchParams)),
+        ),
+      );
+    })
+    // "Szybkie" tab: the sure decisions to look through, then apply the ones the operator kept.
+    .add('POST', '/api/identification-jobs/sure-plan', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      const jobIds = Array.isArray(input?.jobIds) ? input.jobIds.map(String).slice(0, 2000) : null;
+      return send(response, 200, JSON.stringify(sureReviewPlan(catalog.repository, { jobIds })));
+    })
+    .add('POST', '/api/identification-jobs/sure-apply', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      const result = await applySureReviewPlan(catalog, Array.isArray(input?.items) ? input.items : []);
+      // Approvals add ISBNs to the catalogue: the sibling offers with them are matched next.
+      if (result.approved && identificationControl) {
+        identificationControl.start();
+        void identificationControl.tick();
+      }
+      return send(response, 200, JSON.stringify(result));
+    })
+    // ISBN that no source knows: a draft built from the listings, then the edition in one click.
+    .add(['GET', 'POST'], '/api/identification-jobs/:id/offer-edition', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const jobId = params.id;
+      if (request.method === 'GET') return send(response, 200, JSON.stringify(offerEditionDraft(catalog.repository, jobId)));
+      const result = createEditionFromOffer(catalog.repository, jobId, await readJson(request));
+      if (identificationControl) {
+        identificationControl.start();
+        void identificationControl.tick();
+      }
+      return send(response, 200, JSON.stringify(result));
+    })
+    .add('POST', '/api/identification-jobs/:id/decision', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog(),
+        id = params.id;
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      const result = decideIdentificationJob(catalog.repository, id, input);
+      if (input.action === 'requeued' && identificationControl) {
+        identificationControl.start();
+        void identificationControl.tick();
+      }
+      return send(
+        response,
+        200,
+        JSON.stringify(result),
+      );
+    })
+    .add('GET', '/api/identification-jobs/:id/local-candidates', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const job = catalog.repository.database
+        .prepare('SELECT o.id AS offer_id, o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=?')
+        .get(params.id);
+      if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
+      return send(response, 200, JSON.stringify({ items: localWorkCandidates(catalog.repository, job.original_title, { offerId: job.offer_id }) }));
+    })
+    .add(['GET', 'POST'], '/api/identification-jobs/:id/proposals', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const id = params.id;
+      const job = catalog.repository.database
+        .prepare(
+          "SELECT j.id,j.offer_id,o.original_title,o.observed_isbn FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=? AND j.status='review_required'",
+        )
+        .get(id);
+      if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
+      // GET reads the stored proposal and computes one when missing; POST forces a fresh lookup.
+      const stored = request.method === 'GET' ? loadProposal(catalog.repository, id) : null;
+      if (stored) return send(response, 200, JSON.stringify(stored));
+      const fresh = await computeProposal(catalog, job);
+      return send(
+        response,
+        200,
+        JSON.stringify({ jobId: id, queries: fresh.queries, candidates: fresh.candidates, confidence: fresh.confidence, unavailable: fresh.unavailable }),
+      );
+    })
+    .add('POST', '/api/identification-jobs/:id/find-isbn', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const id = params.id;
+      const job = catalog.repository.database.prepare(
+        "SELECT j.id,o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=? AND j.status='review_required'",
+      ).get(id);
+      if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
+      const input = await readJson(request);
+      return send(response, 200, JSON.stringify(
+        await catalog.findIsbnsByTitle(input?.title || job.original_title),
+      ));
+    })
+    .add('POST', '/api/identification-jobs/:id/match-isbn', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const id = params.id;
+      const input = await readJson(request);
+      return send(
+        response,
+        200,
+        JSON.stringify(await matchIdentificationJobByIsbn(catalog, id, input)),
+      );
+    })
+    .add('POST', '/api/catalog/isbn-check', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const raw = (await readJson(request)).isbn;
+      const isbn = normalizeISBN(raw);
+      if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
+      const edition = catalog.repository.findEditionByISBN(isbn);
+      return send(response, 200, JSON.stringify({
+        isbn, found: Boolean(edition),
+        edition: edition ? { id: edition.id, title: edition.title, workId: edition.work_id, workTitle: edition.work_title } : null,
+      }));
+    })
+    .add('POST', '/api/catalog/lookup-preview', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const isbn = normalizeISBN((await readJson(request))?.isbn);
+      if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
+      return send(
+        response,
+        200,
+        JSON.stringify(await catalog.lookupIsbn(isbn)),
+      );
+    })
+    .add('POST', '/api/catalog/lookup-confirm', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const isbn = normalizeISBN((await readJson(request))?.isbn);
+      if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
+      const result = await catalog.resolveIsbn(isbn);
+      return send(
+        response,
+        ['created_edition', 'created_work_and_edition', 'matched_existing'].includes(
+          result.decision,
+        )
+          ? 200
+          : 409,
+        JSON.stringify(result),
+      );
+    })
+    .add('POST', '/api/catalog/link', async ({ request, response, url, params }) => {
+      storageMode();
+      const input = await readJson(request);
+      const catalog = getProductionCatalog();
+      if (!catalog) throw Error('SQLITE_STORAGE_REQUIRES_CATALOG');
+      await withHistoryWriteLock(async () => linkSqliteOffer(catalog, input, { returnHistory: false }));
+      return send(response, 200, JSON.stringify(catalogHistorySnapshot(catalog.repository)));
+    })
+    .add('POST', '/api/search/cancel', async ({ request, response, url, params }) => {
+      if (!scanInFlight || !scanAbortController || scanAbortController.signal.aborted)
+        return send(response, 409, JSON.stringify({ error: 'NO_ACTIVE_SCAN' }));
+      scanAbortController.abort();
+      return send(response, 202, JSON.stringify({ status: 'cancelling' }));
+    })
+    .add('POST', '/api/search', async ({ request, response, url, params }) => {
+      if (scanInFlight)
+        return send(response, 409, JSON.stringify({ error: 'SCAN_ALREADY_RUNNING' }));
+      scanInFlight = true;
+      let scanStarted = false;
+      try {
+        const scanInput = validateSearchInput(await readJson(request));
+        // "Tylko polskie wydania" (scanner form, saved in the database; scheduled scans use it too).
+        try { const store = getProductionCatalog(); if (store?.repository) scanInput.polishOnly = getPolishOnly(store.repository); } catch {}
+        scanStarted = true;
+        scanAbortController = new AbortController();
+        currentScan = { status: 'running', startedAt: new Date().toISOString(),
+          diagnostics: createScanDiagnostics({ queries: scanInput.queries || [], sources: scanInput.sources || [], tasks: scanInput.tasks || null }) };
+        await persistScanStatus(currentScan);
+        if (url.searchParams.get('stream') === '1') {
+          streamHeaders(response);
+          const emit = (event) => {
+            const safe = recordProgress(event);
+            addScanEvent(currentScan.diagnostics, safe);
+            if (!response.destroyed) response.write(JSON.stringify({ type: 'progress', event: safe }) + '\n');
+          };
+          try {
+            const result = await searchAndStore(scanInput, emit, {
+              catalogProvider,
+              search,
+              signal: scanAbortController.signal,
+              shouldAutoResolve: () => identificationControl?.status().running ?? true,
+            });
+            currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: { ...result.summary, scanAt: result.lastScan?.at ?? null } };
+            await persistScanStatus(currentScan);
+            if (!response.destroyed) response.write(JSON.stringify({ type: 'result', result }) + '\n');
+            if (!response.destroyed) response.end();
+          } catch (error) {
+            currentScan = { ...currentScan, status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed', finishedAt: new Date().toISOString() };
+            await persistScanStatus(currentScan);
+            if (!response.destroyed) response.write(
+              JSON.stringify({
+                type: 'error',
+                error: /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'LOCAL_APP_ERROR',
+              }) + '\n',
+            );
+            if (!response.destroyed) response.end();
+          }
+          return;
+        }
+        const result = await searchAndStore(scanInput, (event) => addScanEvent(currentScan.diagnostics, recordProgress(event)), {
+          catalogProvider,
+          search,
+          signal: scanAbortController.signal,
+          shouldAutoResolve: () => identificationControl?.status().running ?? true,
+        });
+        currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: { ...result.summary, scanAt: result.lastScan?.at ?? null } };
+        await persistScanStatus(currentScan);
+        return send(response, 200, JSON.stringify(result));
+      } catch (error) {
+        if (scanStarted) {
+          currentScan = { ...currentScan, status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed', finishedAt: new Date().toISOString() };
+          await persistScanStatus(currentScan);
+        }
+        throw error;
+      } finally {
+        scanAbortController = null;
+        scanInFlight = false;
+      }
+    })
+  ;
   const server = createServer(async (request, response) => {
     try {
       const rejected = validateBookflipRequest(request, tailscaleAccess);
       if (rejected)
         return send(response, rejected.status, JSON.stringify({ error: rejected.error }));
       const url = new URL(request.url || '/', 'http://127.0.0.1');
-      if (request.method === 'GET' && url.pathname === '/api/image') {
-        try {
-          const image = await fetchCachedImage(url.searchParams.get('u'), {
-            cacheDirectory: join(runtimeDataDirectory, 'image-cache'),
-          });
-          response.writeHead(200, {
-            'Content-Type': image.type,
-            'Cache-Control': 'private, max-age=31536000, immutable',
-            'X-Content-Type-Options': 'nosniff',
-            'Referrer-Policy': 'no-referrer',
-            'Content-Security-Policy': "default-src 'none'",
-          });
-          return response.end(image.body);
-        } catch (error) {
-          return send(response, error.statusCode || 502, JSON.stringify({ error: error.message }));
-        }
-      }
-      const offerImage = request.method === 'GET' && url.pathname.match(/^\/api\/offers\/([^/]+)\/image$/);
-      if (offerImage) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const imageUrl = await offerImageUrl(catalog.repository, decodeURIComponent(offerImage[1]));
-        if (!imageUrl) return send(response, 404, JSON.stringify({ error: 'IMAGE_NOT_FOUND' }));
-        response.writeHead(302, { Location: proxiedImage(imageUrl), 'Cache-Control': 'no-store' });
-        return response.end();
-      }
-      if (url.pathname.startsWith('/api/buyback')) {
-        const buyback = getBuyback();
-        if (!buyback) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        if (request.method === 'GET' && url.pathname === '/api/buyback/quotes')
-          return send(response, 200, JSON.stringify({ quotes: buyback.many((url.searchParams.get('isbn') || '').split(',').slice(0, 200)) }));
-        if (request.method === 'GET' && url.pathname === '/api/buyback/batch')
-          return send(response, 200, JSON.stringify(buyback.status()));
-        if (request.method === 'POST' && url.pathname === '/api/buyback/batch')
-          return send(response, 202, JSON.stringify(buyback.start()));
-        if (request.method === 'PUT' && url.pathname === '/api/buyback/auto') {
-          const input = await readJson(request);
-          return send(response, 200, JSON.stringify(buyback.setAuto(input?.enabled === true)));
-        }
-        if (request.method === 'POST' && url.pathname === '/api/buyback/batch/cancel')
-          return send(response, 202, JSON.stringify(buyback.cancel()));
-        if (request.method === 'POST' && url.pathname === '/api/buyback/check') {
-          const input = await readJson(request);
-          try {
-            return send(response, 200, JSON.stringify(await buyback.check(input?.isbn, { force: input?.force === true })));
-          } catch (error) {
-            return send(response, error.status || 502, JSON.stringify({ error: error.message }));
-          }
-        }
-        return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
-      }
-      if (url.pathname === '/api/images/backfill' || url.pathname === '/api/images/backfill/cancel') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        imageBackfill ||= createImageBackfill(catalog.repository);
-        if (request.method === 'GET' && url.pathname === '/api/images/backfill')
-          return send(response, 200, JSON.stringify(imageBackfill.status()));
-        if (request.method === 'POST')
-          return send(response, 202, JSON.stringify(url.pathname.endsWith('/cancel') ? imageBackfill.cancel() : imageBackfill.start()));
-        return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
-      }
-      if (/^\/api\/(?:trading-defaults|trading-summary|scan-runs|source-health|review-decisions|offer-relists|scan-queries|scan-schedule|scan-language|offer-scenarios|data\/|set-details|set-items|set-unknown)/.test(url.pathname) ||
-          (request.method === 'PUT' && /^\/api\/catalog\/(?:works|editions)\//.test(url.pathname)) || url.pathname === '/api/catalog/merge-works' || /^\/api\/catalog\/(?:work-duplicates(?:\/merge)?|title-conflicts(?:\/resolve)?|names(?:\/merge|\/unalias)?|universes(?:\/[^/]+)?)$/.test(url.pathname)) {
+      // Smaller routes live in trading-api.mjs; its route table says which paths are its own.
+      const tradingMatch = tradingRoutes.match(request.method, url.pathname);
+      if (tradingMatch?.handler) {
         const catalog = getProductionCatalog();
         if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-        const data = await tradingRoute({repo:catalog.repository,method:request.method,path:url.pathname,
-          input:['PUT','POST'].includes(request.method) ? await readJson(request) : null});
-        if(data!==undefined) return send(response,200,JSON.stringify(data));
-        return send(response,405,JSON.stringify({error:'METHOD_NOT_ALLOWED'}));
+        const input = ['PUT','POST'].includes(request.method) ? await readJson(request) : null;
+        const data = await tradingMatch.handler({ repo: catalog.repository, method: request.method, input, params: tradingMatch.params });
+        return send(response,200,JSON.stringify(data ?? null));
       }
-      if (request.method === 'GET' && url.pathname === '/api/scan/diagnostics') {
-        const scan = currentScan || await readScanStatus();
-        return send(response, 200, JSON.stringify({ ...scan, progress: scanProgress(scan.diagnostics), telemetry: scanTelemetry(scan.diagnostics, { running: scan.status === 'running' }) }));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/scan/status')
-        return send(response, 200, JSON.stringify(currentScan || await readScanStatus()));
-      if (request.method === 'PUT' && url.pathname.startsWith('/api/catalog/universe/')) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const id = decodeURIComponent(url.pathname.slice('/api/catalog/universe/'.length));
-        return send(response, 200, JSON.stringify(setWorkUniverse(catalog.repository, id, await readJson(request))));
-      }
-      if (url.pathname === '/api/catalog/seeds' || url.pathname.startsWith('/api/catalog/seeds/')) {
-        const catalog = getProductionCatalog();
-        if (!catalog?.seeds) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const id = decodeURIComponent(url.pathname.slice('/api/catalog/seeds/'.length));
-        if (request.method === 'GET' && url.pathname === '/api/catalog/seeds') return send(response, 200, JSON.stringify(catalog.seeds.list()));
-        if (request.method === 'POST' && url.pathname === '/api/catalog/seeds')
-          return send(response, 201, JSON.stringify(catalog.seeds.add(await readJson(request))));
-        if (request.method === 'PUT' && id) return send(response, 200, JSON.stringify(catalog.seeds.setStatus(id, (await readJson(request))?.status)));
-        if (request.method === 'DELETE' && id) return send(response, 200, JSON.stringify(catalog.seeds.remove(id)));
-        return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/catalog/persons') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify({ items: catalogPersons(catalog.repository, { query: url.searchParams.get('q') || '', limit: url.searchParams.get('limit') || 200 }) }));
-      }
-      if (request.method === 'GET' && url.pathname.startsWith('/api/catalog/persons/')) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify(personWorks(catalog.repository, decodeURIComponent(url.pathname.slice('/api/catalog/persons/'.length)))));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/catalog/series-tree') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify({ universes: catalogSeries(catalog.repository) }));
-      }
-      if (url.pathname === '/api/catalog/series-definition') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        if (request.method === 'GET') return send(response, 200, JSON.stringify(getSeriesDefinition(catalog.repository, url.searchParams.get('name') || '')));
-        if (request.method === 'PUT') return send(response, 200, JSON.stringify(saveSeriesDefinition(catalog.repository, await readJson(request))));
-        return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/catalog/insights') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify(catalogInsights(catalog.repository)));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/catalog/summary') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify(catalog.repository.counts()));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/scan-profiles') {
-        const catalog=getProductionCatalog();
-        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-        return send(response,200,JSON.stringify({items:listScanProfiles(catalog.repository)}));
-      }
-      if (request.method === 'POST' && url.pathname === '/api/scan-profiles/import') {
-        const catalog=getProductionCatalog();
-        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-        const input=await readJson(request);
-        return send(response,200,JSON.stringify(putScanProfile(catalog.repository,input?.name,input,{onlyIfAbsent:true})));
-      }
-      if (request.method === 'POST' && url.pathname === '/api/scan-profiles') {
-        const catalog=getProductionCatalog();
-        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-        const input=await readJson(request);
-        const result=putScanProfile(catalog.repository,input?.name,input,{onlyIfAbsent:true});
-        return send(response,result.created?201:409,JSON.stringify(result.created?result:{error:'PROFILE_ALREADY_EXISTS'}));
-      }
-      if ((request.method === 'PUT' || request.method === 'DELETE') &&
-          url.pathname.startsWith('/api/scan-profiles/')) {
-        const catalog=getProductionCatalog();
-        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-        const name=decodeURIComponent(url.pathname.slice('/api/scan-profiles/'.length));
-        if (request.method === 'DELETE')
-          return send(response,200,JSON.stringify(deleteScanProfile(catalog.repository,name)));
-        const input=await readJson(request);
-        return send(response,200,JSON.stringify(putScanProfile(catalog.repository,name,input)));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/sources')
-        return send(response, 200, JSON.stringify({ sources: Object.keys(localSourceHosts), blocked: (() => { try { const catalog = getProductionCatalog(); return catalog ? blockedSources(catalog.repository) : {}; } catch { return {}; } })() }));
-      if (request.method === 'GET' && url.pathname === '/api/history/brief') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify(historyBookLabels(catalog.repository)));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/history') {
-        const catalog = getProductionCatalog();
-        if (!catalog) throw Error('SQLITE_HISTORY_REQUIRES_CATALOG');
-        return send(response, 200, JSON.stringify(catalogHistorySnapshot(catalog.repository)));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/book') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const bookId = url.searchParams.get('id');
-        if (!bookId || bookId.length > 200)
-          return send(response, 404, JSON.stringify({ error: 'BOOK_NOT_FOUND' }));
-        const history = sqliteHistoryModel(catalog.repository, { bookId });
-        const data = bookHistory(history, bookId);
-        return data
-          ? send(response, 200, JSON.stringify(data))
-          : send(response, 404, JSON.stringify({ error: 'BOOK_NOT_FOUND' }));
-      }
-      if (request.method === 'POST' && url.pathname === '/api/catalog') {
-        storageMode();
-        const input = await readJson(request);
-        const catalog = getProductionCatalog();
-        if (!catalog) throw Error('SQLITE_STORAGE_REQUIRES_CATALOG');
-        const created = await withHistoryWriteLock(async () => createSqliteBook(catalog, input));
-        return send(
-          response,
-          created.created ? 201 : 200,
-          JSON.stringify({
-            book: created.book,
-            editionId: created.editionId,
-            catalog: url.searchParams.get('compact') === '1'
-              ? historyBookLabels(catalog.repository)
-              : catalogHistorySnapshot(catalog.repository),
-            catalogSync: { mode: 'sqlite' },
-          }),
-        );
-      }
-      if (request.method === 'POST' && url.pathname === '/api/identification/control') {
-        const catalog = getProductionCatalog();
-        if (!catalog || !identificationControl) return send(response, 503, JSON.stringify({ error: 'IDENTIFICATION_UNAVAILABLE' }));
-        const { action, retryUnresolved = false } = await readJson(request);
-        let retried = null;
-        if (action === 'start') {
-          if (retryUnresolved)
-            retried = retryIdentificationJobs(catalog.repository, 'unresolved');
-          const startedAt = new Date().toISOString();
-          catalog.beginIdentificationRun(startedAt);
-          identificationControl.start({ newRun: true, startedAt });
-          void identificationControl.tick();
-        }
-        else if (action === 'stop') identificationControl.pause();
-        else return send(response, 400, JSON.stringify({ error: 'INVALID_IDENTIFICATION_ACTION' }));
-        return send(response, 200, JSON.stringify({ ...identificationControl.status(), retried }));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/catalog/status') {
-        const catalog = getProductionCatalog();
-        const scheduler = identificationControl?.status() ?? { available: false };
-        return send(response, 200, JSON.stringify(catalog ? { ...catalog.status({ runStartedAt: scheduler.runStartedAt }), scheduler } : { enabled: false }));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/catalog/series') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify({ items: listWorkSeries(catalog.repository) }));
-      }
-      if (request.method === 'PUT' && url.pathname.startsWith('/api/catalog/series/')) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const id = decodeURIComponent(url.pathname.slice('/api/catalog/series/'.length));
-        const data = await readJson(request);
-        return send(response, 200, JSON.stringify(updateWorkSeries(catalog.repository, id, data)));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/catalog/works') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(
-          response,
-          200,
-          JSON.stringify(
-            listCatalogWorks(catalog.repository, Object.fromEntries(url.searchParams)),
-          ),
-        );
-      }
-      // Prices of a book over all its editions, and its price variants.
-      const workPrices = url.pathname.match(/^\/api\/catalog\/works\/([^/]+)\/prices$/);
-      if (request.method === 'GET' && workPrices) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const data = workPriceOverview(catalog.repository, decodeURIComponent(workPrices[1]));
-        return data ? send(response, 200, JSON.stringify(data)) : send(response, 404, JSON.stringify({ error: 'WORK_NOT_FOUND' }));
-      }
-      const variantMerge = url.pathname.match(/^\/api\/catalog\/works\/([^/]+)\/variants\/merge$/);
-      if (request.method === 'POST' && variantMerge) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const input = await readJson(request);
-        return send(response, 200, JSON.stringify(mergeVariants(catalog.repository, decodeURIComponent(variantMerge[1]), String(input?.from ?? ''), String(input?.to ?? ''))));
-      }
-      const editionVariant = url.pathname.match(/^\/api\/catalog\/editions\/([^/]+)\/variant$/);
-      if (request.method === 'PUT' && editionVariant) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const input = await readJson(request);
-        return send(response, 200, JSON.stringify(setEditionVariant(catalog.repository, decodeURIComponent(editionVariant[1]), input?.variantKey ?? null)));
-      }
-      if (request.method === 'GET' && url.pathname.startsWith('/api/catalog/works/')) {
-        const catalog = getProductionCatalog(),
-          id = decodeURIComponent(url.pathname.slice('/api/catalog/works/'.length));
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const data = getCatalogWork(catalog.repository, id);
-        return data
-          ? send(response, 200, JSON.stringify(data))
-          : send(response, 404, JSON.stringify({ error: 'WORK_NOT_FOUND' }));
-      }
-      if (request.method === 'GET' && url.pathname.startsWith('/api/catalog/editions/')) {
-        const catalog = getProductionCatalog(),
-          id = decodeURIComponent(url.pathname.slice('/api/catalog/editions/'.length));
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const data = getCatalogEdition(catalog.repository, id);
-        return data
-          ? send(response, 200, JSON.stringify(data))
-          : send(response, 404, JSON.stringify({ error: 'EDITION_NOT_FOUND' }));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/offer-workspace') {
-        const catalog=getProductionCatalog();
-        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-        return send(response,200,JSON.stringify({items:listOfferWorkspace(catalog.repository)}));
-      }
-      if (request.method === 'POST' && url.pathname === '/api/offer-workspace/import') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error:'CATALOG_DISABLED' }));
-        const input = await readJson(request);
-        return send(response, 200, JSON.stringify(importOfferWorkspace(catalog.repository, input?.entries)));
-      }
-      if (request.method === 'PUT' && url.pathname.startsWith('/api/offer-workspace/')) {
-        const catalog=getProductionCatalog();
-        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-        const id=decodeURIComponent(url.pathname.slice('/api/offer-workspace/'.length));
-        const input=await readJson(request);
-        return send(response,200,JSON.stringify(setOfferWorkspace(catalog.repository,id,input)));
-      }
-      // Oferty → "Wg książki": one row per edition with its listings' count and price range.
-      if (request.method === 'GET' && url.pathname === '/api/offer-groups') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify(listCatalogOfferGroups(catalog.repository, Object.fromEntries(url.searchParams))));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/offers') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(
-          response,
-          200,
-          JSON.stringify(
-            listCatalogOffers(catalog.repository, Object.fromEntries(url.searchParams)),
-          ),
-        );
-      }
-      // Operator changes or removes an offer's edition (catalogue and offer panel).
-      const assignment = url.pathname.match(/^\/api\/offers\/([^/]+)\/assignment$/);
-      if (assignment && ['PUT', 'DELETE'].includes(request.method)) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const offerId = decodeURIComponent(assignment[1]);
-        const input = await readJson(request);
-        // A book without a named edition: the edition the listing points at, or its unknown edition.
-        const editionId = request.method === 'PUT' && !input?.editionId && input?.workId
-          ? catalog.repository.transaction(() => editionForWorkAssignment(catalog.repository, String(input.workId), offerId).editionId)
-          : input?.editionId;
-        const result = request.method === 'PUT'
-          ? reassignOffer(catalog.repository, offerId, editionId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null })
-          : unassignOffer(catalog.repository, offerId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null });
-        return send(response, 200, JSON.stringify(result));
-      }
-      if (request.method === 'GET' && url.pathname.startsWith('/api/offers/')) {
-        const catalog = getProductionCatalog(),
-          id = decodeURIComponent(url.pathname.slice('/api/offers/'.length));
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const data = getCatalogOffer(catalog.repository, id);
-        return data
-          ? send(response, 200, JSON.stringify(data))
-          : send(response, 404, JSON.stringify({ error: 'OFFER_NOT_FOUND' }));
-      }
-      if (request.method === 'POST' && url.pathname === '/api/identification/retry') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const input = await readJson(request);
-        const result = retryIdentificationJobs(catalog.repository, input?.mode);
-        if (result.queued > 0 && identificationControl) {
-          identificationControl.start();
-          void identificationControl.tick();
-        }
-        return send(response, 200, JSON.stringify(result));
-      }
-      if (url.pathname === '/api/sets' && request.method === 'GET') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify({ items: listOfferSets(catalog.repository) }));
-      }
-      if (url.pathname === '/api/sets' && request.method === 'POST') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const input = await readJson(request);
-        if (typeof input?.offerId !== 'string' || !input.offerId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_OFFER_ID' }));
-        return send(response, 200, JSON.stringify(markOfferAsSet(catalog.repository, input.offerId)));
-      }
-      const setCandidatesPath = url.pathname.match(/^\/api\/sets\/([^/]+)\/candidates$/);
-      // GET: suggestions from the listing title; POST {text}: books named in a pasted description.
-      if (setCandidatesPath && ['GET', 'POST'].includes(request.method)) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const input = request.method === 'POST' ? await readJson(request) : {};
-        const text = typeof input?.text === 'string' ? input.text.slice(0, 20000) : '';
-        return send(response, 200, JSON.stringify(setCandidates(catalog.repository, decodeURIComponent(setCandidatesPath[1]), { text })));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/sets-cycle-volumes') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(response, 200, JSON.stringify(cycleVolumeEditions(catalog.repository, url.searchParams.get('name') || '', url.searchParams.get('from'), url.searchParams.get('to'))));
-      }
-      if (url.pathname.startsWith('/api/sets/') && ['POST','DELETE'].includes(request.method)) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        // /api/sets/<offerId>[/editions[/<editionId>]]. (The parts used to be counted with the
-        // leading "/api/sets", so adding a book, removing one and unmarking a set never matched.)
-        const parts = url.pathname.slice('/api/sets/'.length).split('/').map(decodeURIComponent);
-        if (parts.length === 2 && parts[1] === 'editions' && request.method === 'POST') {
-          const input = await readJson(request);
-          if (typeof input?.editionId !== 'string' || !input.editionId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_EDITION_ID' }));
-          return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, parts[0], input.editionId, true)));
-        }
-        if (parts.length === 3 && parts[1] === 'editions' && request.method === 'DELETE')
-          return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, parts[0], parts[2], false)));
-        if (parts.length === 1 && parts[0] && request.method === 'DELETE')
-          return send(response, 200, JSON.stringify(unmarkOfferSet(catalog.repository, parts[0])));
-      }
-      if (request.method === 'GET' && url.pathname === '/api/identification-jobs') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        return send(
-          response,
-          200,
-          JSON.stringify(
-            listIdentificationJobs(catalog.repository, Object.fromEntries(url.searchParams)),
-          ),
-        );
-      }
-      // "Szybkie" tab: the sure decisions to look through, then apply the ones the operator kept.
-      if (request.method === 'POST' && url.pathname === '/api/identification-jobs/sure-plan') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const input = await readJson(request);
-        const jobIds = Array.isArray(input?.jobIds) ? input.jobIds.map(String).slice(0, 2000) : null;
-        return send(response, 200, JSON.stringify(sureReviewPlan(catalog.repository, { jobIds })));
-      }
-      if (request.method === 'POST' && url.pathname === '/api/identification-jobs/sure-apply') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const input = await readJson(request);
-        const result = await applySureReviewPlan(catalog, Array.isArray(input?.items) ? input.items : []);
-        // Approvals add ISBNs to the catalogue: the sibling offers with them are matched next.
-        if (result.approved && identificationControl) {
-          identificationControl.start();
-          void identificationControl.tick();
-        }
-        return send(response, 200, JSON.stringify(result));
-      }
-      // ISBN that no source knows: a draft built from the listings, then the edition in one click.
-      const offerEdition = url.pathname.match(/^\/api\/identification-jobs\/([^/]+)\/offer-edition$/);
-      if (offerEdition && ['GET', 'POST'].includes(request.method)) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const jobId = decodeURIComponent(offerEdition[1]);
-        if (request.method === 'GET') return send(response, 200, JSON.stringify(offerEditionDraft(catalog.repository, jobId)));
-        const result = createEditionFromOffer(catalog.repository, jobId, await readJson(request));
-        if (identificationControl) {
-          identificationControl.start();
-          void identificationControl.tick();
-        }
-        return send(response, 200, JSON.stringify(result));
-      }
-      if (
-        request.method === 'POST' &&
-        /^\/api\/identification-jobs\/[^/]+\/decision$/.test(url.pathname)
-      ) {
-        const catalog = getProductionCatalog(),
-          id = decodeURIComponent(url.pathname.split('/')[3]);
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const input = await readJson(request);
-        const result = decideIdentificationJob(catalog.repository, id, input);
-        if (input.action === 'requeued' && identificationControl) {
-          identificationControl.start();
-          void identificationControl.tick();
-        }
-        return send(
-          response,
-          200,
-          JSON.stringify(result),
-        );
-      }
-      if (request.method === 'GET' && /^\/api\/identification-jobs\/[^/]+\/local-candidates$/.test(url.pathname)) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const job = catalog.repository.database
-          .prepare('SELECT o.id AS offer_id, o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=?')
-          .get(decodeURIComponent(url.pathname.split('/')[3]));
-        if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
-        return send(response, 200, JSON.stringify({ items: localWorkCandidates(catalog.repository, job.original_title, { offerId: job.offer_id }) }));
-      }
-      if (
-        ['GET', 'POST'].includes(request.method) &&
-        /^\/api\/identification-jobs\/[^/]+\/proposals$/.test(url.pathname)
-      ) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const id = decodeURIComponent(url.pathname.split('/')[3]);
-        const job = catalog.repository.database
-          .prepare(
-            "SELECT j.id,j.offer_id,o.original_title,o.observed_isbn FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=? AND j.status='review_required'",
-          )
-          .get(id);
-        if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
-        // GET reads the stored proposal and computes one when missing; POST forces a fresh lookup.
-        const stored = request.method === 'GET' ? loadProposal(catalog.repository, id) : null;
-        if (stored) return send(response, 200, JSON.stringify(stored));
-        const fresh = await computeProposal(catalog, job);
-        return send(
-          response,
-          200,
-          JSON.stringify({ jobId: id, queries: fresh.queries, candidates: fresh.candidates, confidence: fresh.confidence, unavailable: fresh.unavailable }),
-        );
-      }
-      if (
-        request.method === 'POST' &&
-        /^\/api\/identification-jobs\/[^/]+\/find-isbn$/.test(url.pathname)
-      ) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const id = decodeURIComponent(url.pathname.split('/')[3]);
-        const job = catalog.repository.database.prepare(
-          "SELECT j.id,o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=? AND j.status='review_required'",
-        ).get(id);
-        if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
-        const input = await readJson(request);
-        return send(response, 200, JSON.stringify(
-          await catalog.findIsbnsByTitle(input?.title || job.original_title),
-        ));
-      }
-      if (
-        request.method === 'POST' &&
-        /^\/api\/identification-jobs\/[^/]+\/match-isbn$/.test(url.pathname)
-      ) {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const id = decodeURIComponent(url.pathname.split('/')[3]);
-        const input = await readJson(request);
-        return send(
-          response,
-          200,
-          JSON.stringify(await matchIdentificationJobByIsbn(catalog, id, input)),
-        );
-      }
-      if (request.method === 'POST' && url.pathname === '/api/catalog/isbn-check') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const raw = (await readJson(request)).isbn;
-        const isbn = normalizeISBN(raw);
-        if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
-        const edition = catalog.repository.findEditionByISBN(isbn);
-        return send(response, 200, JSON.stringify({
-          isbn, found: Boolean(edition),
-          edition: edition ? { id: edition.id, title: edition.title, workId: edition.work_id, workTitle: edition.work_title } : null,
-        }));
-      }
-      if (request.method === 'POST' && url.pathname === '/api/catalog/lookup-preview') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const isbn = normalizeISBN((await readJson(request))?.isbn);
-        if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
-        return send(
-          response,
-          200,
-          JSON.stringify(await catalog.lookupIsbn(isbn)),
-        );
-      }
-      if (request.method === 'POST' && url.pathname === '/api/catalog/lookup-confirm') {
-        const catalog = getProductionCatalog();
-        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-        const isbn = normalizeISBN((await readJson(request))?.isbn);
-        if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
-        const result = await catalog.resolveIsbn(isbn);
-        return send(
-          response,
-          ['created_edition', 'created_work_and_edition', 'matched_existing'].includes(
-            result.decision,
-          )
-            ? 200
-            : 409,
-          JSON.stringify(result),
-        );
-      }
-      if (request.method === 'POST' && url.pathname === '/api/catalog/link') {
-        storageMode();
-        const input = await readJson(request);
-        const catalog = getProductionCatalog();
-        if (!catalog) throw Error('SQLITE_STORAGE_REQUIRES_CATALOG');
-        await withHistoryWriteLock(async () => linkSqliteOffer(catalog, input, { returnHistory: false }));
-        return send(response, 200, JSON.stringify(catalogHistorySnapshot(catalog.repository)));
-      }
-      if (request.method === 'POST' && url.pathname === '/api/search/cancel') {
-        if (!scanInFlight || !scanAbortController || scanAbortController.signal.aborted)
-          return send(response, 409, JSON.stringify({ error: 'NO_ACTIVE_SCAN' }));
-        scanAbortController.abort();
-        return send(response, 202, JSON.stringify({ status: 'cancelling' }));
-      }
-      if (request.method === 'POST' && url.pathname === '/api/search') {
-        if (scanInFlight)
-          return send(response, 409, JSON.stringify({ error: 'SCAN_ALREADY_RUNNING' }));
-        scanInFlight = true;
-        let scanStarted = false;
-        try {
-          const scanInput = validateSearchInput(await readJson(request));
-          // "Tylko polskie wydania" (scanner form, saved in the database; scheduled scans use it too).
-          try { const store = getProductionCatalog(); if (store?.repository) scanInput.polishOnly = getPolishOnly(store.repository); } catch {}
-          scanStarted = true;
-          scanAbortController = new AbortController();
-          currentScan = { status: 'running', startedAt: new Date().toISOString(),
-            diagnostics: createScanDiagnostics({ queries: scanInput.queries || [], sources: scanInput.sources || [], tasks: scanInput.tasks || null }) };
-          await persistScanStatus(currentScan);
-          if (url.searchParams.get('stream') === '1') {
-            streamHeaders(response);
-            const emit = (event) => {
-              const safe = recordProgress(event);
-              addScanEvent(currentScan.diagnostics, safe);
-              if (!response.destroyed) response.write(JSON.stringify({ type: 'progress', event: safe }) + '\n');
-            };
-            try {
-              const result = await searchAndStore(scanInput, emit, {
-                catalogProvider,
-                search,
-                signal: scanAbortController.signal,
-                shouldAutoResolve: () => identificationControl?.status().running ?? true,
-              });
-              currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: { ...result.summary, scanAt: result.lastScan?.at ?? null } };
-              await persistScanStatus(currentScan);
-              if (!response.destroyed) response.write(JSON.stringify({ type: 'result', result }) + '\n');
-              if (!response.destroyed) response.end();
-            } catch (error) {
-              currentScan = { ...currentScan, status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed', finishedAt: new Date().toISOString() };
-              await persistScanStatus(currentScan);
-              if (!response.destroyed) response.write(
-                JSON.stringify({
-                  type: 'error',
-                  error: /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'LOCAL_APP_ERROR',
-                }) + '\n',
-              );
-              if (!response.destroyed) response.end();
-            }
-            return;
-          }
-          const result = await searchAndStore(scanInput, (event) => addScanEvent(currentScan.diagnostics, recordProgress(event)), {
-            catalogProvider,
-            search,
-            signal: scanAbortController.signal,
-            shouldAutoResolve: () => identificationControl?.status().running ?? true,
-          });
-          currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: { ...result.summary, scanAt: result.lastScan?.at ?? null } };
-          await persistScanStatus(currentScan);
-          return send(response, 200, JSON.stringify(result));
-        } catch (error) {
-          if (scanStarted) {
-            currentScan = { ...currentScan, status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed', finishedAt: new Date().toISOString() };
-            await persistScanStatus(currentScan);
-          }
-          throw error;
-        } finally {
-          scanAbortController = null;
-          scanInFlight = false;
-        }
+      const route = localRoutes.match(request.method, url.pathname);
+      if (route?.handler) {
+        const handled = await route.handler({ request, response, url, params: route.params });
+        if (handled !== undefined || response.writableEnded) return handled;
       }
       if (request.method !== 'GET')
         return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));

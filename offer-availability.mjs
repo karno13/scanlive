@@ -13,7 +13,7 @@ export function markUnseenOffers(database, results, scannedAt) {
   const statement = database.prepare(
     `UPDATE offers SET availability='not_seen'
      WHERE source=? AND availability='unconfirmed' AND last_seen_at < ?
-       AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(matched_queries_json) THEN matched_queries_json ELSE '[]' END) q WHERE q.value=?)
+       AND id IN (SELECT offer_id FROM offer_queries WHERE query=?)
      RETURNING id`,
   );
   const history = database.prepare(

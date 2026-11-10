@@ -39,10 +39,14 @@ function sortedReviewOffers() {
         quickRank(a) - quickRank(b) ||
         (b.catalogMatch?.score ?? b.proposal?.score ?? 0) - (a.catalogMatch?.score ?? a.proposal?.score ?? 0),
     );
+  const price = (row) => row.offer.currentPrice ?? null;
+  const byPrice = (a, b, direction) => (price(a) == null) - (price(b) == null) || direction * ((price(a) ?? 0) - (price(b) ?? 0));
   return rows.sort((a, b) =>
     $('#reviewSort').value === 'price'
-      ? a.offer.currentPrice - b.offer.currentPrice
-      : String(b.offer.firstSeenAt || b.offer.lastSeenAt).localeCompare(String(a.offer.firstSeenAt || a.offer.lastSeenAt)),
+      ? byPrice(a, b, 1)
+      : $('#reviewSort').value === 'price-desc'
+        ? byPrice(a, b, -1)
+        : String(b.offer.firstSeenAt || b.offer.lastSeenAt).localeCompare(String(a.offer.firstSeenAt || a.offer.lastSeenAt)),
   );
 }
 

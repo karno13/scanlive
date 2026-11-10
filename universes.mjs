@@ -11,6 +11,8 @@
 // Until the table is read (and in tests that open no catalogue) the built-in records apply; they
 // are the same as the table's initial rows.
 
+import { createHash } from 'node:crypto';
+
 export const DEFAULT_UNIVERSES = [
   { name: 'Świat Dysku', names: ['Świat Dysku', 'Discworld', 'Discworld series'], lines: [], markers: [] },
   { name: 'Warcraft', names: ['World of Warcraft', 'Warcraft', 'Blizzard Legends'], lines: [], markers: [] },
@@ -90,13 +92,20 @@ function derive(universes) {
 
 let records = DEFAULT_UNIVERSES.map(normalize);
 let derived = derive(records);
+let version = digest(records);
+function digest(list) {
+  return createHash('sha256').update(JSON.stringify(list)).digest('hex').slice(0, 16);
+}
 
 /** Replaces the universes in use (the table after an edit, or the defaults in tests). */
 export function setUniverses(list) {
   records = list.map(normalize).filter((record) => record.name);
   derived = derive(records);
+  version = digest(records);
   return currentUniverses();
 }
+/** Changes whenever the universes in use change (work keys depend on them). */
+export const universesVersion = () => version;
 export function currentUniverses() {
   return records.map((record) => ({ ...record, names: record.names.filter((name) => name !== record.name) }));
 }

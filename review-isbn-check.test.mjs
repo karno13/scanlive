@@ -25,7 +25,7 @@ test('review lookup is read-only and does not silently approve an edition', asyn
   assert.match(frontend, /id="reviewIsbnMatchButton"/);
   assert.match(frontend, /preview:true/);
   assert.match(frontend, /response\.canConfirm/);
-  assert.match(server, /url\.pathname === '\/api\/catalog\/isbn-check'/);
+  assert.match(server, /\.add\('POST', '\/api\/catalog\/isbn-check'/);
   assert.match(server, /repository\.findEditionByISBN\(isbn\)/);
   assert.doesNotMatch(frontend.match(/reviewIsbnCheckButton'\)\.addEventListener[\s\S]*?\n  \}\);/)?.[0] ?? '', /decideReview\(|approveReview\(/);
 });

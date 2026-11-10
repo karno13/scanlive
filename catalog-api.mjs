@@ -1,4 +1,5 @@
 import { normalizeISBN } from './isbn-normalization.mjs';
+import { rejectRepeatsOfRejectedOffers } from './rejected-offers.mjs';
 import { offerStatusHistory, relistLinks, saleWindow } from './offer-status.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { proxiedImage } from './offer-images.mjs';
@@ -764,8 +765,11 @@ export function listIdentificationJobs(repository, options = {}) {
       .get(...params).count,
   );
   const orderBy =
+    // By the offer's price, either way; offers without a price last.
     options.sort === 'price'
-      ? 'o.current_price ASC,j.id'
+      ? 'o.current_price IS NULL,o.current_price ASC,j.id'
+      : options.sort === 'price-desc'
+      ? 'o.current_price IS NULL,o.current_price DESC,j.id'
       : options.sort === 'group'
       ? "bookflip_fold(COALESCE(json_extract(o.matched_queries_json,'$[0]'),'~')),CASE p.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,bookflip_fold(o.original_title),j.id"
       : options.sort === 'proposal'
@@ -998,6 +1002,9 @@ export function decideIdentificationJob(
         'UPDATE identification_jobs SET status=?,run_after=NULL,lease_token=NULL,lease_expires_at=NULL,last_error=NULL,attempt_count=CASE WHEN ?=1 THEN 0 ELSE attempt_count END,result_json=?,updated_at=? WHERE id=?',
       )
       .run(status, action === 'requeued' ? 1 : 0, JSON.stringify(result), at, job.id);
+    // Copies of a just-rejected offer already waiting in review are rejected now (reversibly, see
+    // rejected-offers.mjs) instead of at the next start of the app.
+    if (['not_book', 'excluded'].includes(action)) rejectRepeatsOfRejectedOffers(repository, { now });
     return {
       decision: { id: decisionId, action, editionId, createdAt: at, ...(editionChoice ? { editionReason: editionChoice.reason, unknownEdition: Boolean(editionChoice.unknown) } : {}) },
       job: {

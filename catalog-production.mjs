@@ -1,29 +1,7 @@
 import { defaultCatalogPath } from './catalog-data-location.mjs';
-import { upgradeCatalogBibliography } from './catalog-bibliography.mjs';
-import { mergeWorkGroup } from './trading-api.mjs';
-import { findDuplicateWorkGroups } from './work-grouping.mjs';
-import { reviewAutomaticBundleMatches } from './bundle-detection.mjs';
 import { createSeedService } from './catalog-seeding.mjs';
-import { ensureStarterProfiles } from './starter-profiles.mjs';
-import { inferListingSeries } from './edition-series.mjs';
-
-function mergeAutomaticDuplicates(repository) {
-  const manual = new Set(
-    repository.database.prepare("SELECT id FROM works WHERE verification_status='manual'").all().map((row) => row.id),
-  );
-  let merged = 0;
-  for (const group of findDuplicateWorkGroups(repository)) {
-    if (group.works.some((work) => manual.has(work.id))) continue;
-    try {
-      const sources = group.works.map((work) => work.id).filter((id) => id !== group.targetId);
-      merged += mergeWorkGroup(repository, group.targetId, sources).merged.length;
-    } catch (error) {
-      console.error('AUTOMATIC_WORK_MERGE_SKIPPED', group.key, error?.message ?? error);
-    }
-  }
-  return merged;
-}
-import { createHash } from 'node:crypto';
+import { runStartupJobs } from './startup-jobs.mjs';
+import { ingestScannedOffers } from './offer-ingest.mjs';
 
 import { CatalogResolver } from './catalog-resolver.mjs';
 import { IdentificationWorker } from './identification-worker.mjs';
@@ -34,30 +12,11 @@ import { createEIsbnAdapter } from './metadata-sources/e-isbn.mjs';
 import { SourceRateLimiter, createJsonRequester } from './metadata-http.mjs';
 import { findTitleIsbnCandidates } from './catalog-title-isbn.mjs';
 import { lookupISBN, SqliteMetadataCache } from './metadata-lookup.mjs';
-import { extractOfferISBN } from './isbn.mjs';
-import { identifyOffer } from './offer-identity.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
-import { requeueForNewEvidence } from './offer-enrichment.mjs';
 import { requeueReviewsWithKnownIsbn } from './identification-retry.mjs';
-import { normalizeStoredPublishers } from './publisher-names.mjs';
-import { applyNameAliases, loadNameAliases } from './name-aliases.mjs';
-import { rejectRepeatsOfRejectedOffers, undoUnconfirmedRepeatRejections } from './rejected-offers.mjs';
-import { rejectForeignEditions } from './language-policy.mjs';
-import { backfillConditionsFromEnrichment, observationFields, saveRawSnapshot } from './offer-observations.mjs';
-import { saveOfferDescription } from './set-descriptions.mjs';
-import { loadUniverses } from './universes.mjs';
 
-function stableId(prefix, ...values) {
-  return `${prefix}_${createHash('sha256').update(JSON.stringify(values)).digest('hex').slice(0, 32)}`;
-}
-
-// Prices are stored in grosze. Marketplaces show joke / placeholder prices (e.g. 10 000 zl for a
-// paperback); such a value is unknown, not a real price, and would distort every statistic.
-export const MAX_PLAUSIBLE_PRICE_GROSZE = 1_000_000;
-function integerPrice(value) {
-  const price = Number(value);
-  return Number.isFinite(price) && price > 0 && price < MAX_PLAUSIBLE_PRICE_GROSZE ? Math.round(price) : null;
-}
+// Prices are stored in grosze; see offer-ingest.mjs for the plausibility limit.
+export { MAX_PLAUSIBLE_PRICE_GROSZE } from './offer-ingest.mjs';
 
 export function productionCatalogEnabled(environment = process.env) {
   return !['0', 'false', 'off', 'no'].includes(
@@ -73,29 +32,9 @@ export function createProductionCatalog({
   busyTimeout = 10_000,
 } = {}) {
   const repository = new SqliteCatalogRepository(databasePath, { busyTimeout, now });
-  // Universe names and spellings (Katalog → „Wydawcy i serie”) before anything reads titles.
-  loadUniverses(repository);
-  // One-time upgrade of existing editions from their stored BN MARC records (no network).
+  // Start-up data repairs: most run once (flags in app_preferences); see startup-jobs.mjs.
   try {
-    const upgrade = upgradeCatalogBibliography(repository, { now });
-    // Clean titles reveal reprints that the old glued BN titles hid; join them like new editions
-    // are joined (same strict key), never touching works the operator edited.
-    if (!upgrade.skipped) mergeAutomaticDuplicates(repository);
-    reviewAutomaticBundleMatches(repository, { now });
-    // Copies of rejected offers saved before this rule existed leave the review queue.
-    undoUnconfirmedRepeatRejections(repository, { now });
-    rejectRepeatsOfRejectedOffers(repository, { now });
-    rejectForeignEditions(repository, { now });
-    // "ISA", '"ISA"', 'Isa' → one publisher (BN, Open Library and listings spell them differently).
-    // The operator's publisher / series merges (Katalog → "Wydawcy i serie"), then built-in spellings.
-    loadNameAliases(repository);
-    normalizeStoredPublishers(repository, { now });
-    applyNameAliases(repository, { now });
-    if (String(process.env.BOOKFLIP_STARTER_PROFILES ?? '1') !== '0') ensureStarterProfiles(repository);
-    // Cycle and volume from listing titles for works no bibliographic record describes.
-    inferListingSeries(repository);
-    // Once: condition of offers whose page was read before migration 124.
-    backfillConditionsFromEnrichment(repository, { now });
+    runStartupJobs(repository, { now });
   } catch (error) {
     console.error('BIBLIOGRAPHY_UPGRADE_FAILED', error?.message ?? error);
   }
@@ -199,100 +138,9 @@ export function createProductionCatalog({
         dryRun,
       });
     },
+    /** @param {import('./offer-ingest.mjs').ScannedOffer[]} offers */
     ingestOffers(offers, observedAt = now(), { scanSummary = null } = {}) {
-      const report = { offers: 0, evidence: 0, jobs: 0, skipped: 0 };
-      const at = observedAt instanceof Date ? observedAt.toISOString() : String(observedAt);
-      const newJobOffers = [];
-      repository.transaction(() => {
-        for (const offer of offers ?? []) {
-          let identity;
-          try {
-            identity = identifyOffer(offer);
-          } catch {
-            report.skipped += 1;
-            continue;
-          }
-          const price = integerPrice(offer.price ?? offer.currentPrice);
-          const stored = repository.upsertOffer({
-            id: identity.id,
-            source: identity.source,
-            externalOfferId: identity.externalId,
-            normalizedUrl: identity.url,
-            originalTitle: offer.title ?? offer.originalTitle ?? '',
-            currentPrice: price,
-            currency: offer.currency ?? 'PLN',
-            availability: offer.availability ?? 'unconfirmed',
-            language: offer.language ?? null,
-            observedIsbn: offer.isbn ?? null,
-            imageUrl: offer.image ?? offer.imageUrl ?? null,
-            ...observationFields(offer),
-            matchedQueries: offer.matchedQueries ?? [],
-            firstSeenAt: offer.firstSeenAt ?? at,
-            lastSeenAt: offer.lastSeenAt ?? at,
-            seenCount:
-              Number.isSafeInteger(offer.seenCount) && offer.seenCount > 0
-                ? offer.seenCount
-                : undefined,
-            at: observedAt,
-          });
-          if (price != null) repository.appendPriceObservation(stored.id, price, observedAt);
-          report.offers += 1;
-          // The raw listing objects (result list, listing page) at first sight and when they change.
-          if (offer.rawListing && saveRawSnapshot(repository, stored.id, 'listing', offer.rawListing, at)) report.snapshots = (report.snapshots || 0) + 1;
-          if (offer.rawDetail && saveRawSnapshot(repository, stored.id, 'detail', offer.rawDetail, at)) report.snapshots = (report.snapshots || 0) + 1;
-          // The description read with the listing page also serves sets (no second read of the page).
-          if (typeof offer.listingDescription === 'string' && offer.listingDescription.trim())
-            saveOfferDescription(repository, stored.id, { text: offer.listingDescription.trim().slice(0, 8000), status: 'found' }, at);
-
-          const evidence = extractOfferISBN(offer);
-          let newEvidence = false;
-          for (const observation of evidence.observations.filter((row) => row.valid)) {
-            const value = observation.value;
-            const evidenceId = stableId('scan_isbn', stored.id, value, observation.classification);
-            const saved = repository.putMetadataEvidence({
-              id: evidenceId,
-              offerId: stored.id,
-              fieldName: 'isbn',
-              value,
-              classification: observation.classification,
-              sourceType: `scanner:${identity.source}`,
-              verificationStatus: 'unverified',
-              observedAt,
-              at: observedAt,
-            });
-            if (saved.created) {
-              report.evidence += 1;
-              newEvidence = true;
-            }
-          }
-          const job = repository.putIdentificationJob({
-            offerId: stored.id,
-            status: 'queued',
-            at: observedAt,
-          });
-          if (job.created) {
-            report.jobs += 1;
-            newJobOffers.push(stored.id);
-          }
-          // The seller added or corrected the ISBN since the last scan: the offer waiting in review
-          // with the old answer ("no ISBN") goes back to the resolver.
-          else if (newEvidence && requeueForNewEvidence(repository, stored.id, at)) report.requeued = (report.requeued || 0) + 1;
-        }
-        // A re-listed or duplicate copy of a rejected offer is rejected before the resolver sees it.
-        if (newJobOffers.length) {
-          const { rejected } = rejectRepeatsOfRejectedOffers(repository, { now, offerIds: newJobOffers });
-          if (rejected) report.autoRejected = rejected;
-        }
-        if (scanSummary) {
-          if (scanSummary.at !== at) throw Error('INVALID_SCAN_SUMMARY_TIME');
-          repository.database
-            .prepare(
-              'INSERT OR REPLACE INTO scan_runs(scanned_at,summary_json,created_at) VALUES(?,?,?)',
-            )
-            .run(at, JSON.stringify(scanSummary), at);
-        }
-      });
-      return report;
+      return ingestScannedOffers(repository, offers, observedAt, { scanSummary, now });
     },
     async processQueued(limit = Number(process.env.BOOKFLIP_CATALOG_BATCH ?? 25)) {
       // Offers whose ISBN reached the catalogue since their review (a sibling offer was approved,

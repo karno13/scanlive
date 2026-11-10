@@ -2,7 +2,7 @@
 // this every ISBN (every reprint, every publisher) became its own work. The key is deliberately
 // strict - same main title AND same first author - because a wrong merge is worse than a missed one.
 import { fold } from './title-proposals.mjs';
-import { brandOnlyPattern, universePrefix, universeSuffix } from './universes.mjs';
+import { brandOnlyPattern, universePrefix, universeSuffix, universesVersion } from './universes.mjs';
 
 
 /** "Para w ruch / Raising steam, Discworld series ; t. 40" -> "Para w ruch" */
@@ -90,12 +90,61 @@ function keysOf(work, originals) {
   ].filter(Boolean);
 }
 
+// work_keys (migration 128) holds the keys of every work. Triggers mark works whose title, authors
+// or editions changed; their keys are recomputed here before a lookup. A change of the key rules
+// (KEYS_VERSION) or of the universe names (they shape mainTitle) recomputes all of them.
+const KEYS_VERSION = 1;
+const KEYS_STAMP = 'work_keys_version';
+
+/** Recomputes the keys of changed works; returns how many works were refreshed. */
+export function refreshWorkKeys(repository) {
+  const db = repository.database;
+  const wanted = JSON.stringify(`${KEYS_VERSION}:${universesVersion()}`);
+  const stamp = db.prepare('SELECT value_json FROM app_preferences WHERE key=?').get(KEYS_STAMP)?.value_json;
+  return repository.transaction(() => {
+    if (stamp !== wanted) {
+      db.prepare('INSERT OR IGNORE INTO work_keys_dirty(work_id) SELECT id FROM works').run();
+      db.prepare(
+        'INSERT INTO app_preferences(key,value_json,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at',
+      ).run(KEYS_STAMP, wanted, new Date().toISOString());
+    }
+    const dirty = db.prepare('SELECT work_id FROM work_keys_dirty').all().map((row) => row.work_id);
+    if (!dirty.length) return 0;
+    const work = db.prepare('SELECT id, title, authors_json FROM works WHERE id=?');
+    const originals = db.prepare('SELECT DISTINCT original_title FROM editions WHERE work_id=? AND original_title IS NOT NULL');
+    const clear = db.prepare('DELETE FROM work_keys WHERE work_id=?');
+    const add = db.prepare('INSERT OR IGNORE INTO work_keys(work_id,key) VALUES(?,?)');
+    const done = db.prepare('DELETE FROM work_keys_dirty WHERE work_id=?');
+    for (const id of dirty) {
+      clear.run(id);
+      const row = work.get(id);
+      if (row) {
+        const authors = parseAuthors(row.authors_json);
+        const keys = [workKey(row.title, authors), ...originals.all(id).map((edition) => originalKey(edition.original_title, authors))];
+        for (const key of new Set(keys.filter(Boolean))) add.run(id, key);
+      }
+      done.run(id);
+    }
+    return dirty.length;
+  });
+}
+
 /** An existing work that is the same book as (title, authors[, original title]), or null. */
 export function findWorkByKey(repository, title, authors, originalTitle = null) {
-  const wanted = new Set([workKey(title, authors), originalKey(originalTitle, authors)].filter(Boolean));
-  if (!wanted.size) return null;
-  const originals = originalTitlesByWork(repository);
-  const matches = liveWorks(repository).filter((work) => keysOf(work, originals).some((key) => wanted.has(key)));
+  const wanted = [...new Set([workKey(title, authors), originalKey(originalTitle, authors)].filter(Boolean))];
+  if (!wanted.length) return null;
+  refreshWorkKeys(repository);
+  const matches = repository.database
+    .prepare(
+      `SELECT w.id, w.title, w.authors_json, w.created_at,
+         (SELECT count(*) FROM editions e WHERE e.work_id = w.id) AS editions,
+         (SELECT count(*) FROM offer_matches m JOIN editions e ON e.id = m.edition_id
+            WHERE e.work_id = w.id AND m.status = 'active') AS offers
+       FROM works w
+       WHERE w.id IN (SELECT work_id FROM work_keys WHERE key IN (SELECT value FROM json_each(?)))
+         AND NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id = w.id)`,
+    )
+    .all(JSON.stringify(wanted));
   // Ambiguous (several works already share the key): leave the decision to the operator.
   return matches.length === 1 ? matches[0] : null;
 }

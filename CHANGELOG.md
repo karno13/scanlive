@@ -2,6 +2,15 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-10 (32) — Porządki techniczne
+
+- **Kolejka weryfikacji: „Najdroższe najpierw”** — nowe sortowanie po cenie oferty malejąco (drogie oferty są najważniejsze przy odsprzedaży); przy obu sortowaniach po cenie oferty bez ceny są na końcu (wcześniej na początku).
+- **Tabela tras.** Serwer ma jedną tabelę tras (63 trasy) zamiast łańcucha warunków, a trasy z `trading-api.mjs` — własną tabelę zamiast wyrażenia regularnego, które trzeba było uzupełniać przy każdej nowej ścieżce. Parametry ścieżki (`/api/sets/:offerId/editions/:editionId`) są dekodowane w jednym miejscu — ręczne dzielenie ścieżki spowodowało kiedyś błąd tras zestawów (zmiana 20).
+- **Naprawy danych przy starcie raz, nie przy każdym uruchomieniu.** Cofnięcie błędnych odrzuceń z 8.11, odrzucanie kopii odrzuconych ofert, odrzucanie obcojęzycznych wydań i ujednolicanie wydawców wykonują się teraz jednorazowo (flaga w bazie; ujednolicanie wydawców jeszcze raz, gdy zmienią się reguły pisowni). Dalej robią to: zapis nowej oferty, decyzja „odrzuć” (kopie tej oferty czekające w weryfikacji są odrzucane od razu, a nie przy następnym starcie), każde przejście identyfikacji i włączenie „Tylko polskie wydania”. Przy każdym starcie zostały tylko: wczytanie uniwersów i wariantów nazw do pamięci oraz zastosowanie połączeń nazw serii (serie zapisują BN i ogłoszenia bez tej listy). Cykl i tom z tytułów ogłoszeń liczy już tylko zadanie co 10 minut. Na kopii danych z 2026-11-10 żadna z przeniesionych napraw nic nie zmieniła (0 zmian), a kolejne uruchomienie trwa 48 ms zamiast 120 ms.
+- **Szybsze rozpoznawanie dzieła (migracja 128).** Klucz dzieła (tytuł główny + nazwisko autora, tytuł oryginalny) jest w indeksowanej tabeli; zmienione dzieła są przeliczane same (wyzwalacze), a po zmianie uniwersów — wszystkie. 300 wyszukań: 75 ms zamiast 1387 ms, z tym samym wynikiem.
+- **Frazy ofert jako tabela (migracja 127)** zamiast przeszukiwania JSON w każdym zapytaniu: oznaczanie ofert, których pełny skan nie zwrócił, i statystyki fraz.
+- **Jeden kształt oferty przy zapisie skanu** (`offer-ingest.mjs`, typ JSDoc `ScannedOffer`): title, price, image, isbn — bez równoległych nazw. Sprawdzanie typów bez budowania: `npm run typecheck` (TypeScript tylko jako narzędzie deweloperskie) dla ścieżki oferty i repozytorium.
+
 ## 2026-11-10 (31) — Pomiar nisz
 
 - **Ustawienia → „Skuteczność zapytań i nisz”** ma tabelę profili skanu obok siebie: liczba ofert, mediana dostępnych, **odsetek sprzedanych w 14 dni**, **mediana ceny sprzedanych**, **liczba ofert powyżej 50 zł**. Te same trzy kolumny są przy każdej frazie i źródle. Ma to rozstrzygnąć po kilku tygodniach, czy zostać przy niszy, czy poszerzać zakres — wystarczy zapisać drugi profil (np. „Kryminał PRL”) i skanować oba.

@@ -1,3 +1,4 @@
+// @ts-check
 import { backupBeforeMigrations } from './catalog-data-location.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -113,6 +114,8 @@ export class SqliteCatalogRepository extends CatalogRepository {
     return { ...this.database.prepare('SELECT * FROM works WHERE id=?').get(id), created: true };
   }
 
+  /** @typedef {Record<string, any> & { created: boolean }} StoredRow A saved row (all its columns) and whether it was new. */
+  /** @param {Record<string, any>} [input] @returns {StoredRow} */
   createEdition(input = {}) {
     const merged=input.workId ? this.database.prepare('SELECT target_id FROM catalog_work_merges WHERE source_id=?').get(input.workId) : null;
     if(merged) input={...input,workId:merged.target_id};
@@ -231,6 +234,12 @@ export class SqliteCatalogRepository extends CatalogRepository {
     });
   }
 
+  /**
+   * Saves an offer (by id, by source + external id, or by source + URL). Repository input names:
+   * originalTitle, currentPrice, imageUrl, observedIsbn, plus the observation fields (migration 124).
+   * @param {Record<string, any>} [input]
+   * @returns {StoredRow}
+   */
   upsertOffer(input = {}) {
     const source = String(input.source || ''),
       external = input.externalOfferId == null ? null : String(input.externalOfferId),
@@ -276,7 +285,7 @@ export class SqliteCatalogRepository extends CatalogRepository {
           input.language ?? null,
           input.observedIsbn ?? input.isbn ?? null,
           safeImageUrl(input.imageUrl),
-          json(input.matchedQueries ?? JSON.parse(old.matched_queries_json || '[]')),
+          json(input.matchedQueries ?? JSON.parse(String(old.matched_queries_json || '[]'))),
           input.firstSeenAt || old.first_seen_at || at,
           input.lastSeenAt || at,
           input.seenCount ?? Number(old.seen_count || 0) + 1,

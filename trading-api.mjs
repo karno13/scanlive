@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createRouter } from './router.mjs';
 import { deleteUniverse, listUniverses, saveUniverse } from './universes.mjs';
 import { recentRelistDecisions, undoRelist } from './offer-status.mjs';
 import { listScanProfiles } from './scan-profiles-api.mjs';
@@ -148,24 +149,25 @@ function marketFields(row, stats) {
 export function scanQueryStats(repo, at = Date.now()) {
   const db = repo.database;
   const cutoff = new Date(at - SOLD_WITHIN_DAYS * 86_400_000).toISOString();
-  const queries = `json_each(CASE WHEN json_valid(o.matched_queries_json) THEN o.matched_queries_json ELSE '[]' END) q`;
+  // The phrases that found each offer (offer_queries, migration 127).
+  const queries = 'JOIN offer_queries q ON q.offer_id=o.id';
   const rows = db
     .prepare(
-      `SELECT q.value AS query, o.source AS source, count(*) AS offers,
+      `SELECT q.query AS query, o.source AS source, count(*) AS offers,
          sum(EXISTS(SELECT 1 FROM offer_matches m WHERE m.offer_id=o.id AND m.status='active')) AS matched,
          sum(EXISTS(SELECT 1 FROM identification_jobs j WHERE j.offer_id=o.id AND j.status='review_required')) AS waiting,
          sum(o.observed_isbn IS NULL OR o.observed_isbn='') AS withoutIsbn,
          max(o.last_seen_at) AS lastSeen, ${marketColumns()}
-       FROM offers o, ${queries}
-       GROUP BY q.value, o.source ORDER BY offers DESC LIMIT 200`,
+       FROM offers o ${queries}
+       GROUP BY q.query, o.source ORDER BY offers DESC LIMIT 200`,
     )
     .all(cutoff, cutoff);
   const sep = String.fromCharCode(31);
-  const prices = groupedPriceStats(db, `SELECT o.id AS offer_id, q.value || char(31) || o.source AS grp FROM offers o, ${queries}`, [], 'grp');
+  const prices = groupedPriceStats(db, `SELECT o.id AS offer_id, q.query || char(31) || o.source AS grp FROM offers o ${queries}`, [], 'grp');
   // The same per saved scan profile (its phrases × its sources, each offer once): niches side by side.
   const profiles = listScanProfiles(repo).map((profile) => {
-    const selected = `SELECT DISTINCT o.id AS offer_id, 'p' AS grp FROM offers o, ${queries}
-      WHERE lower(q.value) IN (SELECT lower(value) FROM json_each(?)) AND o.source IN (SELECT value FROM json_each(?))`;
+    const selected = `SELECT DISTINCT o.id AS offer_id, 'p' AS grp FROM offers o ${queries}
+      WHERE lower(q.query) IN (SELECT lower(value) FROM json_each(?)) AND o.source IN (SELECT value FROM json_each(?))`;
     const params = [JSON.stringify(profile.queries || []), JSON.stringify(profile.sources || [])];
     const row = db
       .prepare(`SELECT count(*) AS offers, ${marketColumns()} FROM offers o WHERE o.id IN (SELECT offer_id FROM (${selected}))`)
@@ -194,9 +196,9 @@ export function scanQueryFreshness(repo, days = 30, at = Date.now()) {
   const since = new Date(at - days * 86_400_000).toISOString();
   const rows = repo.database
     .prepare(
-      `SELECT q.value AS query, count(*) AS offers, sum(o.first_seen_at>?) AS fresh, max(o.first_seen_at) AS lastNewAt
-       FROM offers o, json_each(CASE WHEN json_valid(o.matched_queries_json) THEN o.matched_queries_json ELSE '[]' END) q
-       GROUP BY lower(q.value)`,
+      `SELECT q.query AS query, count(*) AS offers, sum(o.first_seen_at>?) AS fresh, max(o.first_seen_at) AS lastNewAt
+       FROM offers o JOIN offer_queries q ON q.offer_id=o.id
+       GROUP BY lower(q.query)`,
     )
     .all(since);
   return {
@@ -227,88 +229,85 @@ export async function dataOverview(repo) {
   const backups=(await Promise.all(files.filter(name=>name.endsWith('.sqlite')).map(async name=>({name,at:(await stat(join(folder,name))).mtime.toISOString()})))).sort((a,b)=>b.at.localeCompare(a.at));
   return { databasePath:repo.path,backupDirectory:folder,lastBackupAt:backups[0]?.at||null,backups:backups.slice(0,20) };
 }
-export async function tradingRoute({repo,method,path,input}) {
-  if(path==='/api/trading-summary'&&method==='GET') {
+// The routes of this module, as a table (router.mjs). local-app.mjs forwards a request here when
+// this table knows its path, so a new route needs no change there.
+export const tradingRoutes = createRouter()
+  .add('GET', '/api/trading-summary', ({ repo }) => {
     const summary=repo.database.prepare(`SELECT count(*) AS watched,
       COALESCE(sum(CASE WHEN w.target_price IS NOT NULL AND o.currency='PLN' AND o.current_price<=round(w.target_price*100) THEN 1 ELSE 0 END),0) AS atTarget
       FROM offer_workspace w JOIN offers o ON o.id=w.offer_id WHERE w.watched=1`).get();
     return {...summary,review:repo.database.prepare("SELECT count(*) AS n FROM identification_jobs WHERE status='review_required'").get().n};
-  }
-  const setDetails=path.match(/^\/api\/set-details\/([^/]+)$/);
-  if(setDetails&&method==='PUT') {
-    const id=decodeURIComponent(setDetails[1]);
+  })
+  .add('PUT', '/api/set-details/:id', ({ repo, input, params }) => {
+    const id=params.id;
     if(typeof input?.confirmed!=='boolean') fail('INVALID_SET_DETAILS');
     if(input.confirmed&&repo.database.prepare('SELECT 1 FROM offer_set_unknown_items WHERE offer_id=?').get(id)) fail('SET_HAS_UNKNOWN_ITEMS',409);
     if(input.confirmed&&!repo.database.prepare('SELECT 1 FROM offer_set_editions WHERE offer_id=?').get(id)) fail('SET_HAS_NO_MEMBERS',409);
     const result=repo.database.prepare('UPDATE offer_sets SET composition_confirmed=?,updated_at=? WHERE offer_id=?').run(Number(input.confirmed),new Date().toISOString(),id);
     if(!result.changes) fail('SET_NOT_FOUND',404);
     return {confirmed:input.confirmed};
-  }
-  const setItem=path.match(/^\/api\/set-items\/([^/]+)\/([^/]+)$/);
-  if(setItem&&method==='PUT') return repo.transaction(()=>{
-    const offerId=decodeURIComponent(setItem[1]),editionId=decodeURIComponent(setItem[2]);
+  })
+  .add('PUT', '/api/set-items/:offerId/:editionId', ({ repo, input, params }) => repo.transaction(()=>{
+    const {offerId,editionId}=params;
     if(!Number.isSafeInteger(input?.quantity)||input.quantity<1||input.quantity>10000) fail('INVALID_QUANTITY');
     const result=repo.database.prepare('UPDATE offer_set_editions SET quantity=?,resale_price=? WHERE offer_id=? AND edition_id=?').run(input.quantity,amount(input.resalePrice),offerId,editionId);
     if(!result.changes) fail('SET_MEMBER_NOT_FOUND',404);
     repo.database.prepare('UPDATE offer_sets SET composition_confirmed=0,updated_at=? WHERE offer_id=?').run(new Date().toISOString(),offerId);
     return {saved:true};
-  });
-  const unknown=path.match(/^\/api\/set-unknown\/([^/]+)(?:\/([^/]+))?$/);
-  if(unknown&&['POST','DELETE'].includes(method)) return repo.transaction(()=>{
-    const offerId=decodeURIComponent(unknown[1]);
+  }))
+  .add(['POST', 'DELETE'], '/api/set-unknown/:offerId/:itemId?', ({ repo, method, input, params }) => repo.transaction(()=>{
+    const offerId=params.offerId;
     if(!repo.database.prepare('SELECT offer_id FROM offer_sets WHERE offer_id=?').get(offerId)) fail('SET_NOT_FOUND',404);
     if(method==='POST') {
       const title=text(input?.title,300,true),quantity=input?.quantity;
       if(!Number.isSafeInteger(quantity)||quantity<1||quantity>10000) fail('INVALID_QUANTITY');
       repo.database.prepare('INSERT INTO offer_set_unknown_items VALUES(?,?,?,?)').run(randomUUID(),offerId,title,quantity);
     } else {
-      if(!unknown[2]) fail('UNKNOWN_ITEM_REQUIRED');
-      repo.database.prepare('DELETE FROM offer_set_unknown_items WHERE offer_id=? AND id=?').run(offerId,decodeURIComponent(unknown[2]));
+      if(!params.itemId) fail('UNKNOWN_ITEM_REQUIRED');
+      repo.database.prepare('DELETE FROM offer_set_unknown_items WHERE offer_id=? AND id=?').run(offerId,params.itemId);
     }
     repo.database.prepare('UPDATE offer_sets SET composition_confirmed=0,updated_at=? WHERE offer_id=?').run(new Date().toISOString(),offerId);
     return {saved:true};
-  });
-  if(path==='/api/trading-defaults'&&method==='GET') return getTradingDefaults(repo);
-  if(path==='/api/trading-defaults'&&method==='PUT') return saveTradingDefaults(repo,input);
-  if(path==='/api/scan-runs'&&method==='GET') return {items:listScanRuns(repo)};
+  }))
+  .add('GET', '/api/trading-defaults', ({ repo }) => getTradingDefaults(repo))
+  .add('PUT', '/api/trading-defaults', ({ repo, input }) => saveTradingDefaults(repo,input))
+  .add('GET', '/api/scan-runs', ({ repo }) => ({items:listScanRuns(repo)}))
   // offers_seen: listings this source returned in its last checked scan, so a source whose
   // health row predates per-phrase success tracking is not shown as dead while it delivers offers.
-  if(path==='/api/source-health'&&method==='GET') return {items:repo.database.prepare('SELECT h.*,(SELECT count(*) FROM offers o WHERE o.source=h.source AND o.last_seen_at>=h.last_checked_at) AS offers_seen FROM source_health h ORDER BY h.source').all()};
-  if(path==='/api/review-decisions'&&method==='GET') return {items:recentReviewDecisions(repo)};
-  const relist=path.match(/^\/api\/offer-relists\/([^/]+)\/undo$/);
-  if(relist&&method==='POST') return undoRelist(repo,decodeURIComponent(relist[1]));
-  const reopen=path.match(/^\/api\/review-decisions\/([^/]+)\/reopen$/);
-  if(reopen&&method==='POST') return reopenReviewDecision(repo,decodeURIComponent(reopen[1]));
-  const scenario=path.match(/^\/api\/offer-scenarios\/([^/]+)$/);
-  if(scenario&&method==='GET') return getOfferScenario(repo,decodeURIComponent(scenario[1]));
-  if(scenario&&method==='PUT') return saveOfferScenario(repo,decodeURIComponent(scenario[1]),input);
-  const work=path.match(/^\/api\/catalog\/works\/([^/]+)$/);
-  if(work&&method==='PUT') return editCatalogWork(repo,decodeURIComponent(work[1]),input);
-  const edition=path.match(/^\/api\/catalog\/editions\/([^/]+)$/);
-  if(edition&&method==='PUT') return editCatalogEdition(repo,decodeURIComponent(edition[1]),input);
-  if(path==='/api/scan-queries/stats'&&method==='GET') return scanQueryStats(repo);
-  if(path==='/api/scan-queries/freshness'&&method==='GET') return scanQueryFreshness(repo);
-  if(path==='/api/catalog/names'&&method==='GET') return listNames(repo);
-  if(path==='/api/catalog/universes'&&method==='GET') return listUniverses(repo);
-  if(path==='/api/catalog/universes'&&method==='PUT') return saveUniverse(repo,input);
-  const universe=path.match(/^\/api\/catalog\/universes\/([^/]+)$/);
-  if(universe&&method==='DELETE') return deleteUniverse(repo,decodeURIComponent(universe[1]));
-  if(path==='/api/catalog/names/merge'&&method==='POST') return mergeNames(repo,input);
-  if(path==='/api/catalog/names/unalias'&&method==='POST') return removeNameAlias(repo,input);
-  if(path==='/api/scan-language'&&method==='GET') return {polishOnly:getPolishOnly(repo)};
-  if(path==='/api/scan-language'&&method==='PUT') return setPolishOnly(repo,input?.polishOnly);
-  if(path==='/api/scan-schedule'&&method==='GET') { const s=getScanSchedule(repo); return {...s,nextRunAt:nextRunAt(s),nextQuickRunAt:nextQuickRunAt(s)}; }
-  if(path==='/api/scan-schedule'&&method==='PUT') { const s=saveScanSchedule(repo,input); return {...s,nextRunAt:nextRunAt(s),nextQuickRunAt:nextQuickRunAt(s)}; }
-  if(path==='/api/catalog/work-duplicates'&&method==='GET') return listWorkDuplicates(repo);
-  if(path==='/api/catalog/title-conflicts'&&method==='GET') return {conflicts:findTitleConflicts(repo)};
-  if(path==='/api/catalog/title-conflicts/resolve'&&method==='POST') return resolveTitleConflict(repo,input);
-  if(path==='/api/catalog/work-duplicates/merge'&&method==='POST') return mergeWorkGroup(repo,input?.targetId,input?.sourceIds);
-  if(path==='/api/catalog/merge-works'&&method==='POST') return mergeCatalogWorks(repo,input?.sourceId,input?.targetId,input?.confirm===true);
-  if(path==='/api/data/overview'&&method==='GET') return dataOverview(repo);
-  if(path==='/api/data/backup'&&method==='POST') {
+  .add('GET', '/api/source-health', ({ repo }) => ({items:repo.database.prepare('SELECT h.*,(SELECT count(*) FROM offers o WHERE o.source=h.source AND o.last_seen_at>=h.last_checked_at) AS offers_seen FROM source_health h ORDER BY h.source').all()}))
+  .add('GET', '/api/review-decisions', ({ repo }) => ({items:recentReviewDecisions(repo)}))
+  .add('POST', '/api/offer-relists/:offerId/undo', ({ repo, params }) => undoRelist(repo,params.offerId))
+  .add('POST', '/api/review-decisions/:id/reopen', ({ repo, params }) => reopenReviewDecision(repo,params.id))
+  .add('GET', '/api/offer-scenarios/:offerId', ({ repo, params }) => getOfferScenario(repo,params.offerId))
+  .add('PUT', '/api/offer-scenarios/:offerId', ({ repo, input, params }) => saveOfferScenario(repo,params.offerId,input))
+  .add('PUT', '/api/catalog/works/:id', ({ repo, input, params }) => editCatalogWork(repo,params.id,input))
+  .add('PUT', '/api/catalog/editions/:id', ({ repo, input, params }) => editCatalogEdition(repo,params.id,input))
+  .add('GET', '/api/scan-queries/stats', ({ repo }) => scanQueryStats(repo))
+  .add('GET', '/api/scan-queries/freshness', ({ repo }) => scanQueryFreshness(repo))
+  .add('GET', '/api/catalog/names', ({ repo }) => listNames(repo))
+  .add('POST', '/api/catalog/names/merge', ({ repo, input }) => mergeNames(repo,input))
+  .add('POST', '/api/catalog/names/unalias', ({ repo, input }) => removeNameAlias(repo,input))
+  .add('GET', '/api/catalog/universes', ({ repo }) => listUniverses(repo))
+  .add('PUT', '/api/catalog/universes', ({ repo, input }) => saveUniverse(repo,input))
+  .add('DELETE', '/api/catalog/universes/:name', ({ repo, params }) => deleteUniverse(repo,params.name))
+  .add('GET', '/api/scan-language', ({ repo }) => ({polishOnly:getPolishOnly(repo)}))
+  .add('PUT', '/api/scan-language', ({ repo, input }) => setPolishOnly(repo,input?.polishOnly))
+  .add('GET', '/api/scan-schedule', ({ repo }) => { const s=getScanSchedule(repo); return {...s,nextRunAt:nextRunAt(s),nextQuickRunAt:nextQuickRunAt(s)}; })
+  .add('PUT', '/api/scan-schedule', ({ repo, input }) => { const s=saveScanSchedule(repo,input); return {...s,nextRunAt:nextRunAt(s),nextQuickRunAt:nextQuickRunAt(s)}; })
+  .add('GET', '/api/catalog/work-duplicates', ({ repo }) => listWorkDuplicates(repo))
+  .add('POST', '/api/catalog/work-duplicates/merge', ({ repo, input }) => mergeWorkGroup(repo,input?.targetId,input?.sourceIds))
+  .add('GET', '/api/catalog/title-conflicts', ({ repo }) => ({conflicts:findTitleConflicts(repo)}))
+  .add('POST', '/api/catalog/title-conflicts/resolve', ({ repo, input }) => resolveTitleConflict(repo,input))
+  .add('POST', '/api/catalog/merge-works', ({ repo, input }) => mergeCatalogWorks(repo,input?.sourceId,input?.targetId,input?.confirm===true))
+  .add('GET', '/api/data/overview', ({ repo }) => dataOverview(repo))
+  .add('POST', '/api/data/backup', async ({ repo }) => {
     if(repo.path===':memory:') fail('BACKUP_REQUIRES_FILE',409);
     const destination=join(dirname(repo.path),'backups','bookflip-manual-'+Date.now()+'-'+randomUUID()+'.sqlite');
     return {path:await backupCatalog({source:repo.path,destination}),...await dataOverview(repo)};
-  }
-  return undefined;
+  });
+
+export async function tradingRoute({repo,method,path,input}) {
+  const found=tradingRoutes.match(method,path);
+  if(!found?.handler) return undefined;
+  return found.handler({repo,method,input,params:found.params});
 }
