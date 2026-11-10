@@ -3,6 +3,7 @@
 // Przygody Gotreka i Felixa t. 7 Czarna Biblioteka 22", author "King, William Bonikowski, Grzegorz
 // Copernicus Corporation"); MARC keeps title, people with roles, publisher and series apart.
 import { fold } from './title-proposals.mjs';
+import { UNIVERSE_SERIES } from './universes.mjs';
 
 /** [{tag, ind1, ind2, subfields: [[code, value]]}] from BN's {"fields":[{"245":{...}}]} shape. */
 export function marcFields(marc) {
@@ -88,8 +89,6 @@ function contributors(fields) {
 }
 
 // Series statements that name a universe or a franchise rather than a story cycle.
-const UNIVERSE_SERIES =
-  /^(?:discworld(?: series)?|swiat dysku|warhammer(?: 40 ?000| fantasy| chronicles| age of sigmar)?(?: black library)?|age of sigmar|world of warcraft|warcraft|blizzard legends|dragonlance(?: saga)?|forgotten realms|zapomniane krainy)$/;
 // Publisher imprints and genre lines: numbered, but the number is the imprint's, not a story's.
 const PUBLISHER_LINE =
   /^(?:fantasy|sf|fantastyka|science fiction|wielka kolekcja|kolekcja.*|czarna biblioteka|black library(?: czarna biblioteka)?|biblioteka.*|seria.*|bestseller.*|powiesc|warhammer powiesc)$/;

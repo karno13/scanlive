@@ -2,12 +2,8 @@
 // this every ISBN (every reprint, every publisher) became its own work. The key is deliberately
 // strict - same main title AND same first author - because a wrong merge is worse than a missed one.
 import { fold } from './title-proposals.mjs';
+import { BRAND_ONLY_ORIGINAL, UNIVERSE_PREFIX, UNIVERSE_SUFFIX } from './universes.mjs';
 
-const UNIVERSE_PREFIX =
-  /^\s*(?:world of warcraft|warcraft|warhammer(?: 40[ ,.]?000| 40k)?|dragonlance|forgotten realms|świat dysku)\s*[:.]\s+/i;
-
-const UNIVERSE_SUFFIX =
-  /\s*[([](?:world of warcraft|warcraft|warhammer(?: 40[ ,.]?000| 40k)?|dragonlance|forgotten realms|świat dysku|swiat dysku|discworld)[)\]]\s*$/i;
 
 /** "Para w ruch / Raising steam, Discworld series ; t. 40" -> "Para w ruch" */
 export function mainTitle(title) {
@@ -61,7 +57,6 @@ function liveWorks(repository) {
     .all();
 }
 
-const BRAND_ONLY_ORIGINAL = /^(?:world of warcraft|warcraft|warhammer(?: 40 ?000)?|discworld(?: series)?|dragonlance|forgotten realms)$/;
 
 /** Second key: the original title ("Light fantastic") names one work across translations and publishers. */
 export function originalKey(originalTitle, authors) {

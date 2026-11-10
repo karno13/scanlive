@@ -9,13 +9,13 @@ import { fold } from './title-proposals.mjs';
 import { mainTitle } from './work-grouping.mjs';
 import { BRAND_ONLY, NOT_A_CYCLE, cycleFromTitle } from './catalog-series.mjs';
 import { seriesKind } from './bn-marc.mjs';
+import { LISTING_UNIVERSE_PHRASES } from './universes.mjs';
 
 const VOLUME_WORD = /^(?:tom|t|ksiega|ks|vol|volume|czesc|cz|#)$/;
 const PRIMARY_VOLUME_WORD = /^(?:tom|t|ksiega|ks|vol|volume|#)$/;
 // Universe names and sales words that sit next to the cycle in listings.
 const NOISE_PHRASES = [
-  'warhammer 40 000', 'warhammer 40000', 'warhammer 40k', 'warhammer fantasy', 'warhammer', 'wh40k', 'w40k', '40k', '40000', '40 000',
-  'world of warcraft', 'warcraft', 'diablo', 'starcraft', 'dragonlance', 'forgotten realms', 'swiat dysku', 'discworld', 'black library',
+  ...LISTING_UNIVERSE_PHRASES,
   'ksiazka', 'ksiazki', 'nowa', 'nowy', 'unikat', 'bdb', 'stan bardzo dobry', 'stan dobry', 'wyd', 'wydanie', 'isa', 'mag',
 ].map((phrase) => phrase.split(' '));
 

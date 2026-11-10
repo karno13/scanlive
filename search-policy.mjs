@@ -1,3 +1,4 @@
+import { SEARCH_FAMILIES, topicTerms } from './universes.mjs';
 // Retrieval aliases never confer edition identity or bibliographic verification.
 export const normalizeSearch = (s) =>
   String(s || '')
@@ -7,12 +8,7 @@ export const normalizeSearch = (s) =>
     .replace(/ł/g, 'l')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-const families = [
-  ['Warhammer', 'Warhammer 40,000', 'WH40K', 'Warhammer 40K'],
-  ['Herezja Horusa', 'Horus Heresy'],
-  ['Warcraft', 'World of Warcraft'],
-  ['Forgotten Realms', 'Zapomniane Krainy'],
-];
+const families = SEARCH_FAMILIES;
 export function searchAliases(title) {
   const key = normalizeSearch(title);
   return (
@@ -46,19 +42,7 @@ export function matchesSearch(task, title) {
 export function matchesTopic(task, title) {
   if (task.mode === 'watchlist') return matchesSearch(task, title);
   const category = normalizeSearch(task.category);
-  const categoryTerms = category.includes('warcraft')
-    ? ['Warcraft', 'World of Warcraft']
-    : category.includes('warhammer') || category.includes('horus') || category.includes('herezja')
-      ? [
-          'Warhammer',
-          'Warhammer 40,000',
-          'WH40K',
-          'Warhammer 40K',
-          'Horus',
-          'Horus Heresy',
-          'Herezja Horusa',
-        ]
-      : [];
+  const categoryTerms = topicTerms(category);
   const terms = [task.searchQuery, task.title, ...(task.aliases || []), ...categoryTerms];
   if (!terms.some(Boolean)) terms.push(task.category || '');
   return matchesSearch({ title: '', searchQuery: '', aliases: terms }, title);

@@ -5,14 +5,13 @@
 // (and can be reopened in "Ostatnie decyzje i poprawianie pomyłek" like any other).
 
 import { normalizeISBN } from './isbn-normalization.mjs';
+import { UNIVERSE_WORDS } from './universes.mjs';
 
 const REJECTED = "('excluded','not_book')";
 export const AUTO_REJECT_AUTHOR = 'auto_same_as_rejected';
 
 // Universe and sales words: on every listing, they never tell one product from another.
-const COMMON = new Set(
-  'world of the warcraft warhammer 40k 40000 000 fantasy dragonlance forgotten realms swiat dysku discworld star wars ksiazka ksiazki nowa nowy tom'.split(' '),
-);
+const COMMON = new Set([...UNIVERSE_WORDS, ...'ksiazka ksiazki nowa nowy tom'.split(' ')]);
 
 /** "World of Warcraft - Der letzte Wächter " → "world of warcraft der letzte wachter"; any script. */
 export function rejectionTitleKey(title) {

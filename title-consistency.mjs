@@ -3,14 +3,10 @@
 // The check is deliberately lenient: one shared word (title, series, universe or author surname)
 // is enough. Only a listing that shares *nothing* with the record is held back for review.
 import { titleTokens, fold } from './title-proposals.mjs';
+import { UNIVERSE_SYNONYMS } from './universes.mjs';
 
 // The same universe written two ways on covers and in BN records.
-const SYNONYMS = [
-  ['discworld', 'swiat dysku'],
-  ['warhammer', '40000 40k'],
-  ['horus heresy', 'herezja horusa'],
-  ['forgotten realms', 'drizzt'],
-];
+const SYNONYMS = UNIVERSE_SYNONYMS;
 
 const stem = (token) => token.slice(0, 5);
 

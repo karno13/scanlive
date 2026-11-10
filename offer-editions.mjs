@@ -14,6 +14,7 @@ import { chooseAmongRecords } from './catalog-resolver.mjs';
 import { storeSeriesStatements } from './edition-series.mjs';
 import { normalizePublisher } from './publisher-names.mjs';
 import { storedIsbnRecord } from './isbn-lookups.mjs';
+import { LISTING_UNIVERSE_PATTERNS } from './universes.mjs';
 
 const RECHECK_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const RETRY_SOON_MS = 24 * 60 * 60 * 1000;
@@ -22,17 +23,7 @@ const word = (pattern) => new RegExp(`(?<!${L})(?:${pattern})(?!${L})`, 'giu');
 // Universe names and sales words: on every cover and in every listing, never the book's own title.
 const NOISE = word(
   [
-    'warhammer(?:\\s*(?:40\\s*[.,]?\\s*000|40\\s*k|40k|fantasy|age of sigmar|horus heresy))?',
-    '40\\s*k',
-    '40[.,]?000',
-    'w40k',
-    'world of warcraft',
-    'warcraft',
-    'dragonlance',
-    'forgotten realms',
-    'świat dysku',
-    'swiat dysku',
-    'discworld',
+    ...LISTING_UNIVERSE_PATTERNS,
     'książka',
     'ksiazka',
     'książki',

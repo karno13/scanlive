@@ -3,20 +3,15 @@
 // annotation (which always wins). Display and navigation only — never identification evidence.
 import { fold } from './title-proposals.mjs';
 import { proxiedImage } from './offer-images.mjs';
+import { BRAND_ONLY, SERIES_UNIVERSES } from './universes.mjs';
 
 // Universe names that appear on covers / in BN series statements, with the label shown.
-const UNIVERSES = [
-  [/\b(?:discworld|swiat dysku)\b/, 'Świat Dysku'],
-  [/\bwarcraft\b/, 'Warcraft'],
-  [/\bwarhammer\b|\bage of sigmar\b|\bherezja horusa\b|\bczarna biblioteka\b/, 'Warhammer'],
-  [/\bdragonlance\b/, 'Dragonlance'],
-  [/\bforgotten realms\b|\bdrizzt/, 'Forgotten Realms'],
-];
+const UNIVERSES = SERIES_UNIVERSES;
 // Publisher lines and genre labels: numbered, but not a story cycle.
 export const NOT_A_CYCLE =
   /^(?:wielka kolekcja|kolekcja.*|czarna biblioteka|fantastyka|fantasy|sf|seria.*fantasy|biblioteka.*|blizzard legends|nowa fantastyka|sensacja.*fantastyka|.*fantasy adventure|fantasy adventure)$/i;
 // Brand words that are not a cycle on their own ("Discworld series t. 14" = the universe itself).
-export const BRAND_ONLY = /^(?:discworld(?: series)?|swiat dysku|warhammer(?: 40[ .,]?000| fantasy| chronicles)?|world of warcraft|warcraft|dragonlance(?: saga)?|forgotten realms)$/;
+export { BRAND_ONLY };
 
 export function universeOf(text) {
   const folded = fold(text);
