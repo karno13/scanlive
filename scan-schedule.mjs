@@ -24,7 +24,43 @@ export function getScanSchedule(repository) {
     lastRunAt: saved.lastRunAt ?? null,
     lastResult: saved.lastResult ?? null,
     lastProfile: typeof saved.lastProfile === 'string' ? saved.lastProfile : null,
+    // Sources left out of the last run (failed recently) and sources that failed during it.
+    lastSkipped: Array.isArray(saved.lastSkipped) ? saved.lastSkipped : [],
+    lastProblems: Array.isArray(saved.lastProblems) ? saved.lastProblems : [],
   };
+}
+
+// A source that failed its last check is left out of scheduled scans for this long, then tried
+// again once so that it can come back on its own (health is updated by every scan that uses it).
+export const DEAD_SOURCE_PAUSE_MS = 24 * 3_600_000;
+
+/** The profile's sources minus those that failed their last check less than a day ago. */
+export function sourcesToScan(repository, sources, at = Date.now()) {
+  let rows = [];
+  try {
+    rows = repository.database.prepare('SELECT source,status,last_checked_at FROM source_health').all();
+  } catch {
+    return { sources: [...sources], skipped: [] };
+  }
+  const dead = new Set(
+    rows
+      .filter((row) => row.status === 'failed' && at - Date.parse(row.last_checked_at || '') < DEAD_SOURCE_PAUSE_MS)
+      .map((row) => row.source),
+  );
+  return { sources: sources.filter((source) => !dead.has(source)), skipped: sources.filter((source) => dead.has(source)) };
+}
+
+/** Sources that reported errors in the scan saved at or after `since`. */
+export function scanProblems(repository, since) {
+  try {
+    const row = repository.database
+      .prepare('SELECT summary_json FROM scan_runs WHERE scanned_at>=? ORDER BY scanned_at DESC LIMIT 1')
+      .get(since);
+    const errors = row ? JSON.parse(row.summary_json).errors || [] : [];
+    return [...new Set(errors.map((error) => error.source).filter(Boolean))].sort();
+  } catch {
+    return [];
+  }
 }
 
 function store(repository, value, now) {
@@ -43,7 +79,7 @@ export function saveScanSchedule(repository, input, now = Date.now()) {
   const profiles = listScanProfiles(repository);
   if (enabled && !(profile === ALL_PROFILES ? profiles.length : profiles.some((item) => item.name === profile))) fail('SCHEDULE_PROFILE_NOT_FOUND');
   const current = getScanSchedule(repository);
-  store(repository, { enabled, profile, everyHours, lastRunAt: current.lastRunAt, lastResult: current.lastResult, lastProfile: current.lastProfile }, now);
+  store(repository, { ...current, enabled, profile, everyHours }, now);
   return getScanSchedule(repository);
 }
 
@@ -85,13 +121,23 @@ export function createScanScheduler({
     const profile = schedule.profile === ALL_PROFILES ? nextProfile(profiles, schedule.lastProfile) : profiles.find((item) => item.name === schedule.profile);
     running = true;
     let result;
+    let skipped = [];
+    let problems = [];
     try {
       if (!profile) result = 'profile-missing';
       else {
-        const status = await runScan({ queries: profile.queries, sources: profile.sources });
-        // 409: a manual scan is already running. Try again on the next check instead of doubling up.
-        if (status === 409) return { skipped: 'scan-running' };
-        result = status >= 200 && status < 300 ? 'ok' : `http-${status}`;
+        const plan = sourcesToScan(repository, profile.sources, now());
+        skipped = plan.skipped;
+        if (!plan.sources.length) result = 'all-sources-down';
+        else {
+          const startedAt = new Date(now()).toISOString();
+          const status = await runScan({ queries: profile.queries, sources: plan.sources });
+          // 409: a manual scan is already running. Try again on the next check instead of doubling up.
+          if (status === 409) return { skipped: 'scan-running' };
+          const success = status >= 200 && status < 300;
+          problems = success ? scanProblems(repository, startedAt) : [];
+          result = success ? (problems.length ? 'partial' : 'ok') : `http-${status}`;
+        }
       }
     } catch (error) {
       result = `error:${String(error?.message ?? error).slice(0, 60)}`;
@@ -100,9 +146,9 @@ export function createScanScheduler({
     }
     // Record the attempt even on failure so that a broken profile cannot be retried every minute.
     const fresh = getScanSchedule(repository);
-    store(repository, { ...fresh, lastRunAt: new Date(now()).toISOString(), lastResult: result, lastProfile: profile?.name ?? fresh.lastProfile }, now());
-    onEvent({ type: 'scheduled_scan', profile: profile?.name ?? schedule.profile, result });
-    return { ran: true, result };
+    store(repository, { ...fresh, lastRunAt: new Date(now()).toISOString(), lastResult: result, lastProfile: profile?.name ?? fresh.lastProfile, lastSkipped: skipped, lastProblems: problems }, now());
+    onEvent({ type: 'scheduled_scan', profile: profile?.name ?? schedule.profile, result, skipped, problems });
+    return { ran: true, result, skipped, problems };
   }
 
   return {

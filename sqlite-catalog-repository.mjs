@@ -7,6 +7,7 @@ import { CatalogRepository } from './catalog-repository.mjs';
 import { applyCatalogMigrations } from './catalog-migrations.mjs';
 import { isbnKeys, normalizeISBN } from './isbn-normalization.mjs';
 import { safeImageUrl } from './offer-images.mjs';
+import { normalizePublisher } from './publisher-names.mjs';
 
 function iso(value) {
   return value instanceof Date ? value.toISOString() : String(value);
@@ -132,7 +133,7 @@ export class SqliteCatalogRepository extends CatalogRepository {
         input.workId,
         legacyId,
         title,
-        input.publisher || null,
+        normalizePublisher(input.publisher),
         integer(input.publicationYear, 'PUBLICATION_YEAR', { nullable: true }),
         input.language || null,
         input.binding || null,

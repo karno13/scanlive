@@ -10,7 +10,8 @@ export function listOfferSets(repository) {
   const rows = db.prepare(`SELECT s.offer_id AS offerId, o.original_title AS title, o.source,
     o.current_price AS currentPrice, o.currency, o.normalized_url AS url, o.image_url AS imageUrl,
     o.observed_isbn AS observedIsbn, o.availability, o.last_seen_at AS lastSeenAt,
-    s.composition_confirmed AS compositionConfirmed, s.created_at AS createdAt
+    s.composition_confirmed AS compositionConfirmed, s.created_at AS createdAt,
+    s.composed_from_description_at AS composedFromDescriptionAt
     FROM offer_sets s JOIN offers o ON o.id=s.offer_id ORDER BY s.updated_at DESC`).all();
   const editions = db.prepare(`SELECT se.offer_id AS offerId, se.edition_id AS editionId,
     e.title AS title, w.title AS workTitle, se.quantity,se.resale_price AS resalePrice,

@@ -39,6 +39,10 @@ import { identifyOffer } from './offer-identity.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import { requeueForNewEvidence } from './offer-enrichment.mjs';
 import { requeueReviewsWithKnownIsbn } from './identification-retry.mjs';
+import { normalizeStoredPublishers } from './publisher-names.mjs';
+import { applyNameAliases, loadNameAliases } from './name-aliases.mjs';
+import { rejectRepeatsOfRejectedOffers, undoUnconfirmedRepeatRejections } from './rejected-offers.mjs';
+import { rejectForeignEditions } from './language-policy.mjs';
 
 function stableId(prefix, ...values) {
   return `${prefix}_${createHash('sha256').update(JSON.stringify(values)).digest('hex').slice(0, 32)}`;
@@ -73,6 +77,15 @@ export function createProductionCatalog({
     // are joined (same strict key), never touching works the operator edited.
     if (!upgrade.skipped) mergeAutomaticDuplicates(repository);
     reviewAutomaticBundleMatches(repository, { now });
+    // Copies of rejected offers saved before this rule existed leave the review queue.
+    undoUnconfirmedRepeatRejections(repository, { now });
+    rejectRepeatsOfRejectedOffers(repository, { now });
+    rejectForeignEditions(repository, { now });
+    // "ISA", '"ISA"', 'Isa' → one publisher (BN, Open Library and listings spell them differently).
+    // The operator's publisher / series merges (Katalog → "Wydawcy i serie"), then built-in spellings.
+    loadNameAliases(repository);
+    normalizeStoredPublishers(repository, { now });
+    applyNameAliases(repository, { now });
     if (String(process.env.BOOKFLIP_STARTER_PROFILES ?? '1') !== '0') ensureStarterProfiles(repository);
     // Cycle and volume from listing titles for works no bibliographic record describes.
     inferListingSeries(repository);
@@ -182,6 +195,7 @@ export function createProductionCatalog({
     ingestOffers(offers, observedAt = now(), { scanSummary = null } = {}) {
       const report = { offers: 0, evidence: 0, jobs: 0, skipped: 0 };
       const at = observedAt instanceof Date ? observedAt.toISOString() : String(observedAt);
+      const newJobOffers = [];
       repository.transaction(() => {
         for (const offer of offers ?? []) {
           let identity;
@@ -242,10 +256,18 @@ export function createProductionCatalog({
             status: 'queued',
             at: observedAt,
           });
-          if (job.created) report.jobs += 1;
+          if (job.created) {
+            report.jobs += 1;
+            newJobOffers.push(stored.id);
+          }
           // The seller added or corrected the ISBN since the last scan: the offer waiting in review
           // with the old answer ("no ISBN") goes back to the resolver.
           else if (newEvidence && requeueForNewEvidence(repository, stored.id, at)) report.requeued = (report.requeued || 0) + 1;
+        }
+        // A re-listed or duplicate copy of a rejected offer is rejected before the resolver sees it.
+        if (newJobOffers.length) {
+          const { rejected } = rejectRepeatsOfRejectedOffers(repository, { now, offerIds: newJobOffers });
+          if (rejected) report.autoRejected = rejected;
         }
         if (scanSummary) {
           if (scanSummary.at !== at) throw Error('INVALID_SCAN_SUMMARY_TIME');

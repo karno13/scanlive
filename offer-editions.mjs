@@ -12,6 +12,8 @@ import { persistMetadataResults } from './metadata-lookup.mjs';
 import { enrichEdition } from './catalog-bibliography.mjs';
 import { chooseAmongRecords } from './catalog-resolver.mjs';
 import { storeSeriesStatements } from './edition-series.mjs';
+import { normalizePublisher } from './publisher-names.mjs';
+import { storedIsbnRecord } from './isbn-lookups.mjs';
 
 const RECHECK_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const RETRY_SOON_MS = 24 * 60 * 60 * 1000;
@@ -225,11 +227,16 @@ export function offerEditionDraft(repository, jobId) {
       queries.push(...JSON.parse(offer.matched_queries_json || '[]'));
     } catch {}
   queries = [...new Set(queries)];
+  // A lubimyczytac.pl page with this exact ISBN (looked up in the background) beats the listings.
+  const record = isbn ? storedIsbnRecord(repository, isbn) : null;
   return {
     jobId: job.id,
     isbn,
-    title: titles[0] ?? clean(job.original_title).slice(0, 200),
-    authors,
+    title: record?.title || titles[0] || clean(job.original_title).slice(0, 200),
+    authors: record?.authors?.length ? record.authors.slice(0, 2) : authors,
+    ...(record
+      ? { record: { source: 'lubimyczytac.pl', url: record.url, publisher: record.publisher, publicationYear: record.publicationYear, cycle: record.cycle, pages: record.pages } }
+      : {}),
     universe: universeOf([job.original_title, ...queries].join(' ')),
     siblings: offers.filter((offer) => offer.job_id !== job.id && offer.status === 'review_required').length,
     listings: offers.slice(0, 8).map((offer) => offer.original_title),
@@ -246,7 +253,9 @@ function validInput(input) {
   if (authors.some((name) => name.length > 120)) throw Object.assign(Error('INVALID_AUTHOR'), { statusCode: 400 });
   const isbn = normalizeISBN(input?.isbn);
   if (!isbn) throw Object.assign(Error('INVALID_ISBN'), { statusCode: 400 });
-  return { title, authors, isbn };
+  const publisher = clean(input?.publisher).slice(0, 200) || null;
+  const year = Number(input?.publicationYear);
+  return { title, authors, isbn, publisher, publicationYear: Number.isInteger(year) && year >= 1400 && year <= 2100 ? year : null };
 }
 
 /**
@@ -254,7 +263,9 @@ function validInput(input) {
  * The other offers with the same ISBN follow automatically (see requeueReviewsWithKnownIsbn).
  */
 export function createEditionFromOffer(repository, jobId, input = {}, { now = () => new Date() } = {}) {
-  const { title, authors, isbn } = validInput(input);
+  const { title, authors, isbn, publisher, publicationYear } = validInput(input);
+  // Publisher, year and cycle confirmed by a page with this exact ISBN (lubimyczytac.pl).
+  const record = storedIsbnRecord(repository, isbn);
   const job = jobOffer(repository, jobId);
   if (job.status !== 'review_required') throw Object.assign(Error('REVIEW_JOB_NOT_PENDING'), { statusCode: 409 });
   const at = now().toISOString();
@@ -266,7 +277,17 @@ export function createEditionFromOffer(repository, jobId, input = {}, { now = ()
       const work =
         findWorkByKey(repository, title, authors) ??
         repository.createWork({ id: randomUUID(), title, normalizedTitle: fold(title), authors, verificationStatus: 'unverified', at });
-      edition = repository.createEdition({ id: randomUUID(), workId: work.id, title, verificationStatus: 'unverified', at });
+      edition = repository.createEdition({
+        id: randomUUID(),
+        workId: work.id,
+        title,
+        publisher: publisher ?? record?.publisher ?? null,
+        publicationYear: publicationYear ?? record?.publicationYear ?? null,
+        verificationStatus: 'unverified',
+        at,
+      });
+      if (record?.cycle?.name)
+        storeSeriesStatements(repository, edition.id, [{ name: record.cycle.name, volume: record.cycle.volume, kind: 'cycle' }], 'lubimyczytac');
       const keys = isbnKeys(isbn).length ? isbnKeys(isbn) : [isbn];
       for (const key of keys)
         repository.attachIdentifier(edition.id, key.length === 10 ? 'isbn10' : 'isbn13', key, {
@@ -283,7 +304,9 @@ export function createEditionFromOffer(repository, jobId, input = {}, { now = ()
       action: 'approved',
       editionId: edition.id,
       reason: created
-        ? 'Wydanie utworzone z ogłoszenia — ISBN nieznany BN, Open Library i Google Books.'
+        ? record
+          ? 'Wydanie utworzone z ogłoszenia — ISBN nieznany BN, Open Library i e-ISBN; opis z lubimyczytac.pl (ten sam ISBN).'
+          : 'Wydanie utworzone z ogłoszenia — ISBN nieznany BN, Open Library i Google Books.'
         : 'Przypisano do wydania z tym ISBN.',
     }, { now });
     return { editionId: edition.id, workId: edition.work_id, created, decision: decision.decision };
@@ -313,7 +336,7 @@ export function upgradeOfferEdition(repository, editionId, metadata, { now = () 
       )
       .run(
         String(record.title || edition.title).slice(0, 500),
-        record.publisher || null,
+        normalizePublisher(record.publisher),
         Number.isInteger(Number(record.publicationYear)) && record.publicationYear >= 1400 && record.publicationYear <= 2100
           ? Number(record.publicationYear)
           : null,

@@ -11,9 +11,11 @@ Lokalny serwer `local-app.mjs` zapisuje udane skany **bezpośrednio do SQLite**:
 
 Nie ma produkcyjnego dual-write do `local-offer-history.json`. Historyczne narzędzia JSON są osobne. Nie trzeba korzystać z GitHub Actions do skanowania.
 
-## Lokalizacja danych
+## Źródła metadanych
 
-Identyfikacja sprawdza najpierw lokalny katalog ISBN, następnie Bibliotekę Narodową. Open Library jest używana wyłącznie po odpowiedzi BN `not_found`. Awaria lub nieprawidłowa odpowiedź BN nie oznacza braku książki. Wyszukiwanie ISBN po tytule również korzysta najpierw z BN, a przy braku kandydatów z Open Library. Różnice między dostawcami nie blokują identyfikacji; przypisanie sprawdza wyłącznie ISBN, bez porównywania tytułu, autora, wydawcy, języka ani innych metadanych oferty. Nieprawidłowy ISBN i niejednoznaczne rekordy nadal wymagają wyjaśnienia.
+Identyfikacja sprawdza najpierw lokalny katalog ISBN, następnie Bibliotekę Narodową. Kolejne źródła (Open Library, e-ISBN, Google Books — ten ostatni tylko z kluczem `BOOKFLIP_GOOGLE_BOOKS_KEY`) są pytane dopiero po odpowiedzi BN `not_found`. ISBN, którego nie zna żadne z nich, jest w tle szukany po tytule na lubimyczytac.pl (`isbn-lookups.mjs`); liczy się tylko strona z tym samym ISBN, a wynik wypełnia jedynie formularz „Utwórz wydanie z ogłoszenia”. Awaria lub nieprawidłowa odpowiedź BN nie oznacza braku książki. Wyszukiwanie ISBN po tytule również korzysta najpierw z BN, a przy braku kandydatów z Open Library. Różnice między dostawcami nie blokują identyfikacji; przypisanie sprawdza wyłącznie ISBN, bez porównywania tytułu, autora, wydawcy, języka ani innych metadanych oferty. Nieprawidłowy ISBN i niejednoznaczne rekordy nadal wymagają wyjaśnienia.
+
+## Lokalizacja danych
 
 Domyślnie Windows: `%LOCALAPPDATA%\BookFlip\data\bookflip-catalog.sqlite`. Można nadpisać przez `BOOKFLIP_CATALOG_DB`. W nowej instalacji stary katalog `scan-results` **nie jest automatycznie importowany**.
 
@@ -32,8 +34,16 @@ Przed uruchomieniem niezaaplikowanych migracji istniejącej bazy wykonywany jest
 | `BOOKFLIP_METADATA_TIMEOUT_MS` | Timeout zewnętrznych metadanych |
 | `BOOKFLIP_CATALOG_LEASE_MS`, `BOOKFLIP_CATALOG_RETRY_MS` | Lease i opóźnienie ponowień |
 | `BOOKFLIP_LOCAL_PORT` | Port lokalnego serwera (domyślnie 4317) |
-| `BOOKFLIP_DETAIL_ENRICHMENT=0` | Wyłączenie czytania stron szczegółów (Tezeusz.pl) i propozycji po tytule |
+| `BOOKFLIP_DETAIL_ENRICHMENT=0` | Wyłączenie pracy w tle czytającej strony serwisów: szczegóły ofert, propozycje po tytule, opisy zestawów, ISBN z lubimyczytac.pl |
 | `BOOKFLIP_SCHEDULED_SCANS=0` | Wyłączenie harmonogramu automatycznych skanów |
+| `BOOKFLIP_OFFER_LIFECYCLE=0` | Bez sprawdzania, czy znikające oferty są sprzedane/usunięte |
+| `BOOKFLIP_E_ISBN=0` | Wyłączenie źródła e-ISBN |
+| `BOOKFLIP_GOOGLE_BOOKS_KEY` | Klucz Google Books (bez klucza źródło jest pomijane) |
+| `BOOKFLIP_AUTO_BACKUP=0`, `BOOKFLIP_BACKUP_DIR` | Wyłączenie codziennej kopii; drugi katalog kopii |
+| `BOOKFLIP_CATALOG_SEEDS=0` | Bez zasilania katalogu z BN w tle |
+| `BOOKFLIP_STARTER_PROFILES=0` | Bez profili startowych skanera |
+| `BOOKFLIP_BUYBACK_AUTO=0` | Bez automatycznego pobierania cen skupu |
+| `BOOKFLIP_TAILSCALE_HOST`, `BOOKFLIP_TAILSCALE_USER` | Ustawiane przez skrypt Tailscale (`docs/TAILSCALE.md`) |
 
 ## Zasady integralności
 

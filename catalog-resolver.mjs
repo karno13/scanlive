@@ -6,7 +6,7 @@ import { persistMetadataResults } from './metadata-lookup.mjs';
 
 import { findWorkByKey, mainTitle } from './work-grouping.mjs';
 import { enrichEdition } from './catalog-bibliography.mjs';
-import { looksLikeBundle } from './bundle-detection.mjs';
+import { createCatalogBundleDetector, looksLikeBundle } from './bundle-detection.mjs';
 import { operatorRejectedEditions } from './offer-assignment.mjs';
 import { titleConflict } from './title-consistency.mjs';
 import { notCatalogueMaterial } from './game-material.mjs';
@@ -273,6 +273,17 @@ export class CatalogResolver {
     this.repository = repository;
     this.lookupMetadata = lookupMetadata;
     this.now = now;
+    this.bundleDetector = null;
+  }
+
+  /** Words ("zestaw", "tomy 1-3") or two catalogue titles in one listing; the detector is rebuilt each minute. */
+  #looksLikeBundle(title) {
+    if (looksLikeBundle(title)) return true;
+    if (!this.repository.database) return false;
+    const at = Date.now();
+    if (!this.bundleDetector || at - this.bundleDetector.at > 60_000)
+      this.bundleDetector = { at, detect: createCatalogBundleDetector(this.repository) };
+    return this.bundleDetector.detect(title).length >= 2;
   }
 
   evidenceForOffer(offer) {
@@ -348,7 +359,7 @@ export class CatalogResolver {
 
     const isbn = normalizeISBN(isbnEvidence.isbn ?? isbnEvidence.candidateIsbn);
     // Several books in one listing, one ISBN shown: the operator decides (usually "mark as set").
-    if (offerId && !manualProtected && !operatorEvidence(isbnEvidence) && looksLikeBundle(offerTitleOf(currentOffer)))
+    if (offerId && !manualProtected && !operatorEvidence(isbnEvidence) && this.#looksLikeBundle(offerTitleOf(currentOffer)))
       return decision('review_required', ['possible_bundle'], proof, {}, { candidate: { isbn } });
     const existing = this.repository.findEditionByISBN(isbn);
     if (manualProtected && existing && manual.edition_id !== existing.id)

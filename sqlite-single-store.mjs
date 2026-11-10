@@ -187,12 +187,14 @@ export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], sc
         // failed: nothing answered, so the source is effectively down for this scan.
         const ok=results.every(result=>result.status==='ok');
         const someOk=results.some(result=>result.status==='ok'||result.status==='partial');
+        // limited: nothing answered, but only because of HTTP 429 — the source works at a slower pace.
+        const limited=!someOk&&results.every(result=>result.status==='ok'||result.diagnostic?.code==='SOURCE_HTTP_429');
         const code=[...new Set(results.filter(result=>result.status!=='ok').map(result=>result.diagnostic?.code||'SOURCE_REQUEST_FAILED'))].join(', ');
         db.prepare(`INSERT INTO source_health(source,last_checked_at,last_success_at,last_error_at,last_error,status) VALUES(?,?,?,?,?,?)
           ON CONFLICT(source) DO UPDATE SET last_checked_at=excluded.last_checked_at,
           last_success_at=COALESCE(excluded.last_success_at,source_health.last_success_at),
           last_error_at=COALESCE(excluded.last_error_at,source_health.last_error_at),
-          last_error=COALESCE(excluded.last_error,source_health.last_error),status=excluded.status`).run(source,at,someOk?at:null,ok?null:at,ok?null:code,ok?'ok':someOk?'partial':'failed');
+          last_error=COALESCE(excluded.last_error,source_health.last_error),status=excluded.status`).run(source,at,someOk?at:null,ok?null:at,ok?null:code,ok?'ok':someOk?'partial':limited?'limited':'failed');
       }
     }
     return report;

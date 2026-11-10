@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 
 import { catalogTitle, parseBnMarc, personKey } from './bn-marc.mjs';
 import { fold } from './title-proposals.mjs';
+import { normalizePublisher } from './publisher-names.mjs';
 
 const UPGRADE_KEY = 'bibliography_upgrade_v1';
 
@@ -105,7 +106,7 @@ export function enrichEdition(repository, editionId, { now = () => new Date() } 
          place_of_publication=?, genres_json=?, updated_at=? WHERE id=?`,
     ).run(
       title,
-      details.publisher,
+      normalizePublisher(details.publisher),
       details.publicationYear,
       details.binding,
       details.subtitle,

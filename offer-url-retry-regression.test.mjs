@@ -23,6 +23,7 @@ test('browser external links refuse unsafe legacy protocols', () => {
 test('retry-after headers are not shortened to default exponential cap', () => {
   assert.equal(retryDelay({status:429,retryAfter:180},1),180000);
   assert.equal(retryDelay({status:429,retryAfter:86400},1),86400000);
-  assert.equal(retryDelay({status:429,retryAfter:null},1),1000);
+  assert.equal(retryDelay({status:429,retryAfter:null},1),30000);
+  assert.equal(retryDelay({status:429,retryAfter:null},2),60000);
   assert.equal(retryDelay({retryAfter:undefined},7),30000);
 });

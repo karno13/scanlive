@@ -19,6 +19,8 @@ const sources = {
   OLX: { host: 'www.olx.pl', path: '/d/oferta/' },
   'Tezeusz.pl': { host: 'tezeusz.pl', path: null },
   'Dedalus.pl': { host: 'dedalus.pl', path: null },
+  // Not a marketplace: book pages read to confirm ISBNs no bibliographic source knows.
+  'lubimyczytac.pl': { host: 'lubimyczytac.pl', path: '/ksiazka/' },
 };
 const norm = (s) =>
   String(s)
@@ -181,6 +183,8 @@ export async function readSourceHtml(
     if ([403, 429].includes(response.status)) {
       const retryAfter = retryAfterSeconds(response.headers.get('retry-after'), now());
       gate.cooldown(source, retryAfter, {now});
+      // Adaptive pace: a refusal doubles this source's gap between requests (see marketplace-gate).
+      gate.slowDown?.(source);
       let html;
       try {
         html = await readBody(response, 100000);
@@ -235,8 +239,11 @@ export async function readSourceHtml(
       throw Error('SOURCE_NOT_HTML');
     }
     const html = await readBody(response);
-    if (sourceChallenge(html))
+    if (sourceChallenge(html)) {
+      gate.slowDown?.(source);
       throw Object.assign(Error('SOURCE_CAPTCHA'), { blocked: true, status: response.status });
+    }
+    gate.speedUp?.(source);
     return html;
   }
   throw Error('SOURCE_REDIRECT_LIMIT');

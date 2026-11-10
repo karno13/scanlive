@@ -7,8 +7,12 @@ import { retryIdentificationJobs } from './identification-retry.mjs';
 import { enrichOffers } from './offer-enrichment.mjs';
 import { DETAIL_SOURCES } from './source-details.mjs';
 import { checkOfferLifecycle } from './offer-lifecycle.mjs';
+import { fillSetsFromDescriptions } from './set-descriptions.mjs';
+import { lookupUnknownIsbns } from './isbn-lookups.mjs';
+import { getPolishOnly, rejectForeignEditions } from './language-policy.mjs';
 import { blockedSources } from './source-blocks.mjs';
 import { reassignOffer, unassignOffer } from './offer-assignment.mjs';
+import { editionForWorkAssignment, mergeVariants, setEditionVariant, workPriceOverview } from './edition-variants.mjs';
 import { createAutoBackupScheduler } from './auto-backup.mjs';
 import { createScanScheduler, localScanRunner } from './scan-schedule.mjs';
 import { computeProposal, loadProposal, refreshProposals, rescoreStoredProposals } from './title-proposals.mjs';
@@ -39,10 +43,11 @@ import {
   getCatalogOffer,
   getCatalogWork,
   listCatalogOffers,
+  listCatalogOfferGroups,
   listCatalogWorks,
   listIdentificationJobs,
   matchIdentificationJobByIsbn,
-  localEditionCandidates,
+  localWorkCandidates,
   sureReviewPlan,
   applySureReviewPlan,
 } from './catalog-api.mjs';
@@ -136,6 +141,8 @@ export function retryDelay(error, attempt) {
   const suggested = retryAfter === null || retryAfter === undefined ? NaN : Number(retryAfter) * 1000;
   if (Number.isFinite(suggested) && suggested >= 0)
     return Math.min(24 * 60 * 60 * 1000, Math.max(1000, suggested));
+  // A rate limit without Retry-After clears in tens of seconds, not in one or two.
+  if (error?.status === 429) return 30000 * attempt;
   return Math.min(30000, Math.max(1000, 1000 * 2 ** (attempt - 1)));
 }
 async function retryRead(read, { onProgress = () => {}, waiter = wait, context = {}, signal = null } = {}) {
@@ -196,7 +203,8 @@ export async function searchOffers(
           mode: 'discovery',
           title: query,
           category: query,
-          language: 'pl',
+          // null: foreign editions are kept ("Tylko polskie wydania" switched off).
+          language: input?.polishOnly === false ? null : 'pl',
           searchQuery: query,
           page: 1,
           paginationVersion: 1,
@@ -615,6 +623,49 @@ function scheduleProposalRefresh(catalogStore) {
 // ten minutes, through the shared per-source pacing gate.
 let runningLifecycle = null;
 let lifecycleNextAt = 0;
+// ISBNs that BN, Open Library and e-ISBN do not know: searched by title on lubimyczytac.pl (two
+// per two minutes, paced); a page with the same ISBN fills the "create edition" draft.
+let runningIsbnLookups = null;
+let isbnLookupsNextAt = 0;
+function scheduleIsbnLookups(catalogStore) {
+  if (runningIsbnLookups || Date.now() < isbnLookupsNextAt || String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0') return;
+  if (!catalogStore.repository?.database) return;
+  isbnLookupsNextAt = Date.now() + 2 * 60_000;
+  const repository = catalogStore.repository;
+  runningIsbnLookups = lookupUnknownIsbns(repository, { draftOf: (jobId) => offerEditionDraft(repository, jobId), limit: 2 })
+    .then((report) => {
+      if (report.paused) isbnLookupsNextAt = Date.now() + 30 * 60_000;
+      if (report.checked) recordProgress({ type: 'isbn_lookups', ...report });
+    })
+    .catch((error) =>
+      recordProgress({ type: 'isbn_lookups_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'ISBN_LOOKUP_ERROR' }),
+    )
+    .finally(() => {
+      runningIsbnLookups = null;
+    });
+}
+
+// Set listings: their description is read (a few every three minutes, paced per source) and an
+// empty set gets the books it names. A throttled or blocked source is left alone for half an hour.
+let runningSetDescriptions = null;
+let setDescriptionsNextAt = 0;
+function scheduleSetDescriptions(catalogStore) {
+  if (runningSetDescriptions || Date.now() < setDescriptionsNextAt || String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0') return;
+  if (!catalogStore.repository?.database) return;
+  setDescriptionsNextAt = Date.now() + 3 * 60_000;
+  runningSetDescriptions = fillSetsFromDescriptions(catalogStore.repository, { limit: 4 })
+    .then((report) => {
+      if (report.paused) setDescriptionsNextAt = Date.now() + 30 * 60_000;
+      if (report.checked) recordProgress({ type: 'set_descriptions', ...report });
+    })
+    .catch((error) =>
+      recordProgress({ type: 'set_descriptions_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'SET_DESCRIPTION_ERROR' }),
+    )
+    .finally(() => {
+      runningSetDescriptions = null;
+    });
+}
+
 function scheduleLifecycleCheck(catalogStore) {
   if (runningLifecycle || Date.now() < lifecycleNextAt || String(process.env.BOOKFLIP_OFFER_LIFECYCLE ?? '1') === '0') return;
   if (!catalogStore.repository?.database) return;
@@ -671,6 +722,11 @@ function scheduleCatalogResolution(catalogStore) {
     .then(() => enrichPendingOffers(catalogStore))
     .then(() => catalogStore.processQueued())
     .then((result) => {
+      // Foreign editions found by this pass leave review at once while "Tylko polskie wydania" is on.
+      if (catalogStore.repository?.database) rejectForeignEditions(catalogStore.repository);
+      return result;
+    })
+    .then((result) => {
       // An idle poll every few seconds must not grow the log: record only real work.
       if (result.processed || result.failed)
         recordProgress({
@@ -692,6 +748,8 @@ function scheduleCatalogResolution(catalogStore) {
       runningCatalogResolution = null;
       scheduleProposalRefresh(catalogStore);
       scheduleLifecycleCheck(catalogStore);
+      scheduleSetDescriptions(catalogStore);
+      scheduleIsbnLookups(catalogStore);
       scheduleOfferEditionRecheck(catalogStore);
       scheduleListingSeries(catalogStore);
     });
@@ -752,6 +810,10 @@ async function searchAndStore(
       source: row.source,
       query: row.query,
       code: row.diagnostic?.code || 'SOURCE_REQUEST_FAILED',
+      // Lets "retry failed tasks" leave out bot checks and the tasks skipped after one.
+      ...(row.diagnostic?.blocked ? { blocked: true } : {}),
+      ...(row.diagnostic?.skipped ? { skipped: true } : {}),
+      ...(row.diagnostic?.retryable === false ? { retryable: false } : {}),
     }));
   const saved = await withHistoryWriteLock(async () => {
     scanCancelled(signal);
@@ -848,8 +910,8 @@ export function createLocalAppServer({
           return send(response, 202, JSON.stringify(url.pathname.endsWith('/cancel') ? imageBackfill.cancel() : imageBackfill.start()));
         return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
       }
-      if (/^\/api\/(?:trading-defaults|trading-summary|scan-runs|source-health|review-decisions|scan-queries|scan-schedule|offer-scenarios|data\/|set-details|set-items|set-unknown)/.test(url.pathname) ||
-          (request.method === 'PUT' && /^\/api\/catalog\/(?:works|editions)\//.test(url.pathname)) || url.pathname === '/api/catalog/merge-works' || /^\/api\/catalog\/(?:work-duplicates(?:\/merge)?|title-conflicts(?:\/resolve)?)$/.test(url.pathname)) {
+      if (/^\/api\/(?:trading-defaults|trading-summary|scan-runs|source-health|review-decisions|scan-queries|scan-schedule|scan-language|offer-scenarios|data\/|set-details|set-items|set-unknown)/.test(url.pathname) ||
+          (request.method === 'PUT' && /^\/api\/catalog\/(?:works|editions)\//.test(url.pathname)) || url.pathname === '/api/catalog/merge-works' || /^\/api\/catalog\/(?:work-duplicates(?:\/merge)?|title-conflicts(?:\/resolve)?|names(?:\/merge|\/unalias)?)$/.test(url.pathname)) {
         const catalog = getProductionCatalog();
         if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
         const data = await tradingRoute({repo:catalog.repository,method:request.method,path:url.pathname,
@@ -1028,6 +1090,28 @@ export function createLocalAppServer({
           ),
         );
       }
+      // Prices of a book over all its editions, and its price variants.
+      const workPrices = url.pathname.match(/^\/api\/catalog\/works\/([^/]+)\/prices$/);
+      if (request.method === 'GET' && workPrices) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const data = workPriceOverview(catalog.repository, decodeURIComponent(workPrices[1]));
+        return data ? send(response, 200, JSON.stringify(data)) : send(response, 404, JSON.stringify({ error: 'WORK_NOT_FOUND' }));
+      }
+      const variantMerge = url.pathname.match(/^\/api\/catalog\/works\/([^/]+)\/variants\/merge$/);
+      if (request.method === 'POST' && variantMerge) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        return send(response, 200, JSON.stringify(mergeVariants(catalog.repository, decodeURIComponent(variantMerge[1]), String(input?.from ?? ''), String(input?.to ?? ''))));
+      }
+      const editionVariant = url.pathname.match(/^\/api\/catalog\/editions\/([^/]+)\/variant$/);
+      if (request.method === 'PUT' && editionVariant) {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        return send(response, 200, JSON.stringify(setEditionVariant(catalog.repository, decodeURIComponent(editionVariant[1]), input?.variantKey ?? null)));
+      }
       if (request.method === 'GET' && url.pathname.startsWith('/api/catalog/works/')) {
         const catalog = getProductionCatalog(),
           id = decodeURIComponent(url.pathname.slice('/api/catalog/works/'.length));
@@ -1064,6 +1148,12 @@ export function createLocalAppServer({
         const input=await readJson(request);
         return send(response,200,JSON.stringify(setOfferWorkspace(catalog.repository,id,input)));
       }
+      // Oferty → "Wg książki": one row per edition with its listings' count and price range.
+      if (request.method === 'GET' && url.pathname === '/api/offer-groups') {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        return send(response, 200, JSON.stringify(listCatalogOfferGroups(catalog.repository, Object.fromEntries(url.searchParams))));
+      }
       if (request.method === 'GET' && url.pathname === '/api/offers') {
         const catalog = getProductionCatalog();
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
@@ -1082,8 +1172,12 @@ export function createLocalAppServer({
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
         const offerId = decodeURIComponent(assignment[1]);
         const input = await readJson(request);
+        // A book without a named edition: the edition the listing points at, or its unknown edition.
+        const editionId = request.method === 'PUT' && !input?.editionId && input?.workId
+          ? catalog.repository.transaction(() => editionForWorkAssignment(catalog.repository, String(input.workId), offerId).editionId)
+          : input?.editionId;
         const result = request.method === 'PUT'
-          ? reassignOffer(catalog.repository, offerId, input?.editionId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null })
+          ? reassignOffer(catalog.repository, offerId, editionId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null })
           : unassignOffer(catalog.repository, offerId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null });
         return send(response, 200, JSON.stringify(result));
       }
@@ -1217,10 +1311,10 @@ export function createLocalAppServer({
         const catalog = getProductionCatalog();
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
         const job = catalog.repository.database
-          .prepare('SELECT o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=?')
+          .prepare('SELECT o.id AS offer_id, o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=?')
           .get(decodeURIComponent(url.pathname.split('/')[3]));
         if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
-        return send(response, 200, JSON.stringify({ items: localEditionCandidates(catalog.repository, job.original_title) }));
+        return send(response, 200, JSON.stringify({ items: localWorkCandidates(catalog.repository, job.original_title, { offerId: job.offer_id }) }));
       }
       if (
         ['GET', 'POST'].includes(request.method) &&
@@ -1335,6 +1429,8 @@ export function createLocalAppServer({
         let scanStarted = false;
         try {
           const scanInput = validateSearchInput(await readJson(request));
+          // "Tylko polskie wydania" (scanner form, saved in the database; scheduled scans use it too).
+          try { const store = getProductionCatalog(); if (store?.repository) scanInput.polishOnly = getPolishOnly(store.repository); } catch {}
           scanStarted = true;
           scanAbortController = new AbortController();
           currentScan = { status: 'running', startedAt: new Date().toISOString(),

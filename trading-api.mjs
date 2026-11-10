@@ -6,6 +6,8 @@ import { backupCatalog } from './scripts/backup-catalog.mjs';
 import { findDuplicateWorkGroups } from './work-grouping.mjs';
 import { findTitleConflicts, resolveTitleConflict } from './title-consistency.mjs';
 import { getScanSchedule, saveScanSchedule, nextRunAt } from './scan-schedule.mjs';
+import { getPolishOnly, setPolishOnly } from './language-policy.mjs';
+import { listNames, mergeNames, removeNameAlias } from './name-aliases.mjs';
 function fail(code, statusCode = 400) { throw Object.assign(Error(code), { statusCode }); }
 export function amount(value) {
   if (value === null) return null;
@@ -137,6 +139,21 @@ export function scanQueryStats(repo) {
     })),
   };
 }
+/** Per phrase: offers ever found, listings first seen in the last `days`, and the newest one. */
+export function scanQueryFreshness(repo, days = 30, at = Date.now()) {
+  const since = new Date(at - days * 86_400_000).toISOString();
+  const rows = repo.database
+    .prepare(
+      `SELECT q.value AS query, count(*) AS offers, sum(o.first_seen_at>?) AS fresh, max(o.first_seen_at) AS lastNewAt
+       FROM offers o, json_each(CASE WHEN json_valid(o.matched_queries_json) THEN o.matched_queries_json ELSE '[]' END) q
+       GROUP BY lower(q.value)`,
+    )
+    .all(since);
+  return {
+    days,
+    items: rows.map((row) => ({ query: String(row.query), offers: Number(row.offers), fresh: Number(row.fresh || 0), lastNewAt: row.lastNewAt })),
+  };
+}
 export function listWorkDuplicates(repo) {
   return { groups: findDuplicateWorkGroups(repo) };
 }
@@ -218,6 +235,12 @@ export async function tradingRoute({repo,method,path,input}) {
   const edition=path.match(/^\/api\/catalog\/editions\/([^/]+)$/);
   if(edition&&method==='PUT') return editCatalogEdition(repo,decodeURIComponent(edition[1]),input);
   if(path==='/api/scan-queries/stats'&&method==='GET') return scanQueryStats(repo);
+  if(path==='/api/scan-queries/freshness'&&method==='GET') return scanQueryFreshness(repo);
+  if(path==='/api/catalog/names'&&method==='GET') return listNames(repo);
+  if(path==='/api/catalog/names/merge'&&method==='POST') return mergeNames(repo,input);
+  if(path==='/api/catalog/names/unalias'&&method==='POST') return removeNameAlias(repo,input);
+  if(path==='/api/scan-language'&&method==='GET') return {polishOnly:getPolishOnly(repo)};
+  if(path==='/api/scan-language'&&method==='PUT') return setPolishOnly(repo,input?.polishOnly);
   if(path==='/api/scan-schedule'&&method==='GET') { const s=getScanSchedule(repo); return {...s,nextRunAt:nextRunAt(s)}; }
   if(path==='/api/scan-schedule'&&method==='PUT') { const s=saveScanSchedule(repo,input); return {...s,nextRunAt:nextRunAt(s)}; }
   if(path==='/api/catalog/work-duplicates'&&method==='GET') return listWorkDuplicates(repo);

@@ -99,3 +99,28 @@ test('acquire waits without an abort signal (null signal must not reach timers)'
   await gate.acquire('S', { pause: realWait });
   await gate.acquire('S', { pause: realWait, signal: null });
 });
+
+test('Allegro Lokalnie, which answers 429 after a few quick searches, is asked every 8 seconds', async () => {
+  let clock = 0;
+  const waits = [];
+  const gate = createMarketplaceGate({ intervalMs: 2000 });
+  const options = { now: () => clock, pause: async (delay) => { waits.push(delay); clock += delay; } };
+  await gate.acquire('Allegro Lokalnie', options);
+  await gate.acquire('Allegro Lokalnie', options);
+  await gate.acquire('Vinted', options);
+  await gate.acquire('Vinted', options);
+  assert.deepEqual(waits, [8000, 2000]);
+});
+
+test('a refusing source slows down (twice the gap, at most 30 s) and speeds up again with answers', async () => {
+  let clock = 0;
+  const gate = createMarketplaceGate({ intervalMs: 2000 });
+  const options = { source: 'Nowe źródło', gate, now: () => clock, pause: async (delay) => { clock += delay; } };
+  const refuse = async () => new Response('slow down', { status: 429, headers: { 'retry-after': '0' } });
+  const answer = async () => new Response('<html>ok</html>', { headers: { 'content-type': 'text/html' } });
+  for (let i = 0; i < 6; i++) await assert.rejects(readSourceHtml('https://www.vinted.pl/catalog/1', { ...options, source: 'Vinted', fetcher: refuse }));
+  assert.equal(gate.snapshot('Vinted').intervalMs, 30000);
+  for (let i = 0; i < 40; i++) await readSourceHtml('https://www.vinted.pl/items/1', { ...options, source: 'Vinted', fetcher: answer });
+  assert.equal(gate.snapshot('Vinted').intervalMs, 2000);
+  assert.equal(gate.snapshot('Allegro Lokalnie').baseIntervalMs, 8000);
+});

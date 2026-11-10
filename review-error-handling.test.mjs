@@ -18,6 +18,6 @@ test('review decision handles errors, double submissions, and refresh failure', 
 
 test('manual catalog review metric counts review_required only', () => {
   assert.ok(shell.includes("statuses.review_required || 0"));
-  assert.match(html, /Ręczna weryfikacja/);
-  assert.match(html, /wymaga decyzji/);
+  // One line under the catalogue title: '455 ofert do decyzji'.
+  assert.match(html, /id="catalogIncomplete">0<\/b> ofert do decyzji/);
 });

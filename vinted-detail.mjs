@@ -168,7 +168,14 @@ export function parseVintedDetail(html, url) {
     }
   const evidence = extractOfferISBN({ parameters: candidates });
   const language = languageFromCandidates(candidates);
+  // The seller's description of this item (JSON-LD Product or the item object): for a set it lists
+  // the books, one per line ("Blask fantastyczny", "Trzy wiedźmy", "Straż! Straż!").
+  const description = identityMatched
+    ? candidates.map((node) => node?.description).find((text) => typeof text === 'string' && text.trim()) || null
+    : null;
   return {
+    // Zero-width spaces that Vinted puts before each line are dropped.
+    description: description ? description.replace(/200B/g, '').trim().slice(0, 8000) : null,
     isbn: evidence.isbn,
     isbnDetection: evidence,
     recognized: identityMatched,

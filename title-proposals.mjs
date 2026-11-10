@@ -106,8 +106,18 @@ export function derivativeMarker(offerTitle, candidateTitle = '') {
   return null;
 }
 
-/** 0..1 confidence that `candidate` is the book named by `offerTitle`. */
-export function scoreCandidate(offerTitle, candidate) {
+/** Author name words of a candidate (first and last names, folded), as written in listings. */
+export function authorTokens(candidate) {
+  return titleTokens(candidate.authorText ?? (candidate.authors ?? []).join(' ')).filter((word) => word.length > 3);
+}
+
+/**
+ * 0..1 confidence that `candidate` is the book named by `offerTitle`.
+ * `knownAuthors`: author words of other books (the catalogue, the other candidates). A listing that
+ * names one of them and not the candidate's own author is about another author's book — "Smoki
+ * jesiennego zmierzchu M. Weis, T. Hickman" is not "Smoki" by Douglas Niles.
+ */
+export function scoreCandidate(offerTitle, candidate, { knownAuthors = null } = {}) {
   const offer = new Set(titleTokens(offerTitle));
   const { main } = candidateTokenSets(candidate);
   if (!main.length || !offer.size) return 0;
@@ -121,15 +131,25 @@ export function scoreCandidate(offerTitle, candidate) {
   // The author written in the listing is a strong confirmation.
   const authorWords = titleTokens(candidate.authorText ?? (candidate.authors ?? []).join(' '));
   const surnames = authorWords.slice(0, 2);
+  const ownAuthor = authorWords.some((word) => word.length > 3 && offer.has(word));
   if (surnames.some((word) => word.length > 3 && offer.has(word))) score = Math.min(1, score + 0.07);
+  if (!ownAuthor && knownAuthors) {
+    const own = new Set([...authorWords, ...main]);
+    if ([...offer].some((word) => word.length > 3 && knownAuthors.has(word) && !own.has(word))) score *= 0.55;
+  }
+  // A one-word title found inside a long listing ("Smoki" in a twelve-word title) is weak evidence
+  // on its own: below the proposal threshold unless the author confirms it.
+  if (main.length === 1 && offer.size >= 5 && !ownAuthor) score = Math.min(score, 0.55);
   if (candidate.language && !/pol/i.test(candidate.language)) score *= 0.7;
   if (derivativeMarker(offerTitle, candidate.title)) score *= 0.55;
   return Math.round(score * 100) / 100;
 }
 
 export function rankCandidates(offerTitle, candidates, { limit = 6 } = {}) {
+  // The other candidates' authors tell which author a listing names.
+  const knownAuthors = new Set(candidates.flatMap(authorTokens));
   const ranked = candidates
-    .map((candidate) => ({ ...candidate, score: scoreCandidate(offerTitle, candidate) }))
+    .map((candidate) => ({ ...candidate, score: scoreCandidate(offerTitle, candidate, { knownAuthors }) }))
     .filter((candidate) => candidate.score >= 0.35)
     .sort((a, b) => b.score - a.score || String(b.publicationYear).localeCompare(String(a.publicationYear)));
   const best = ranked[0];

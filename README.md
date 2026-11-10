@@ -41,9 +41,9 @@ Weryfikacja ISBN najpierw pokazuje propozycję; przypisanie następuje po
 zatwierdzeniu. Ostatnie ręczne decyzje można ponownie otworzyć do poprawienia
 w zakładce **Do weryfikacji**, z zachowaniem historii.
 
-Migracja **118** dodaje listy tomów cykli (widok Serie). Migracja **104** dodaje dane procesu zakupowego. Nie zmieniaj starszych plików
+Migracje **120–123**: opisy ogłoszeń (zestawy uzupełniają się same), warianty nazw wydawców i serii, ISBN potwierdzone na lubimyczytac.pl, warianty cenowe wydań i „Wydanie nieustalone”. Migracja **119** odtwarza ostatni udany odczyt źródeł (stan źródeł w Skanerze). Migracja **118** dodaje listy tomów cykli (widok Serie). Migracja **104** dodaje dane procesu zakupowego. Nie zmieniaj starszych plików
 migracji. Przed aktualizacją istniejącego schematu działa mechanizm kopii
-zapasowej opisany poniżej. Szczegóły zmian: [Przebudowa UX/UI](docs/archive/ZMIANY-UX-UI.md).
+zapasowej opisany poniżej. Szczegóły zmian: [CHANGELOG](CHANGELOG.md).
 
 **Budowa bazy (migracje 112–114):** wydania mają dane z rekordu MARC Biblioteki Narodowej
 (osoby z rolami, serie z numerami tomów, tytuł oryginału, oprawa, strony). Katalog można zasilać
@@ -75,6 +75,8 @@ i `BOOKFLIP_BACKUP_DIR` (druga kopia na innym dysku). Szczegóły w [CHANGELOG](
 
 Znajdowanie ISBN w źródłach zewnętrznych nie gwarantuje automatycznego przypisania. Sprzeczne lub słabe dowody nadal kierują ofertę do ręcznej weryfikacji.
 
+**Decyzje automatyczne (zawsze do cofnięcia w „Ostatnie decyzje”):** ponownie wystawiona kopia ręcznie odrzuconej oferty (ten sam tytuł w tym samym źródle albo ten sam ISBN) jest odrzucana od razu; przy włączonym „Tylko polskie wydania” (Skaner, domyślnie włączone) odrzucane są wydania obcojęzyczne. Ręczne przypisania i zestawy nigdy nie są odrzucane automatycznie. Kandydaci w weryfikacji to książki; wydanie jest wybierane tylko, gdy ogłoszenie je wskazuje — inaczej oferta trafia do „Wydanie nieustalone” tej książki.
+
 ## Gdzie są dane?
 
 **Nowa instalacja niczego nie importuje ze starego katalogu programu.**
@@ -99,9 +101,12 @@ Backup używa API SQLite (uwzględnia WAL), sprawdza integralność i nie nadpis
 ## Testowanie
 
 ```powershell
+npm install          # jednorazowo: ESLint i Prettier (devDependencies)
 npm test
 npm run lint
 npm run check:syntax
+# test przeglądarkowy; jednorazowo: npm install --no-save --no-package-lock playwright@1.55.1 && npx playwright install chromium
+node scripts/browser-smoke.mjs
 ```
 
 `npm test` izoluje katalog SQLite, log i stan skanowania w katalogu tymczasowym
@@ -141,8 +146,9 @@ obserwowane oferty, notatki i serie (oraz profile skanowania w wersjach obsługu
 5. Dopiero po sprawdzeniu zdecyduj o zastąpieniu starej bazy. Nie podmieniaj pliku
    SQLite, kiedy serwer pracuje.
 
-Kopie warto trzymać także na innym dysku; backup i przywracanie nie oznaczają
-automatycznego harmonogramu tworzenia kopii.
+Kopie warto trzymać także na innym dysku. Niezależnie od ręcznego backupu serwer
+codziennie sam tworzy kopię w `backups` (zostaje 7 najnowszych); `BOOKFLIP_BACKUP_DIR`
+dodaje drugą kopię w innym miejscu.
 
 ## Pomiar wydajności skanowania SQLite (bez internetu)
 

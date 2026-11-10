@@ -39,7 +39,7 @@ test('a due scan runs the saved profile once and records the attempt', async () 
     runScan: async (input) => (calls.push(input), 200),
     now: () => clock,
   });
-  assert.deepEqual(await scheduler.tick(), { ran: true, result: 'ok' });
+  assert.deepEqual(await scheduler.tick(), { ran: true, result: 'ok', skipped: [], problems: [] });
   assert.deepEqual(calls, [{ queries: ['Warcraft', 'Świat Dysku'], sources: ['Vinted'] }]);
   assert.equal(getScanSchedule(repo).lastRunAt, '2026-11-07T12:00:00.000Z');
   assert.deepEqual(await scheduler.tick(), { skipped: 'not-due' });
@@ -83,4 +83,31 @@ test('an enabled schedule whose profile was deleted records "profile-missing" an
   const scheduler = createScanScheduler({ getRepository: () => repo, runScan: async () => (scans++, 200), now: () => Date.now() });
   assert.equal((await scheduler.tick()).result, 'profile-missing');
   assert.equal(scans, 0);
+});
+
+test('scheduled scans leave out sources that failed less than a day ago and report partial runs', async () => {
+  const repo = setup();
+  saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 6 });
+  const db = repo.database;
+  db.prepare("UPDATE scan_profiles SET sources_json=? WHERE name='Fantasy'").run(JSON.stringify(['Vinted', 'Allegro', 'OLX']));
+  const clock = Date.parse('2026-11-07T12:00:00Z');
+  const insert = db.prepare('INSERT INTO source_health(source,last_checked_at,last_success_at,last_error_at,last_error,status) VALUES(?,?,?,?,?,?)');
+  insert.run('Allegro', '2026-11-07T08:00:00.000Z', null, '2026-11-07T08:00:00.000Z', 'SOURCE_CAPTCHA', 'failed');
+  insert.run('OLX', '2026-11-05T08:00:00.000Z', null, '2026-11-05T08:00:00.000Z', 'SOURCE_HTTP_403', 'failed');
+  const calls = [];
+  const scheduler = createScanScheduler({
+    getRepository: () => repo,
+    runScan: async (input) => {
+      calls.push(input);
+      db.prepare('INSERT INTO scan_runs(scanned_at,summary_json,created_at) VALUES(?,?,?)').run('2026-11-07T12:00:01.000Z', JSON.stringify({ errors: [{ source: 'OLX', query: 'Warcraft', code: 'SOURCE_HTTP_403' }] }), '2026-11-07T12:00:01.000Z');
+      return 200;
+    },
+    now: () => clock,
+  });
+  const outcome = await scheduler.tick();
+  // Allegro failed 4 h ago: paused. OLX failed 2 days ago: tried again.
+  assert.deepEqual(calls[0].sources, ['Vinted', 'OLX']);
+  assert.deepEqual(outcome, { ran: true, result: 'partial', skipped: ['Allegro'], problems: ['OLX'] });
+  assert.deepEqual(getScanSchedule(repo).lastSkipped, ['Allegro']);
+  assert.deepEqual(getScanSchedule(repo).lastProblems, ['OLX']);
 });
