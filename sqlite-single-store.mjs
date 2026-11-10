@@ -5,6 +5,7 @@ import { normalizedIsbn } from './offer-history.mjs';
 import { sourceOfferId, offerExternalId } from './offer-identity.mjs';
 import { sqliteHistoryModel } from './sqlite-history-read.mjs';
 import { analyzedOffers } from './price-analysis.mjs';
+import { detectRelists } from './offer-status.mjs';
 
 export function storageMode(env = process.env) {
   const mode = String(env.BOOKFLIP_STORAGE || 'sqlite').toLowerCase();
@@ -179,6 +180,8 @@ export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], sc
       membership.run(at,row.id,Number(row.isNew),Number(row.changed));
     // Offers absent from a complete scan of their phrase are most likely sold or withdrawn.
     if (scanContext) markUnseenOffers(db, scanContext.results || [], at);
+    // A listing that left the results while the same seller's copy appeared is a relist, not a sale.
+    if (scanContext) detectRelists(catalog.repository, { now: () => new Date(at) });
     if (scanContext) {
       const grouped = new Map();
       for(const result of scanContext.results || []) {

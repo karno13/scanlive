@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { recentRelistDecisions, undoRelist } from './offer-status.mjs';
 import { readdir, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { backupCatalog } from './scripts/backup-catalog.mjs';
@@ -42,9 +43,12 @@ export function listScanRuns(repo) {
   });
 }
 export function recentReviewDecisions(repo) {
-  return repo.database.prepare(`SELECT d.id,d.action,d.reason,d.created_at AS createdAt,d.offer_id AS offerId,o.original_title AS title,
+  const decisions=repo.database.prepare(`SELECT d.id,d.action,d.reason,d.created_at AS createdAt,d.offer_id AS offerId,o.original_title AS title,
     d.edition_id AS editionId,r.id AS revisionId FROM review_decisions d JOIN offers o ON o.id=d.offer_id
     LEFT JOIN review_revisions r ON r.decision_id=d.id ORDER BY d.created_at DESC,d.id DESC LIMIT 30`).all();
+  // Automatic relist links are decisions too (offer_relists, created_by 'relist_detection').
+  return [...decisions,...recentRelistDecisions(repo.database,30)]
+    .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))).slice(0,30);
 }
 export function reopenReviewDecision(repo,id) {
   return repo.transaction(() => {
@@ -225,6 +229,8 @@ export async function tradingRoute({repo,method,path,input}) {
   // health row predates per-phrase success tracking is not shown as dead while it delivers offers.
   if(path==='/api/source-health'&&method==='GET') return {items:repo.database.prepare('SELECT h.*,(SELECT count(*) FROM offers o WHERE o.source=h.source AND o.last_seen_at>=h.last_checked_at) AS offers_seen FROM source_health h ORDER BY h.source').all()};
   if(path==='/api/review-decisions'&&method==='GET') return {items:recentReviewDecisions(repo)};
+  const relist=path.match(/^\/api\/offer-relists\/([^/]+)\/undo$/);
+  if(relist&&method==='POST') return undoRelist(repo,decodeURIComponent(relist[1]));
   const reopen=path.match(/^\/api\/review-decisions\/([^/]+)\/reopen$/);
   if(reopen&&method==='POST') return reopenReviewDecision(repo,decodeURIComponent(reopen[1]));
   const scenario=path.match(/^\/api\/offer-scenarios\/([^/]+)$/);

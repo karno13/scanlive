@@ -1,4 +1,5 @@
 import { normalizeISBN } from './isbn-normalization.mjs';
+import { offerStatusHistory, relistLinks, saleWindow } from './offer-status.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { proxiedImage } from './offer-images.mjs';
 import { authorTokens, scoreCandidate, titleTokens } from './title-proposals.mjs';
@@ -526,6 +527,10 @@ export function getCatalogOffer(repository, offerId) {
     .all(row.id);
   return {
     ...offer(row),
+    // When it was seen, missed, checked; a sale's interval; earlier and later copies of the listing.
+    statusHistory: offerStatusHistory(database, row.id),
+    saleWindow: saleWindow(database, row.id),
+    relists: relistLinks(database, row.id),
     priceHistory: database
       .prepare(
         'SELECT price,observed_at FROM offer_price_history WHERE offer_id=? ORDER BY observed_at',

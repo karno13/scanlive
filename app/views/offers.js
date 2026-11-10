@@ -23,6 +23,26 @@ export function observationFacts(offer, { money, date, escapeHtml }) {
   return facts.map(([label, value]) => `<span><b>${escapeHtml(label)}</b><small>${escapeHtml(value)}</small></span>`).join('');
 }
 
+const STATUS_LABELS = { seen: 'w wynikach skanu', not_seen: 'brak w pełnym skanie', available: 'sprawdzona: dostępna', reserved: 'sprawdzona: zarezerwowana', sold: 'sprawdzona: sprzedana', unavailable: 'sprawdzona: usunięta', unknown: 'sprawdzona: stan nieczytelny' };
+const RELIST_REASONS = { same_seller_title: 'ten sam sprzedawca i tytuł', same_seller_isbn: 'ten sam sprzedawca i ISBN', manual: 'wskazane ręcznie' };
+// When the listing sold (an interval, not a moment), its earlier / later copies and its status history.
+export function listingHistoryMarkup(offer, { money, date, escapeHtml }) {
+  const parts = [];
+  const window = offer.saleWindow;
+  if (window?.to)
+    parts.push(`<p class="sale-window"><b>Sprzedana</b> ${window.from ? 'między ' + escapeHtml(date(window.from)) + ' a ' : 'przed '}${escapeHtml(date(window.to))}${window.from ? '' : ' (wcześniejszej obserwacji brak)'}</p>`);
+  const link = (row, label) =>
+    `<li>${label}: <a href="${escapeHtml(row.url)}" target="_blank" rel="noreferrer">${escapeHtml(row.title)}</a> · ${money(row.price)} · od ${escapeHtml(date(row.firstSeenAt))} <small>(${escapeHtml(RELIST_REASONS[row.reason] || row.reason)}${row.status === 'undone' ? ', rozłączone' : ''})</small>${row.status === 'active' && row.undoId ? ` <button class="link-button" type="button" data-relist-undo="${escapeHtml(row.undoId)}">To różne ogłoszenia</button>` : ''}</li>`;
+  const previous = (offer.relists?.previous || []).map((row) => link({ ...row, undoId: offer.id }, 'Wcześniej wystawiona jako'));
+  const next = (offer.relists?.next || []).map((row) => link({ ...row, undoId: row.offerId }, 'Wystawiona ponownie jako'));
+  if (previous.length || next.length)
+    parts.push(`<ul class="relist-links">${[...previous, ...next].join('')}</ul><p class="inline-note">Ponowne wystawienie nie jest sprzedażą. Powiązanie jest automatyczne; nic nie zostało przez nie odrzucone.</p>`);
+  const history = offer.statusHistory || [];
+  if (history.length)
+    parts.push(`<details class="detail-disclosure"><summary>Historia stanów (${history.length})</summary><div class="price-list">${history.map((row) => `<span><small>${escapeHtml(date(row.observedAt))}</small><b>${escapeHtml(STATUS_LABELS[row.status] || row.status)}</b></span>`).join('')}</div></details>`);
+  return parts.length ? `<section class="detail-section listing-history">${parts.join('')}</section>` : '';
+}
+
 // Titles that list several books ("A + B + C", "zestaw", "tomy 1-4"): the set action is offered first.
 function looksLikeSet(title) {
   const text = String(title ?? '').toLowerCase();
@@ -236,7 +256,7 @@ async function openOfferDrawer(id) {
       active = offer.matches.find((item) => item.status === 'active');
     if(serial!==drawerSerial) return;
     $('#offerDrawerContent').innerHTML =
-      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><p class="drawer-pills">${drawerPills(offer, active)}</p><h2>${escapeHtml(offer.title)}</h2><div class="detail-grid"><span><b>Cena</b><small>${money(offer.currentPrice)}</small></span><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span>${observationFacts(offer, { money, date, escapeHtml })}</div>${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}<button class="button secondary" type="button" id="drawerMarkSet" title="Jedno ogłoszenie, kilka książek: skład ustalisz w zakładce Zestawy">${looksLikeSet(offer.title) ? 'Oznacz jako zestaw' : 'To zestaw kilku książek'}</button></div>`;
+      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><p class="drawer-pills">${drawerPills(offer, active)}</p><h2>${escapeHtml(offer.title)}</h2><div class="detail-grid"><span><b>Cena</b><small>${money(offer.currentPrice)}</small></span><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span>${observationFacts(offer, { money, date, escapeHtml })}</div>${listingHistoryMarkup(offer, { money, date, escapeHtml })}${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}<button class="button secondary" type="button" id="drawerMarkSet" title="Jedno ogłoszenie, kilka książek: skład ustalisz w zakładce Zestawy">${looksLikeSet(offer.title) ? 'Oznacz jako zestaw' : 'To zestaw kilku książek'}</button></div>`;
     const primaryActions = $('#offerDrawerContent .detail-actions');
     $('#offerDrawerContent h2').after(primaryActions);
     await ensureWorkspaceLoaded();
@@ -297,6 +317,18 @@ async function openOfferDrawer(id) {
     ['scenarioPurchase', 'scenarioShipping', 'scenarioOther', 'scenarioResale'].forEach((id) =>
       $('#' + id)?.addEventListener('input', calculateScenario),
     );
+    for (const button of document.querySelectorAll('[data-relist-undo]'))
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          await json('/api/offer-relists/' + encodeURIComponent(button.dataset.relistUndo) + '/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          toast('Rozłączono: to dwa różne ogłoszenia.');
+          if (serial === drawerSerial) await openOfferDrawerAgain(offer.id);
+        } catch (error) {
+          button.disabled = false;
+          toast('Nie rozłączono: ' + error.message);
+        }
+      });
     $('#drawerMarkSet')?.addEventListener('click', async (event) => {
       const button = event.currentTarget;
       // A set has no single edition: an existing assignment is detached, so it is confirmed first.

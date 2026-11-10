@@ -13,8 +13,16 @@ export function markUnseenOffers(database, results, scannedAt) {
   const statement = database.prepare(
     `UPDATE offers SET availability='not_seen'
      WHERE source=? AND availability='unconfirmed' AND last_seen_at < ?
-       AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(matched_queries_json) THEN matched_queries_json ELSE '[]' END) q WHERE q.value=?)`,
+       AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(matched_queries_json) THEN matched_queries_json ELSE '[]' END) q WHERE q.value=?)
+     RETURNING id`,
   );
-  for (const result of completeResults(results)) marked += Number(statement.run(result.source, scannedAt, result.query).changes);
+  const history = database.prepare(
+    "INSERT OR IGNORE INTO offer_status_history(offer_id,status,via,observed_at) VALUES(?,'not_seen','scan',?)",
+  );
+  for (const result of completeResults(results))
+    for (const row of statement.all(result.source, scannedAt, result.query)) {
+      history.run(row.id, scannedAt);
+      marked++;
+    }
   return marked;
 }

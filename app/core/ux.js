@@ -6,7 +6,7 @@ const labels = {
   multiple_conflicting_isbn:'Sprzeczne numery ISBN',offer_catalog_conflict:'Dane oferty nie pasują do wydania',offer_metadata_conflict:'Dane oferty nie pasują do metadanych',
   metadata_sources_conflict:'Źródła podają różne dane',insufficient_offer_context:'Za mało danych do przypisania',
   isbn_not_found_in_metadata_sources:'ISBN nie występuje w źródłach',metadata_invalid_or_incomplete:'Niepełne dane wydania',
-  metadata_source_temporary_error:'Źródło metadanych chwilowo niedostępne',approved:'Zatwierdzone wydanie',excluded:'Odrzucona oferta',not_book:'To nie jest książka',requeued:'Ponowiona identyfikacja',proposal_rejected:'Odrzucona propozycja',
+  metadata_source_temporary_error:'Źródło metadanych chwilowo niedostępne',approved:'Zatwierdzone wydanie',excluded:'Odrzucona oferta',not_book:'To nie jest książka',requeued:'Ponowiona identyfikacja',relist_linked:'Ponowne wystawienie (automatycznie)',relist_undone:'Ponowne wystawienie — rozłączone',proposal_rejected:'Odrzucona propozycja',
 };
 export function statusLabel(value) { return labels[value] || (value ? 'Wymaga sprawdzenia' : 'Brak danych'); }
 import { confirmDialog } from './dialogs.js';

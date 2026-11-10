@@ -141,6 +141,16 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
         const item=document.createElement('div');item.className='decision-history-row';
         const label=document.createElement('span');label.textContent=row.title+' · '+statusLabel(row.action)+' · '+new Date(row.createdAt).toLocaleString('pl-PL');
         const reopen=document.createElement('button');reopen.type='button';reopen.className='button secondary';reopen.textContent=row.revisionId?'Otwarto ponownie':'Popraw decyzję';reopen.disabled=Boolean(row.revisionId);
+        // An automatic relist link: undone by separating the two listings.
+        if(String(row.action).startsWith('relist_')) {
+          reopen.textContent=row.revisionId?'Rozłączono':'Rozłącz — to różne ogłoszenia';
+          reopen.addEventListener('click',async()=>{
+            reopen.disabled=true;
+            try {await write('/api/offer-relists/'+encodeURIComponent(row.offerId)+'/undo',{},'POST');await refreshDecisions();}
+            catch(error){reopen.disabled=false;toast('Nie rozłączono: '+error.message);}
+          });
+          item.append(label,reopen);parent.append(item);continue;
+        }
         reopen.addEventListener('click',async()=>{
           if(!(await confirmDialog('Otworzyć ofertę do ponownej weryfikacji? Poprzednia decyzja pozostanie w historii. Aktualne przypisanie tej decyzji zostanie wycofane.', { title: 'Ponowna weryfikacja', confirmLabel: 'Otwórz ponownie', danger: true }))) return;
           reopen.disabled=true;

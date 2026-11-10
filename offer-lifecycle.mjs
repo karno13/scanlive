@@ -2,10 +2,9 @@
 // "Zarezerwowane"; a page that is gone (404/410) means the listing was removed. The last observed
 // price is kept: together with the date it is the best evidence of what a book sold for.
 import { readSourceHtml } from './marketplaces.mjs';
+import { CHECK_TIERS, detectRelists, recordOfferStatus } from './offer-status.mjs';
 
 export const LIFECYCLE_SOURCES = new Set(['Vinted', 'Allegro Lokalnie', 'Tezeusz.pl', 'Dedalus.pl', 'Empik']);
-const NOT_SEEN_FOR_MS = 2 * 24 * 3_600_000;
-const RECHECK_AFTER_MS = 3 * 24 * 3_600_000;
 
 /** 'sold' | 'reserved' | 'hidden' | 'available' | null (cannot tell) from a Vinted item page. */
 export function parseVintedStatus(html, itemId) {
@@ -42,18 +41,27 @@ const vintedId = (url) => String(url).match(/\/items\/(\d+)/)?.[1] ?? null;
 export function pendingLifecycleChecks(repository, { limit = 8, now = () => new Date(), sources = [...LIFECYCLE_SOURCES] } = {}) {
   const at = now().getTime();
   const marks = sources.map(() => '?').join(',');
+  // Price tiers (CHECK_TIERS): expensive listings are checked sooner after they leave the scans and
+  // again more often; within the due ones the most expensive go first, never-checked before rechecks.
+  const tier = () =>
+    'CASE ' +
+    CHECK_TIERS.slice(0, -1).map((t) => `WHEN coalesce(current_price,0)>=${t.minPrice} THEN ?`).join(' ') +
+    ' ELSE ? END';
+  const cutoffs = (field) => CHECK_TIERS.map((t) => new Date(at - t[field]).toISOString());
   return repository.database
     .prepare(
-      `SELECT id, source, normalized_url AS url, availability FROM offers
+      `SELECT id, source, normalized_url AS url, availability, current_price AS price FROM offers
        WHERE source IN (${marks}) AND availability IN ('unconfirmed','not_seen','available','reserved','hidden')
-         AND last_seen_at < ? AND (availability_checked_at IS NULL OR availability_checked_at < ?)
-       ORDER BY availability_checked_at IS NOT NULL, availability_checked_at, last_seen_at LIMIT ?`,
+         AND last_seen_at < ${tier()} AND (availability_checked_at IS NULL OR availability_checked_at < ${tier()})
+       ORDER BY coalesce(current_price,0) DESC, availability_checked_at IS NOT NULL, availability_checked_at, last_seen_at LIMIT ?`,
     )
-    .all(...sources, new Date(at - NOT_SEEN_FOR_MS).toISOString(), new Date(at - RECHECK_AFTER_MS).toISOString(), Math.max(1, Math.min(100, limit)));
+    .all(...sources, ...cutoffs('notSeenMs'), ...cutoffs('recheckMs'), Math.max(1, Math.min(100, limit)));
 }
 
 function save(repository, offer, availability, at) {
   const changed = availability && availability !== offer.availability;
+  // Every check is kept, also "still on sale": it narrows the moment of a later sale.
+  recordOfferStatus(repository.database, offer.id, availability || 'unknown', at, 'check');
   repository.database
     .prepare(
       `UPDATE offers SET availability=coalesce(?,availability), availability_checked_at=?,
@@ -100,6 +108,8 @@ export async function checkOfferLifecycle(
     else report.unknown += 1;
     save(repository, offer, status === 'hidden' ? 'unavailable' : status, at);
   }
+  // A listing found gone may have been put up again by its seller.
+  if (report.removed) report.relisted = detectRelists(repository, { now }).linked;
   return report;
 }
 

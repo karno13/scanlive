@@ -8,6 +8,7 @@ import { applyCatalogMigrations } from './catalog-migrations.mjs';
 import { isbnKeys, normalizeISBN } from './isbn-normalization.mjs';
 import { safeImageUrl } from './offer-images.mjs';
 import { normalizePublisher } from './publisher-names.mjs';
+import { recordOfferStatus } from './offer-status.mjs';
 
 function iso(value) {
   return value instanceof Date ? value.toISOString() : String(value);
@@ -283,6 +284,10 @@ export class SqliteCatalogRepository extends CatalogRepository {
           id,
         );
       this.#writeObservation(id, input);
+      // Seen again after it was missing, found gone or sold: part of its status history.
+      const availability = input.availability || old.availability || 'unconfirmed';
+      if (availability === 'unconfirmed' && old.availability && old.availability !== 'unconfirmed')
+        recordOfferStatus(this.database, id, 'seen', input.lastSeenAt || at, 'scan');
       return {
         ...this.database.prepare('SELECT * FROM offers WHERE id=?').get(id),
         created: false,
@@ -314,6 +319,7 @@ export class SqliteCatalogRepository extends CatalogRepository {
         at,
       );
     this.#writeObservation(id, input);
+    recordOfferStatus(this.database, id, 'seen', input.firstSeenAt || at, 'scan');
     return { ...this.database.prepare('SELECT * FROM offers WHERE id=?').get(id), created: true };
   }
 
