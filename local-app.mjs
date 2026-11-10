@@ -33,7 +33,7 @@ import { extname, join, dirname, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as wait } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { scanMarketplace } from './marketplaces.mjs';
+import { NEWEST_ORDER_SOURCES, scanMarketplace } from './marketplaces.mjs';
 import { localSourceHosts } from './local-scan.mjs';
 import { readVintedLanguage } from './vinted-detail.mjs';
 import { listedAtFromAge } from './offer-observations.mjs';
@@ -111,9 +111,17 @@ export function validateSearchInput(input) {
         input.tasks.some(task=>!queries.includes(task?.query)||!sources.includes(task?.source)))
       throw Object.assign(Error('INVALID_SCAN_TASKS'),{statusCode:400});
     const tasks=[...new Map(input.tasks.map(task=>[JSON.stringify([task.source,task.query]),{source:task.source,query:task.query}])).values()];
-    return {queries,sources,tasks};
+    return {queries,sources,tasks,...newestMode(input, sources)};
   }
-  return { queries, sources };
+  return { queries, sources, ...newestMode(input, sources) };
+}
+// Quick scan: the first page of the newest listings per phrase, only where a source can sort by
+// date. It never concludes that an offer disappeared (see persistSqliteScan).
+function newestMode(input, sources) {
+  if (input?.mode !== 'newest') return {};
+  if (!sources.some((source) => NEWEST_ORDER_SOURCES.has(source)))
+    throw Object.assign(Error('NEWEST_SCAN_NEEDS_SORTABLE_SOURCE'), { statusCode: 400 });
+  return { mode: 'newest' };
 }
 
 const retryLimit = 3;
@@ -181,7 +189,8 @@ export async function searchOffers(
     onOffers = null,
   } = {},
 ) {
-  const { queries, sources, tasks } = validateSearchInput(input),
+  const { queries, sources, tasks, mode } = validateSearchInput(input),
+    newest = mode === 'newest',
     results = [],
     languageCache = detailCache;
   await Promise.all(
@@ -191,6 +200,7 @@ export async function searchOffers(
       let blockedBy = null;
       for (const query of queries) {
         if(tasks && !tasks.some(task=>task.source===source && task.query===query)) continue;
+        if (newest && !NEWEST_ORDER_SOURCES.has(source)) continue;
         scanCancelled(signal);
         if (blockedBy) {
           onProgress({ type: 'source-error', source, query, code: blockedBy.code, partial: 0 });
@@ -209,6 +219,7 @@ export async function searchOffers(
           searchQuery: query,
           page: 1,
           paginationVersion: 1,
+          ...(newest ? { order: 'newest' } : {}),
         };
         onProgress({ type: 'source-start', source, query });
         try {
@@ -218,6 +229,7 @@ export async function searchOffers(
             (event) => onProgress({ ...event, source, query }),
             retryWait,
             signal,
+            newest ? 1 : 50,
           );
           let offers = scan.offers,
             diagnostic = scan.diagnostic;
@@ -305,6 +317,7 @@ export async function searchOffers(
     language: 'pl',
     queries,
     sources,
+    ...(newest ? { mode: 'newest' } : {}),
     summary: {
       offers: offers.length,
       successful: results.filter((row) => row.status === 'ok').length,
@@ -316,14 +329,14 @@ export async function searchOffers(
     results: results.map(({ offers, ...row }) => ({ ...row, count: offers.length })),
   };
 }
-async function scanAllPages(task, scanner, onProgress = () => {}, waiter = wait, signal = null) {
+async function scanAllPages(task, scanner, onProgress = () => {}, waiter = wait, signal = null, maxPages = 50) {
   const offers = [],
     seenPages = new Set(),
     pages = [],
     rejected = {};
   let current = { ...task },
     diagnostic = null;
-  for (let pageIndex = 0; pageIndex < 50; pageIndex++) {
+  for (let pageIndex = 0; pageIndex < maxPages; pageIndex++) {
     scanCancelled(signal);
     if (seenPages.has(current.page)) {
       diagnostic = errorDiagnostic(Error('PAGINATION_LOOP'));
@@ -852,7 +865,7 @@ async function searchAndStore(
     scanCancelled(signal);
     return persistSqliteScan(catalog, { offers: result.offers, searchedAt: result.searchedAt, errors, scanState,
       rejected: result.summary?.rejected,
-      scanContext: { queries: input.queries, sources: input.sources, results: result.results } });
+      scanContext: { queries: input.queries, sources: input.sources, results: result.results, ...(result.mode ? { mode: result.mode } : {}) } });
   });
   if (String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0' && shouldAutoResolve())
     scheduleCatalogResolution(catalog);

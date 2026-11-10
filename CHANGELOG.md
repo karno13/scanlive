@@ -2,6 +2,12 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-10 (29) — Szybki skan najnowszych ofert
+
+- **Drugi tryb skanu.** W „Automatyczny skan” jest nowa sekcja „Szybki skan najnowszych ofert” z własnym odstępem (1–24 h, domyślnie co 2 h), **domyślnie wyłączona**. Czyta jedną stronę wyników na frazę, posortowaną od najnowszych, tylko w źródłach, które pozwalają tak sortować — sprawdzone na żywej stronie: Vinted (`order=newest_first`; ok. 90 ogłoszeń na stronie). Używa tego samego profilu co pełny skan; gdy oba są do wykonania, pierwszeństwo ma pełny.
+- **Nie oznacza ofert jako zniknięte** — nawet gdy fraza ma tylko jedną stronę wyników. Robi to wyłącznie pełny skan, który pozostaje bez zmian.
+- Nowe oferty z szybkiego skanu są widoczne w pasku „Od ostatniej wizyty” jak każde nowe oferty (liczone po dacie pierwszego wykrycia).
+
 ## 2026-11-10 (28) — Ceny porównują porównywalne
 
 - **Rodzaj oferty.** Każda oferta ma rodzaj wynikający ze źródła: nowa w sklepie (Empik, Dedalus, sklepy z Empik Marketplace), antykwariat (Tezeusz, antykwariaty sprzedające przez Empik), prywatny egzemplarz (Vinted, OLX, Allegro Lokalnie). Reguły są w jednym miejscu i działają tak samo w kodzie i w zapytaniach SQL. Na danych z 2026-11-10: 1936 prywatnych, 365 ze sklepów, 77 z antykwariatów. Oferty z Empiku zapisane przed zmianą 26 nie mają nazwy sprzedawcy, więc do najbliższego skanu liczą się jako sklepowe.

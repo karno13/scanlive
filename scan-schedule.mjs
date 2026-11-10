@@ -3,12 +3,26 @@
 // single-scan guard, rate limits and safeguards) as a scan started from the interface.
 import { request as httpRequest } from 'node:http';
 import { listScanProfiles } from './scan-profiles-api.mjs';
+import { NEWEST_ORDER_SOURCES } from './marketplaces.mjs';
 
 const KEY = 'scan_schedule';
 // Schedule value meaning "every saved profile in turn": one profile per run, alphabetical.
 export const ALL_PROFILES = '__all__';
 const MIN_HOURS = 1;
 const MAX_HOURS = 168;
+// Quick scan of the newest listings: its own interval, off by default.
+const QUICK_DEFAULT_HOURS = 2;
+const QUICK_MAX_HOURS = 24;
+
+function quickSchedule(saved = {}) {
+  return {
+    enabled: saved.enabled === true,
+    everyHours: Number.isInteger(saved.everyHours) ? saved.everyHours : QUICK_DEFAULT_HOURS,
+    lastRunAt: saved.lastRunAt ?? null,
+    lastResult: saved.lastResult ?? null,
+    lastProfile: typeof saved.lastProfile === 'string' ? saved.lastProfile : null,
+  };
+}
 
 function fail(code, statusCode = 400) {
   throw Object.assign(Error(code), { statusCode });
@@ -27,6 +41,7 @@ export function getScanSchedule(repository) {
     // Sources left out of the last run (failed recently) and sources that failed during it.
     lastSkipped: Array.isArray(saved.lastSkipped) ? saved.lastSkipped : [],
     lastProblems: Array.isArray(saved.lastProblems) ? saved.lastProblems : [],
+    quick: quickSchedule(saved.quick),
   };
 }
 
@@ -76,10 +91,17 @@ export function saveScanSchedule(repository, input, now = Date.now()) {
   const profile = typeof input?.profile === 'string' ? input.profile : '';
   const everyHours = Number(input?.everyHours);
   if (!Number.isInteger(everyHours) || everyHours < MIN_HOURS || everyHours > MAX_HOURS) fail('INVALID_SCHEDULE_INTERVAL');
-  const profiles = listScanProfiles(repository);
-  if (enabled && !(profile === ALL_PROFILES ? profiles.length : profiles.some((item) => item.name === profile))) fail('SCHEDULE_PROFILE_NOT_FOUND');
   const current = getScanSchedule(repository);
-  store(repository, { ...current, enabled, profile, everyHours }, now);
+  const quick = { ...current.quick };
+  if (input?.quick !== undefined) {
+    const hours = Number(input.quick?.everyHours ?? quick.everyHours);
+    if (!Number.isInteger(hours) || hours < MIN_HOURS || hours > QUICK_MAX_HOURS) fail('INVALID_QUICK_SCAN_INTERVAL');
+    quick.enabled = input.quick?.enabled === true;
+    quick.everyHours = hours;
+  }
+  const profiles = listScanProfiles(repository);
+  if ((enabled || quick.enabled) && !(profile === ALL_PROFILES ? profiles.length : profiles.some((item) => item.name === profile))) fail('SCHEDULE_PROFILE_NOT_FOUND');
+  store(repository, { ...current, enabled, profile, everyHours, quick }, now);
   return getScanSchedule(repository);
 }
 
@@ -88,6 +110,13 @@ export function nextProfile(profiles, last) {
   if (!profiles.length) return null;
   const index = profiles.findIndex((item) => item.name === last);
   return profiles[(index + 1) % profiles.length];
+}
+
+/** When the next quick scan (newest listings) is due, or null when it is off. */
+export function nextQuickRunAt(schedule) {
+  if (!schedule.quick?.enabled || !schedule.profile) return null;
+  const last = schedule.quick.lastRunAt ? Date.parse(schedule.quick.lastRunAt) : 0;
+  return last + schedule.quick.everyHours * 3_600_000;
 }
 
 /** When the next scan is due, or null when the schedule is off. */
@@ -115,8 +144,12 @@ export function createScanScheduler({
     if (!repository) return { skipped: 'no-catalog' };
     const schedule = getScanSchedule(repository);
     const due = nextRunAt(schedule);
-    if (due === null) return { skipped: 'off' };
-    if (now() < due) return { skipped: 'not-due' };
+    // The full scan has priority; the quick one runs in between, when it is due itself.
+    if (due === null || now() < due) {
+      const quickDue = nextQuickRunAt(schedule);
+      if (quickDue !== null && now() >= quickDue) return quickTick(repository, schedule);
+      return { skipped: due === null && quickDue === null ? 'off' : 'not-due' };
+    }
     const profiles = listScanProfiles(repository);
     const profile = schedule.profile === ALL_PROFILES ? nextProfile(profiles, schedule.lastProfile) : profiles.find((item) => item.name === schedule.profile);
     running = true;
@@ -149,6 +182,33 @@ export function createScanScheduler({
     store(repository, { ...fresh, lastRunAt: new Date(now()).toISOString(), lastResult: result, lastProfile: profile?.name ?? fresh.lastProfile, lastSkipped: skipped, lastProblems: problems }, now());
     onEvent({ type: 'scheduled_scan', profile: profile?.name ?? schedule.profile, result, skipped, problems });
     return { ran: true, result, skipped, problems };
+  }
+
+  async function quickTick(repository, schedule) {
+    const profiles = listScanProfiles(repository);
+    const profile = schedule.profile === ALL_PROFILES ? nextProfile(profiles, schedule.quick.lastProfile) : profiles.find((item) => item.name === schedule.profile);
+    running = true;
+    let result;
+    try {
+      const sortable = (profile?.sources || []).filter((source) => NEWEST_ORDER_SOURCES.has(source));
+      const plan = sourcesToScan(repository, sortable, now());
+      if (!profile) result = 'profile-missing';
+      else if (!sortable.length) result = 'no-sortable-source';
+      else if (!plan.sources.length) result = 'all-sources-down';
+      else {
+        const status = await runScan({ queries: profile.queries, sources: plan.sources, mode: 'newest' });
+        if (status === 409) return { skipped: 'scan-running' };
+        result = status >= 200 && status < 300 ? 'ok' : `http-${status}`;
+      }
+    } catch (error) {
+      result = `error:${String(error?.message ?? error).slice(0, 60)}`;
+    } finally {
+      running = false;
+    }
+    const fresh = getScanSchedule(repository);
+    store(repository, { ...fresh, quick: { ...fresh.quick, lastRunAt: new Date(now()).toISOString(), lastResult: result, lastProfile: profile?.name ?? fresh.quick.lastProfile } }, now());
+    onEvent({ type: 'scheduled_quick_scan', profile: profile?.name ?? schedule.profile, result });
+    return { ran: true, quick: true, result };
   }
 
   return {

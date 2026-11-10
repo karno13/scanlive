@@ -3698,3 +3698,6 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
 .wp-comparable .wp-sold { background: var(--green-soft); border-radius: 8px; padding: 8px 10px; box-shadow: inset 3px 0 var(--green); }
 .wp-comparable .wp-sold strong { color: var(--green); }
 .wp-table .wp-conditions th[scope='rowgroup'] { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding-top: 14px; }
+/* Scan schedule: quick scan of the newest listings (changelog 29) */
+.scan-schedule .quick-scan { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 4px; margin: 10px 0; display: grid; gap: 6px; }
+.scan-schedule .quick-scan legend { font-size: 13px; font-weight: 600; padding: 0 4px; }

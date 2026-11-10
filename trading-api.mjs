@@ -6,7 +6,7 @@ import { backupCatalog } from './scripts/backup-catalog.mjs';
 
 import { findDuplicateWorkGroups } from './work-grouping.mjs';
 import { findTitleConflicts, resolveTitleConflict } from './title-consistency.mjs';
-import { getScanSchedule, saveScanSchedule, nextRunAt } from './scan-schedule.mjs';
+import { getScanSchedule, saveScanSchedule, nextRunAt, nextQuickRunAt } from './scan-schedule.mjs';
 import { getPolishOnly, setPolishOnly } from './language-policy.mjs';
 import { listNames, mergeNames, removeNameAlias } from './name-aliases.mjs';
 function fail(code, statusCode = 400) { throw Object.assign(Error(code), { statusCode }); }
@@ -247,8 +247,8 @@ export async function tradingRoute({repo,method,path,input}) {
   if(path==='/api/catalog/names/unalias'&&method==='POST') return removeNameAlias(repo,input);
   if(path==='/api/scan-language'&&method==='GET') return {polishOnly:getPolishOnly(repo)};
   if(path==='/api/scan-language'&&method==='PUT') return setPolishOnly(repo,input?.polishOnly);
-  if(path==='/api/scan-schedule'&&method==='GET') { const s=getScanSchedule(repo); return {...s,nextRunAt:nextRunAt(s)}; }
-  if(path==='/api/scan-schedule'&&method==='PUT') { const s=saveScanSchedule(repo,input); return {...s,nextRunAt:nextRunAt(s)}; }
+  if(path==='/api/scan-schedule'&&method==='GET') { const s=getScanSchedule(repo); return {...s,nextRunAt:nextRunAt(s),nextQuickRunAt:nextQuickRunAt(s)}; }
+  if(path==='/api/scan-schedule'&&method==='PUT') { const s=saveScanSchedule(repo,input); return {...s,nextRunAt:nextRunAt(s),nextQuickRunAt:nextQuickRunAt(s)}; }
   if(path==='/api/catalog/work-duplicates'&&method==='GET') return listWorkDuplicates(repo);
   if(path==='/api/catalog/title-conflicts'&&method==='GET') return {conflicts:findTitleConflicts(repo)};
   if(path==='/api/catalog/title-conflicts/resolve'&&method==='POST') return resolveTitleConflict(repo,input);

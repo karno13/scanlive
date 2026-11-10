@@ -69,6 +69,9 @@ export function sourceAvailable(code) {
   if (/^IN_|AVAILABLE|PRE_SALE|PreOrder|PreSale|InStock|LimitedAvailability|OnlineOnly|InStoreOnly/i.test(text)) return true;
   return null;
 }
+// Sources whose results can be sorted newest first (checked on the live page 2026-11-10). The quick
+// scan reads one such page per phrase; other sources only offer their default order.
+export const NEWEST_ORDER_SOURCES = new Set(['Vinted']);
 export function searchUrl(task) {
   if (!sources[task.source] || task.host !== sources[task.source].host)
     throw Error('UNTRUSTED_MARKETPLACE_TASK');

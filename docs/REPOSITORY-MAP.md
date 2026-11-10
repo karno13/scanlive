@@ -19,7 +19,7 @@
 | Obserwacje ofert | `offer-observations.mjs` (stan egzemplarza i jego klasa, opłata kupującego, sprzedawca, zdjęcia, data wystawienia, polubienia, surowe obiekty ogłoszenia w `offer_raw_snapshots`) |
 | Sygnał sprzedaży | `offer-status.mjs` (historia stanów oferty, przedział sprzedaży, ponowne wystawienia, progi sprawdzania wg ceny), `offer-lifecycle.mjs` (sprawdzanie stron ofert), `offer-availability.mjs` |
 | Oferty | `app/views/offers.js`, `app/views/offer-groups.js` („Wg książki”, `GET /api/offer-groups`) |
-| Skaner: harmonogram i jakość | `scan-schedule.mjs`, `offer-availability.mjs`, `app/views/scan-schedule.js` |
+| Skaner: harmonogram i jakość | `scan-schedule.mjs` (pełny skan i szybki skan najnowszych — `mode: 'newest'`, `NEWEST_ORDER_SOURCES` w `marketplaces.mjs`), `offer-availability.mjs`, `app/views/scan-schedule.js` |
 | Zdjęcia i okładki | `offer-images.mjs` (walidacja URL, proxy `/api/image` z cache, `og:image`), `app/core/bibliography.js` (czyste etykiety BN, okładki) |
 | Pulpit i paleta | `catalog-insights.mjs` (`/api/catalog/insights`), `app/views/dashboard.js`, `app/views/palette.js`, `app/core/preferences.js` |
 | Trwały katalog danych / backup | `catalog-data-location.mjs`, `scripts/backup-catalog.mjs` |

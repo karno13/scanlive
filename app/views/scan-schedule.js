@@ -16,6 +16,16 @@ export function describeResult(schedule) {
   return label + (skipped.length ? '; pominięto niedziałające: ' + skipped.join(', ') : '');
 }
 
+const QUICK_RESULTS = { ok: 'udany', 'no-sortable-source': 'pominięty — profil nie ma źródła sortowanego od najnowszych (Vinted)', 'all-sources-down': 'pominięty — źródło nie działało', 'profile-missing': 'nie odbył się — profil nie istnieje' };
+/** The quick scan of the newest listings, in words. */
+export function describeQuick(schedule) {
+  const quick = schedule.quick;
+  if (!quick?.enabled) return 'Szybki skan jest wyłączony.';
+  const last = quick.lastRunAt ? `Ostatni: ${when(quick.lastRunAt)} (${QUICK_RESULTS[quick.lastResult] || quick.lastResult || 'brak wyniku'}).` : 'Jeszcze się nie odbył.';
+  const next = schedule.nextQuickRunAt ? ` Następny: ${when(Math.max(schedule.nextQuickRunAt, Date.now()))}.` : '';
+  return `Co ${quick.everyHours} h. ${last}${next}`;
+}
+
 /** One line for the folded section header: on/off, interval and the next run. */
 export function scheduleHeadline(schedule) {
   if (!schedule.enabled) return 'Automatyczny skan: wyłączony';
@@ -35,6 +45,12 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
       <label class="field"><span>Co ile godzin</span><input id="scheduleHours" type="number" min="1" max="168" step="1" value="24" inputmode="numeric"></label>
       <label class="check"><input id="scheduleEnabled" type="checkbox"> Skanuj automatycznie, gdy aplikacja jest uruchomiona</label>
       <p class="inline-note">Źródła, które nie działały w ostatnim skanie, są pomijane przez dobę, potem sprawdzane ponownie.</p>
+      <fieldset class="quick-scan"><legend>Szybki skan najnowszych ofert</legend>
+        <label class="check"><input id="quickEnabled" type="checkbox"> Między pełnymi skanami sprawdzaj tylko najnowsze ogłoszenia</label>
+        <label class="field"><span>Co ile godzin</span><input id="quickHours" type="number" min="1" max="24" step="1" value="2" inputmode="numeric"></label>
+        <p class="inline-note">Jedna strona wyników na frazę, posortowana od najnowszych — tylko w źródłach, które to umożliwiają (obecnie Vinted). Nie oznacza ofert jako znikniętych; robi to wyłącznie pełny skan. Nowe oferty widać w pasku „Od ostatniej wizyty”.</p>
+        <p id="quickStatus" class="inline-note"></p>
+      </fieldset>
       <button id="scheduleSave" class="button secondary compact" type="button">Zapisz harmonogram</button>
       <p id="scheduleStatus" class="inline-note" role="status" aria-live="polite"></p>
     </div>`;
@@ -50,10 +66,11 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
   };
   const show = (schedule) => {
     // Name, then interval and next run in muted text, then a flag when off or when the last run had errors.
-    const meta = schedule.enabled
-      ? 'co ' + schedule.everyHours + ' h' + (schedule.nextRunAt ? ' · następny ' + when(Math.max(schedule.nextRunAt, Date.now())) : '')
-      : '';
-    const flag = !schedule.enabled
+    const meta = [
+      schedule.enabled ? 'co ' + schedule.everyHours + ' h' + (schedule.nextRunAt ? ' · następny ' + when(Math.max(schedule.nextRunAt, Date.now())) : '') : '',
+      schedule.quick?.enabled ? 'najnowsze co ' + schedule.quick.everyHours + ' h' : '',
+    ].filter(Boolean).join(' · ');
+    const flag = !schedule.enabled && !schedule.quick?.enabled
       ? '<span class="schedule-flag is-off">wyłączony</span>'
       : schedule.lastResult && schedule.lastResult !== 'ok'
         ? '<span class="schedule-flag">' + (schedule.lastResult === 'partial' ? 'ostatni z błędami' : 'ostatni nieudany') + '</span>'
@@ -75,6 +92,9 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
       $('#scheduleProfile').value = schedule.profile || '';
       $('#scheduleHours').value = schedule.everyHours;
       $('#scheduleEnabled').checked = schedule.enabled;
+      $('#quickEnabled').checked = Boolean(schedule.quick?.enabled);
+      $('#quickHours').value = schedule.quick?.everyHours ?? 2;
+      $('#quickStatus').textContent = describeQuick(schedule);
       show(schedule);
       $('#scheduleStatus').textContent = items.length
         ? describe(schedule)
@@ -95,9 +115,11 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
           enabled: $('#scheduleEnabled').checked,
           profile: $('#scheduleProfile').value,
           everyHours: Number($('#scheduleHours').value),
+          quick: { enabled: $('#quickEnabled').checked, everyHours: Number($('#quickHours').value) },
         }),
       });
       $('#scheduleStatus').textContent = describe(saved);
+      $('#quickStatus').textContent = describeQuick(saved);
       show(saved);
       toast('Zapisano harmonogram skanowania.');
     } catch (error) {
@@ -106,7 +128,9 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
           ? 'Wybierz zapisany profil.'
           : error.message === 'INVALID_SCHEDULE_INTERVAL'
             ? 'Podaj liczbę godzin od 1 do 168.'
-            : 'Nie zapisano harmonogramu: ' + error.message,
+            : error.message === 'INVALID_QUICK_SCAN_INTERVAL'
+              ? 'Szybki skan: podaj liczbę godzin od 1 do 24.'
+              : 'Nie zapisano harmonogramu: ' + error.message,
       );
     } finally {
       button.disabled = false;

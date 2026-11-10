@@ -188,7 +188,8 @@ export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], sc
     for (const row of outcomes) if (db.prepare('SELECT id FROM offers WHERE id=?').get(row.id))
       membership.run(at,row.id,Number(row.isNew),Number(row.changed));
     // Offers absent from a complete scan of their phrase are most likely sold or withdrawn.
-    if (scanContext) markUnseenOffers(db, scanContext.results || [], at);
+    // A quick scan of the newest listings sees one page: it never concludes an offer is gone.
+    if (scanContext && scanContext.mode !== 'newest') markUnseenOffers(db, scanContext.results || [], at);
     // A listing that left the results while the same seller's copy appeared is a relist, not a sale.
     if (scanContext) detectRelists(catalog.repository, { now: () => new Date(at) });
     if (scanContext) {
