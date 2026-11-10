@@ -36,7 +36,10 @@ export function safeImageUrl(value) {
   if (url.protocol === 'http:') url.protocol = 'https:';
   if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
   if (!imageHostAllowed(url.hostname)) return null;
-  if (/\.svg(?:$|\?)/i.test(url.pathname) || /no_picture|empty-photo|placeholder/i.test(url.pathname))
+  if (
+    /\.svg(?:$|\?)/i.test(url.pathname) ||
+    /no_picture|empty-photo|placeholder/i.test(url.pathname)
+  )
     return null;
   return url.href;
 }
@@ -52,7 +55,8 @@ export function imageFromDetailHtml(html) {
   const text = String(html || '');
   for (const match of text.matchAll(/<meta\b([^>]*)>/gi)) {
     const attrs = match[1];
-    if (!/\b(?:property|name)\s*=\s*["'](?:og:image|og:image:url|twitter:image)["']/i.test(attrs)) continue;
+    if (!/\b(?:property|name)\s*=\s*["'](?:og:image|og:image:url|twitter:image)["']/i.test(attrs))
+      continue;
     // Allegro Lokalnie writes the value unquoted: content=https://a.allegroimg.com/…
     const quoted = attrs.match(/\bcontent\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s"'>]+))/i);
     const content = quoted?.[1] ?? quoted?.[2] ?? quoted?.[3];
@@ -100,7 +104,10 @@ export async function fetchCachedImage(raw, { cacheDirectory, fetcher = fetch } 
         signal: controller.signal,
         headers: { accept: 'image/avif,image/webp,image/jpeg,image/png,image/*;q=0.8' },
       });
-      const type = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+      const type = String(response.headers.get('content-type') || '')
+        .split(';')[0]
+        .trim()
+        .toLowerCase();
       if (!response.ok || !IMAGE_TYPES.test(type)) {
         await mkdir(join(cacheDirectory, key.slice(0, 2)), { recursive: true });
         await writeFile(file + '.missing', String(response.status));
@@ -109,7 +116,8 @@ export async function fetchCachedImage(raw, { cacheDirectory, fetcher = fetch } 
       const length = Number(response.headers.get('content-length') || 0);
       if (length > MAX_BYTES) throw Object.assign(Error('IMAGE_TOO_LARGE'), { statusCode: 413 });
       const body = Buffer.from(await response.arrayBuffer());
-      if (body.length > MAX_BYTES) throw Object.assign(Error('IMAGE_TOO_LARGE'), { statusCode: 413 });
+      if (body.length > MAX_BYTES)
+        throw Object.assign(Error('IMAGE_TOO_LARGE'), { statusCode: 413 });
       await mkdir(join(cacheDirectory, key.slice(0, 2)), { recursive: true });
       await writeFile(file, body);
       await writeFile(file + '.type', type);
@@ -174,8 +182,21 @@ const abortableWait = (ms, signal) =>
  * means "slower", not "blocked": the worker waits (1, 2, 4 min) and retries the same offer.
  * Offers waiting for review go first, then catalog-linked ones, newest first.
  */
-export function createImageBackfill(repository, { readHtml, limitPerSource = 400, throttleWaitMs = 60_000 } = {}) {
-  let status = { state: 'idle', done: 0, filled: 0, failed: 0, total: 0, skippedSources: [], waitingSources: [], startedAt: null, finishedAt: null };
+export function createImageBackfill(
+  repository,
+  { readHtml, limitPerSource = 400, throttleWaitMs = 60_000 } = {},
+) {
+  let status = {
+    state: 'idle',
+    done: 0,
+    filled: 0,
+    failed: 0,
+    total: 0,
+    skippedSources: [],
+    waitingSources: [],
+    startedAt: null,
+    finishedAt: null,
+  };
   let controller = null;
   const pending = () =>
     repository.database
@@ -202,7 +223,9 @@ export function createImageBackfill(repository, { readHtml, limitPerSource = 400
       bySource.set(row.source, list);
     }
     status.total = [...bySource.values()].reduce((sum, list) => sum + list.length, 0);
-    const update = repository.database.prepare('UPDATE offers SET image_url=? WHERE id=? AND image_url IS NULL');
+    const update = repository.database.prepare(
+      'UPDATE offers SET image_url=? WHERE id=? AND image_url IS NULL',
+    );
     await Promise.all(
       [...bySource].map(async ([source, list]) => {
         let streak = 0;
@@ -244,11 +267,25 @@ export function createImageBackfill(repository, { readHtml, limitPerSource = 400
     );
   }
   return {
-    status: () => ({ ...status, skippedSources: [...status.skippedSources], waitingSources: [...status.waitingSources] }),
+    status: () => ({
+      ...status,
+      skippedSources: [...status.skippedSources],
+      waitingSources: [...status.waitingSources],
+    }),
     start() {
       if (status.state === 'running') return this.status();
       controller = new AbortController();
-      status = { state: 'running', done: 0, filled: 0, failed: 0, total: 0, skippedSources: [], waitingSources: [], startedAt: new Date().toISOString(), finishedAt: null };
+      status = {
+        state: 'running',
+        done: 0,
+        filled: 0,
+        failed: 0,
+        total: 0,
+        skippedSources: [],
+        waitingSources: [],
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+      };
       run(controller.signal)
         .catch(() => {})
         .finally(() => {

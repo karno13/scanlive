@@ -8,9 +8,18 @@ import { markOfferAsSet } from './offer-sets.mjs';
 
 test('a set gets books, loses one, suggests from its title and can be unmarked', async (t) => {
   const repo = new SqliteCatalogRepository(process.env.BOOKFLIP_CATALOG_DB);
-  const offer = repo.upsertOffer({ id: 'Vinted:42', source: 'Vinted', normalizedUrl: 'https://www.vinted.pl/items/42', originalTitle: 'Terry Pratchett Mort i Kolor magii zestaw', currentPrice: 4000 });
+  const offer = repo.upsertOffer({
+    id: 'Vinted:42',
+    source: 'Vinted',
+    normalizedUrl: 'https://www.vinted.pl/items/42',
+    originalTitle: 'Terry Pratchett Mort i Kolor magii zestaw',
+    currentPrice: 4000,
+  });
   repo.putIdentificationJob({ offerId: offer.id, status: 'review_required' });
-  for (const [work, title] of [['w-mort', 'Mort'], ['w-kolor', 'Kolor magii']]) {
+  for (const [work, title] of [
+    ['w-mort', 'Mort'],
+    ['w-kolor', 'Kolor magii'],
+  ]) {
     repo.createWork({ id: work, title, authors: ['Pratchett, Terry'] });
     repo.createEdition({ id: 'e-' + work, workId: work, title });
   }
@@ -33,16 +42,31 @@ test('a set gets books, loses one, suggests from its title and can be unmarked',
 
   const suggestions = await call('GET', `/api/sets/${id}/candidates`);
   assert.equal(suggestions.status, 200);
-  assert.deepEqual(suggestions.data.items.map((item) => item.editionId).sort(), ['e-w-kolor', 'e-w-mort']);
+  assert.deepEqual(suggestions.data.items.map((item) => item.editionId).sort(), [
+    'e-w-kolor',
+    'e-w-mort',
+  ]);
 
-  assert.equal((await call('POST', `/api/sets/${id}/editions`, { editionId: 'e-w-mort' })).status, 200);
-  assert.equal((await call('POST', `/api/sets/${id}/editions`, { editionId: 'e-w-kolor' })).status, 200);
+  assert.equal(
+    (await call('POST', `/api/sets/${id}/editions`, { editionId: 'e-w-mort' })).status,
+    200,
+  );
+  assert.equal(
+    (await call('POST', `/api/sets/${id}/editions`, { editionId: 'e-w-kolor' })).status,
+    200,
+  );
   let sets = (await call('GET', '/api/sets')).data.items;
-  assert.deepEqual(sets[0].editions.map((item) => item.editionId).sort(), ['e-w-kolor', 'e-w-mort']);
+  assert.deepEqual(sets[0].editions.map((item) => item.editionId).sort(), [
+    'e-w-kolor',
+    'e-w-mort',
+  ]);
 
   assert.equal((await call('DELETE', `/api/sets/${id}/editions/e-w-kolor`, {})).status, 200);
   sets = (await call('GET', '/api/sets')).data.items;
-  assert.deepEqual(sets[0].editions.map((item) => item.editionId), ['e-w-mort']);
+  assert.deepEqual(
+    sets[0].editions.map((item) => item.editionId),
+    ['e-w-mort'],
+  );
 
   assert.equal((await call('DELETE', `/api/sets/${id}`, {})).status, 200);
   assert.equal((await call('GET', '/api/sets')).data.items.length, 0);

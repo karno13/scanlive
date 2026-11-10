@@ -18,11 +18,10 @@ function distinctEditions(values, max = 3) {
 
 // This is discovery only. Never create or assign editions from a title search:
 // the same work can have many editions, translations and ISBNs.
-export async function findTitleIsbnCandidates(
-  rawTitle,
-  { requestBn, requestOpenLibrary } = {},
-) {
-  const title = String(rawTitle ?? '').trim().slice(0, 160);
+export async function findTitleIsbnCandidates(rawTitle, { requestBn, requestOpenLibrary } = {}) {
+  const title = String(rawTitle ?? '')
+    .trim()
+    .slice(0, 160);
   if (title.length < 4) throw Object.assign(Error('TITLE_TOO_SHORT'), { statusCode: 400 });
   const bn = new URL('https://data.bn.org.pl/api/institutions/bibs.json');
   bn.searchParams.set('title', title);
@@ -39,9 +38,12 @@ export async function findTitleIsbnCandidates(
     for (const book of Array.isArray(books) ? books.slice(0, 8) : []) {
       // BN title search also returns articles and periodicals; only monographs are candidates.
       if (book.kind && !/^(?:ksi[aą][zż]ka|book)$/i.test(String(book.kind).trim())) continue;
-      for (const isbn of distinctEditions(isbnCandidates(book.isbnIssn ?? book.isbn ?? book.isbns ?? [])))
+      for (const isbn of distinctEditions(
+        isbnCandidates(book.isbnIssn ?? book.isbn ?? book.isbns ?? []),
+      ))
         candidates.push({
-          isbn, source: 'bn',
+          isbn,
+          source: 'bn',
           title: String(book.title ?? title).slice(0, 220),
           // BN returns authors as one free-text string ("Pratchett, Terry (1948-2015) ...").
           authors: Array.isArray(book.authors) ? book.authors.map(String).slice(0, 3) : [],
@@ -52,17 +54,27 @@ export async function findTitleIsbnCandidates(
         });
     }
   } else if (!['not_found'].includes(bnResponse.status)) errors.push('bn');
-  const olResponse = candidates.length === 0 && ['found', 'not_found'].includes(bnResponse.status)
-    ? await requestOpenLibrary(ol.href)
-    : { status: 'skipped' };
+  const olResponse =
+    candidates.length === 0 && ['found', 'not_found'].includes(bnResponse.status)
+      ? await requestOpenLibrary(ol.href)
+      : { status: 'skipped' };
   if (olResponse.status === 'found') {
-    for (const book of (Array.isArray(olResponse.payload?.docs) ? olResponse.payload.docs : []).slice(0, 8)) {
+    for (const book of (Array.isArray(olResponse.payload?.docs)
+      ? olResponse.payload.docs
+      : []
+    ).slice(0, 8)) {
       for (const isbn of distinctEditions(isbnCandidates(book.isbn ?? [])))
         candidates.push({
-          isbn, source: 'open_library',
+          isbn,
+          source: 'open_library',
           title: String(book.title ?? title).slice(0, 220),
-          authors: (Array.isArray(book.author_name) ? book.author_name : []).map(String).slice(0, 3),
-          language: (Array.isArray(book.language) ? book.language : []).map(String).slice(0, 3).join(', '),
+          authors: (Array.isArray(book.author_name) ? book.author_name : [])
+            .map(String)
+            .slice(0, 3),
+          language: (Array.isArray(book.language) ? book.language : [])
+            .map(String)
+            .slice(0, 3)
+            .join(', '),
           publicationYear: String(book.first_publish_year ?? '').slice(0, 10),
         });
     }
@@ -70,11 +82,13 @@ export async function findTitleIsbnCandidates(
   const seen = new Set();
   return {
     title,
-    candidates: candidates.filter((item) => {
-      if (seen.has(item.isbn)) return false;
-      seen.add(item.isbn);
-      return true;
-    }).slice(0, 16),
+    candidates: candidates
+      .filter((item) => {
+        if (seen.has(item.isbn)) return false;
+        seen.add(item.isbn);
+        return true;
+      })
+      .slice(0, 16),
     unavailable: errors,
   };
 }

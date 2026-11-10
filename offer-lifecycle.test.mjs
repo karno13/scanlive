@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkOfferLifecycle, parseVintedStatus, pendingLifecycleChecks } from './offer-lifecycle.mjs';
+import {
+  checkOfferLifecycle,
+  parseVintedStatus,
+  pendingLifecycleChecks,
+} from './offer-lifecycle.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 
 // Shapes of the Vinted item-page sidebar plugins (escaped inside the Next.js payload).
@@ -30,11 +34,26 @@ test('offers missing from scans are checked once and their sale is dated', async
       ['live', 'https://www.vinted.pl/items/333-c'],
       ['fresh', 'https://www.vinted.pl/items/444-d'],
     ])
-      repository.upsertOffer({ id, source: 'Vinted', normalizedUrl: url, originalTitle: id, currentPrice: 3000, lastSeenAt: id === 'fresh' ? new Date().toISOString() : old, firstSeenAt: old });
+      repository.upsertOffer({
+        id,
+        source: 'Vinted',
+        normalizedUrl: url,
+        originalTitle: id,
+        currentPrice: 3000,
+        lastSeenAt: id === 'fresh' ? new Date().toISOString() : old,
+        firstSeenAt: old,
+      });
     const now = () => new Date('2026-11-07T12:00:00.000Z');
     repository.database.prepare("UPDATE offers SET last_seen_at=? WHERE id<>'fresh'").run(old);
-    repository.database.prepare("UPDATE offers SET last_seen_at=? WHERE id='fresh'").run('2026-11-07T00:00:00.000Z');
-    assert.deepEqual(pendingLifecycleChecks(repository, { now }).map((row) => row.id).sort(), ['gone', 'live', 'sold']);
+    repository.database
+      .prepare("UPDATE offers SET last_seen_at=? WHERE id='fresh'")
+      .run('2026-11-07T00:00:00.000Z');
+    assert.deepEqual(
+      pendingLifecycleChecks(repository, { now })
+        .map((row) => row.id)
+        .sort(),
+      ['gone', 'live', 'sold'],
+    );
     const report = await checkOfferLifecycle(repository, {
       now,
       fetchHtml: async (url) => {
@@ -45,13 +64,22 @@ test('offers missing from scans are checked once and their sale is dated', async
     assert.equal(report.sold, 1);
     assert.equal(report.removed, 1);
     assert.equal(report.available, 1);
-    const row = (id) => repository.database.prepare('SELECT availability, availability_changed_at, current_price FROM offers WHERE id=?').get(id);
+    const row = (id) =>
+      repository.database
+        .prepare(
+          'SELECT availability, availability_changed_at, current_price FROM offers WHERE id=?',
+        )
+        .get(id);
     assert.equal(row('sold').availability, 'sold');
     assert.equal(row('sold').availability_changed_at, '2026-11-07T12:00:00.000Z');
     assert.equal(row('sold').current_price, 3000, 'last price kept');
     assert.equal(row('gone').availability, 'unavailable');
     assert.equal(row('live').availability, 'available');
-    assert.equal(pendingLifecycleChecks(repository, { now }).length, 0, 'not rechecked within three days');
+    assert.equal(
+      pendingLifecycleChecks(repository, { now }).length,
+      0,
+      'not rechecked within three days',
+    );
   } finally {
     repository.close();
   }
@@ -61,7 +89,12 @@ test('a blocked source is left alone for the rest of the round', async () => {
   const repository = new SqliteCatalogRepository(':memory:');
   try {
     for (const id of ['1', '2'])
-      repository.upsertOffer({ id, source: 'Vinted', normalizedUrl: `https://www.vinted.pl/items/${id}-x`, originalTitle: id });
+      repository.upsertOffer({
+        id,
+        source: 'Vinted',
+        normalizedUrl: `https://www.vinted.pl/items/${id}-x`,
+        originalTitle: id,
+      });
     repository.database.prepare("UPDATE offers SET last_seen_at='2026-10-01T00:00:00.000Z'").run();
     let calls = 0;
     const report = await checkOfferLifecycle(repository, {

@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { catalogTitle, displayName, parseBnMarc, seriesKind, seriesName, trimPunctuation } from './bn-marc.mjs';
+import {
+  catalogTitle,
+  displayName,
+  parseBnMarc,
+  seriesKind,
+  seriesName,
+  trimPunctuation,
+} from './bn-marc.mjs';
 import { looksLikeBundle } from './bundle-detection.mjs';
 import { createBnAdapter } from './metadata-sources/bn.mjs';
 import { KINSLAYER } from './fixtures/metadata/bn-kinslayer.mjs';
@@ -32,7 +39,11 @@ test('MARC separates title, people with roles, publisher and physical details', 
 });
 
 test('series statements are classified and keep their volume numbers', () => {
-  const series = parseBnMarc(KINSLAYER).series.map((entry) => [entry.name, entry.kind, entry.volume]);
+  const series = parseBnMarc(KINSLAYER).series.map((entry) => [
+    entry.name,
+    entry.kind,
+    entry.volume,
+  ]);
   assert.deepEqual(series, [
     ['Gotrek i Felix', 'cycle', null],
     ['Fantasy', 'publisher_line', null],
@@ -53,7 +64,12 @@ test('title keeps subtitle and part number in record order', () => {
   const record = {
     marc: {
       fields: [
-        f('245', [{ a: 'World of Warcraft :' }, { b: 'kronika.' }, { n: 'T. 1 /' }, { c: 'Chris Metzen' }], '1', '0'),
+        f(
+          '245',
+          [{ a: 'World of Warcraft :' }, { b: 'kronika.' }, { n: 'T. 1 /' }, { c: 'Chris Metzen' }],
+          '1',
+          '0',
+        ),
       ],
     },
   };
@@ -72,7 +88,11 @@ test('names are shown given name first and keep initials', () => {
 
 test('BN adapter takes title, authors, publisher and binding from MARC', async () => {
   const adapter = createBnAdapter({
-    requester: async () => ({ status: 'found', payload: { bibs: [KINSLAYER] }, url: 'https://bn.test' }),
+    requester: async () => ({
+      status: 'found',
+      payload: { bibs: [KINSLAYER] },
+      url: 'https://bn.test',
+    }),
   });
   const result = await adapter.lookup('9788382320084');
   assert.equal(result.status, 'found');

@@ -136,14 +136,19 @@ function detailObservation(data, id, candidates) {
   if (age) out.listedAtText = age.slice(0, 60);
   const marker = '"item_id":"' + id + '"';
   let photos = null;
-  for (let at = data.indexOf(marker); at >= 0 && photos === null; at = data.indexOf(marker, at + marker.length)) {
+  for (
+    let at = data.indexOf(marker);
+    at >= 0 && photos === null;
+    at = data.indexOf(marker, at + marker.length)
+  ) {
     const near = data.slice(at, at + 4000).search(/"photos"\s*:\s*\[/);
     if (near < 0) continue;
     const start = data.indexOf('[', at + near);
     const list = arrayAt(data, start);
     if (Array.isArray(list)) photos = list;
   }
-  if (photos) out.photoCount = new Set(photos.map((photo, index) => photo?.id ?? photo?.url ?? index)).size;
+  if (photos)
+    out.photoCount = new Set(photos.map((photo, index) => photo?.id ?? photo?.url ?? index)).size;
   for (const m of data.matchAll(/"favourite_count"\s*:\s*(\d+)/g)) {
     const start = data.lastIndexOf('{', m.index);
     const node = start >= 0 ? objectAt(data, start) : null;
@@ -152,10 +157,15 @@ function detailObservation(data, id, candidates) {
       break;
     }
   }
-  const item = candidates.find((node) => node && String(node.id ?? node.itemId ?? node.item_id) === id && node.seller_id != null);
+  const item = candidates.find(
+    (node) =>
+      node && String(node.id ?? node.itemId ?? node.item_id) === id && node.seller_id != null,
+  );
   if (item) out.sellerId = String(item.seller_id);
   out.rawDetail = {
-    item: candidates.find((node) => node && String(node.id ?? node.itemId ?? node.item_id) === id) || null,
+    item:
+      candidates.find((node) => node && String(node.id ?? node.itemId ?? node.item_id) === id) ||
+      null,
     condition,
     listedAge: age,
     photos,
@@ -238,7 +248,9 @@ export function parseVintedDetail(html, url) {
   // The seller's description of this item (JSON-LD Product or the item object): for a set it lists
   // the books, one per line ("Blask fantastyczny", "Trzy wiedźmy", "Straż! Straż!").
   const description = identityMatched
-    ? candidates.map((node) => node?.description).find((text) => typeof text === 'string' && text.trim()) || null
+    ? candidates
+        .map((node) => node?.description)
+        .find((text) => typeof text === 'string' && text.trim()) || null
     : null;
   return {
     // Zero-width spaces that Vinted puts before each line are dropped.

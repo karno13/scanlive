@@ -10,12 +10,21 @@
 export const SOURCE_INTERVAL_MS = { 'Allegro Lokalnie': 8000 };
 export const MAX_INTERVAL_MS = 30_000;
 
-export function createMarketplaceGate({ intervalMs = 2000, perSource = SOURCE_INTERVAL_MS, maxIntervalMs = MAX_INTERVAL_MS } = {}) {
+export function createMarketplaceGate({
+  intervalMs = 2000,
+  perSource = SOURCE_INTERVAL_MS,
+  maxIntervalMs = MAX_INTERVAL_MS,
+} = {}) {
   const states = new Map();
   const base = (source) => perSource[source] ?? intervalMs;
   const get = (source) => {
     if (!states.has(source))
-      states.set(source, { nextAt: 0, cooldownUntil: 0, interval: base(source), queue: Promise.resolve() });
+      states.set(source, {
+        nextAt: 0,
+        cooldownUntil: 0,
+        interval: base(source),
+        queue: Promise.resolve(),
+      });
     return states.get(source);
   };
   return {
@@ -51,7 +60,12 @@ export function createMarketplaceGate({ intervalMs = 2000, perSource = SOURCE_IN
     },
     snapshot(source) {
       const state = get(source);
-      return { nextAt: state.nextAt, cooldownUntil: state.cooldownUntil, intervalMs: state.interval, baseIntervalMs: base(source) };
+      return {
+        nextAt: state.nextAt,
+        cooldownUntil: state.cooldownUntil,
+        intervalMs: state.interval,
+        baseIntervalMs: base(source),
+      };
     },
   };
 }

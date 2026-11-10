@@ -216,7 +216,9 @@ test('Empik searches the Polish books category and pages on full result pages', 
   assert.equal(new URL(searchUrl(empikTask)).pathname, '/ksiazki,31,s');
   const page = (count) =>
     '<div class="search-content js-search-content" itemtype="https://schema.org/ItemList">' +
-    Array.from({ length: count }, (_, i) => empikCard({ id: 'p' + (1730634700 + i), title: 'Warcraft tom ' + i })).join('') +
+    Array.from({ length: count }, (_, i) =>
+      empikCard({ id: 'p' + (1730634700 + i), title: 'Warcraft tom ' + i }),
+    ).join('') +
     '</div>';
   const scan = (html) =>
     scanMarketplace(empikTask, {

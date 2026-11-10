@@ -54,7 +54,8 @@ export function rejectionReason(task, title, metadata) {
   // Empik searches series and descriptions inside its book category: a Black Library novel
   // ("Kosmiczny Wilk. Tom 1") found for "warhammer" rarely names the universe in its title.
   // Its own fantasy / SF genre is trusted; other genres must still name the topic.
-  if (task.source === 'Empik' && /^Książki\/Fantastyka/i.test(String(metadata?.category ?? ''))) return null;
+  if (task.source === 'Empik' && /^Książki\/Fantastyka/i.test(String(metadata?.category ?? '')))
+    return null;
   if (!matchesTopic(task, title)) return 'topic';
   return null; // Matching query + product exclusions; no mandatory generic book keyword.
 }
@@ -65,8 +66,18 @@ export function acceptsBook(task, title, metadata) {
 export function sourceAvailable(code) {
   const text = String(code || '');
   if (!text) return null;
-  if (/UNAVAILABLE|NOT_AVAILABLE|OUT_OF_STOCK|OutOfStock|SOLD_OUT|SoldOut|Discontinued|NOTIFY|ARCHIV/i.test(text)) return false;
-  if (/^IN_|AVAILABLE|PRE_SALE|PreOrder|PreSale|InStock|LimitedAvailability|OnlineOnly|InStoreOnly/i.test(text)) return true;
+  if (
+    /UNAVAILABLE|NOT_AVAILABLE|OUT_OF_STOCK|OutOfStock|SOLD_OUT|SoldOut|Discontinued|NOTIFY|ARCHIV/i.test(
+      text,
+    )
+  )
+    return false;
+  if (
+    /^IN_|AVAILABLE|PRE_SALE|PreOrder|PreSale|InStock|LimitedAvailability|OnlineOnly|InStoreOnly/i.test(
+      text,
+    )
+  )
+    return true;
   return null;
 }
 // Sources whose results can be sorted newest first (checked on the live page 2026-11-10). The quick
@@ -174,7 +185,14 @@ async function readBody(response, limit = 4000000) {
 }
 export async function readSourceHtml(
   raw,
-  { fetcher = fetch, source, pause = wait, now = Date.now, gate = sharedMarketplaceGate, signal = null } = {},
+  {
+    fetcher = fetch,
+    source,
+    pause = wait,
+    now = Date.now,
+    gate = sharedMarketplaceGate,
+    signal = null,
+  } = {},
 ) {
   const config = sources[source];
   if (!config) throw Error('UNTRUSTED_MARKETPLACE_TASK');
@@ -190,7 +208,7 @@ export async function readSourceHtml(
     )
       throw Error('UNSAFE_SOURCE_REDIRECT');
     // Provider cooldown can outlive the HTTP timeout; count only the actual request.
-    await gate.acquire(source, {now, pause, signal});
+    await gate.acquire(source, { now, pause, signal });
     const requestTimeout = AbortSignal.timeout(18000);
     const requestSignal = signal ? AbortSignal.any([signal, requestTimeout]) : requestTimeout;
     const response = await fetcher(url, {
@@ -200,7 +218,7 @@ export async function readSourceHtml(
     });
     if ([403, 429].includes(response.status)) {
       const retryAfter = retryAfterSeconds(response.headers.get('retry-after'), now());
-      gate.cooldown(source, retryAfter, {now});
+      gate.cooldown(source, retryAfter, { now });
       // Adaptive pace: a refusal doubles this source's gap between requests (see marketplace-gate).
       gate.slowDown?.(source);
       let html;
@@ -208,13 +226,21 @@ export async function readSourceHtml(
         html = await readBody(response, 100000);
       } catch {
         if (response.status === 403)
-          throw Object.assign(Error('SOURCE_FORBIDDEN_UNREADABLE'), { blocked: true, status: 403, retryAfter });
+          throw Object.assign(Error('SOURCE_FORBIDDEN_UNREADABLE'), {
+            blocked: true,
+            status: 403,
+            retryAfter,
+          });
         html = '';
       }
       // A bot check answered with 403 or 429 (Allegro Lokalnie) is a block, not a rate limit:
       // retrying it only lengthens the scan. BookFlip does not get around such checks.
       if (sourceChallenge(html))
-        throw Object.assign(Error('SOURCE_CAPTCHA'), { blocked: true, status: response.status, retryAfter });
+        throw Object.assign(Error('SOURCE_CAPTCHA'), {
+          blocked: true,
+          status: response.status,
+          retryAfter,
+        });
       // CloudFront's refusal page (OLX) rejects automated requests outright: no retry either.
       // Other 403s may be a temporary throttle (Vinted) and stay retryable.
       if (response.status === 403 && /The request could not be satisfied/i.test(html))
@@ -242,7 +268,7 @@ export async function readSourceHtml(
         response.status === 408 || response.status === 425 || response.status >= 500;
       if (retryable) {
         const cooldown = retryAfterSeconds(response.headers.get('retry-after'), now());
-        gate.cooldown(source, cooldown, {now});
+        gate.cooldown(source, cooldown, { now });
       }
       throw Object.assign(Error('SOURCE_HTTP_' + response.status), {
         status: response.status,
@@ -266,7 +292,13 @@ export async function readSourceHtml(
   }
   throw Error('SOURCE_REDIRECT_LIMIT');
 }
-export function parseMarketplace(html, task, observedAt = new Date().toISOString(), limit = 20, rejected = {}) {
+export function parseMarketplace(
+  html,
+  task,
+  observedAt = new Date().toISOString(),
+  limit = 20,
+  rejected = {},
+) {
   searchUrl(task);
   // Listings left out before saving are counted by reason, for the scan summary.
   const reject = (reason) => {
@@ -521,7 +553,10 @@ function parseBookstore(html, book, source) {
     const isbn = extractOfferISBN(metadata).isbn;
     const image = safeImageUrl(metadata.image);
     // The shop's own availability when it states one; a shop listing without it is taken as on sale.
-    const availabilityCode = typeof metadata.availability === 'string' ? metadata.availability.replace(/^https?:\/\/schema\.org\//, '') : '';
+    const availabilityCode =
+      typeof metadata.availability === 'string'
+        ? metadata.availability.replace(/^https?:\/\/schema\.org\//, '')
+        : '';
     const available = sourceAvailable(availabilityCode);
     rows.push({
       title,
@@ -601,7 +636,10 @@ function parseBookstore(html, book, source) {
     const price = offer.price ?? offer.lowPrice,
       currency = offer.priceCurrency || 'PLN';
     if (offer.lowPrice != null && offer.price == null) continue;
-    add(p.name || p.title, offer.url || p.url || p['@id'], price, currency, { ...p, availability: offer.availability });
+    add(p.name || p.title, offer.url || p.url || p['@id'], price, currency, {
+      ...p,
+      availability: offer.availability,
+    });
   }
   if (['Allegro', 'Empik'].includes(source)) {
     if (!products.length) throw Error('UNRECOGNIZED_MARKETPLACE_DATA');
@@ -771,7 +809,13 @@ export async function scanMarketplace(task, options = {}) {
   const html = await readSourceHtml(searchUrl(task), { ...options, source: task.source }),
     paginated = task.paginationVersion === 1;
   const rejected = {};
-  const offers = parseMarketplace(html, task, new Date().toISOString(), paginated ? 5001 : 20, rejected);
+  const offers = parseMarketplace(
+    html,
+    task,
+    new Date().toISOString(),
+    paginated ? 5001 : 20,
+    rejected,
+  );
   if (offers.length > 5000) throw Error('MARKETPLACE_PAGE_TOO_LARGE');
   const pagination = paginated
     ? { ...marketplacePageInfo(html, task, offers), total: offers.length }

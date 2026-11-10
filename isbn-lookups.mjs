@@ -17,7 +17,9 @@ export function storedIsbnRecord(repository, isbn) {
   if (!key) return null;
   try {
     const row = repository.database
-      .prepare("SELECT record_json FROM external_isbn_lookups WHERE source='lubimyczytac' AND isbn=? AND status='found'")
+      .prepare(
+        "SELECT record_json FROM external_isbn_lookups WHERE source='lubimyczytac' AND isbn=? AND status='found'",
+      )
       .get(key);
     return row ? JSON.parse(row.record_json) : null;
   } catch {
@@ -60,7 +62,10 @@ function save(repository, isbn, status, record, at) {
  * Looks up a few unknown ISBNs. `draftOf(jobId)` gives the title and authors from the listings
  * (offerEditionDraft); `find` is findLcRecord (replaceable in tests).
  */
-export async function lookupUnknownIsbns(repository, { draftOf, find = findLcRecord, limit = 2, now = () => new Date() } = {}) {
+export async function lookupUnknownIsbns(
+  repository,
+  { draftOf, find = findLcRecord, limit = 2, now = () => new Date() } = {},
+) {
   const report = { checked: 0, found: 0, errors: 0, paused: false };
   for (const [isbn, jobId] of pending(repository, limit, now().getTime())) {
     report.checked++;

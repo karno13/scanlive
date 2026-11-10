@@ -1,19 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cycleFromTitle, universeOf, stripOriginalTitle, catalogSeries, phraseLabel, setWorkUniverse } from './catalog-series.mjs';
+import {
+  cycleFromTitle,
+  universeOf,
+  stripOriginalTitle,
+  catalogSeries,
+  phraseLabel,
+  setWorkUniverse,
+} from './catalog-series.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 
 test('cycle and volume are read from BN series statements', () => {
-  assert.deepEqual(cycleFromTitle('Dziedzictwo / Legacy, Legenda Drizzta ; ks. 7 Forgotten Realms'), { cycle: 'Legenda Drizzta', volume: 7 });
-  assert.deepEqual(cycleFromTitle('Noc oka / Night of the eye, Dragonlance Saga. Obrońcy Magii t. 1'), { cycle: 'Obrońcy Magii', volume: 1 });
   assert.deepEqual(
-    cycleFromTitle('Ucieczka "Eisensteina" : herezja trwa / Flight of the Eisenstein, Herezja Horusa ; 4 Warhammer 40.000 Herezja Horusa 4'),
+    cycleFromTitle('Dziedzictwo / Legacy, Legenda Drizzta ; ks. 7 Forgotten Realms'),
+    { cycle: 'Legenda Drizzta', volume: 7 },
+  );
+  assert.deepEqual(
+    cycleFromTitle('Noc oka / Night of the eye, Dragonlance Saga. Obrońcy Magii t. 1'),
+    { cycle: 'Obrońcy Magii', volume: 1 },
+  );
+  assert.deepEqual(
+    cycleFromTitle(
+      'Ucieczka "Eisensteina" : herezja trwa / Flight of the Eisenstein, Herezja Horusa ; 4 Warhammer 40.000 Herezja Horusa 4',
+    ),
     { cycle: 'Herezja Horusa', volume: 4 },
   );
-  assert.deepEqual(cycleFromTitle('Gwardia honorowa / Honour guard, Duchy Gaunta t. 6 Czarna Biblioteka 41'), { cycle: 'Duchy Gaunta', volume: 6 });
+  assert.deepEqual(
+    cycleFromTitle('Gwardia honorowa / Honour guard, Duchy Gaunta t. 6 Czarna Biblioteka 41'),
+    { cycle: 'Duchy Gaunta', volume: 6 },
+  );
   // The universe itself numbered: volume without a cycle. Publisher collections are not cycles.
-  assert.deepEqual(cycleFromTitle('Ciekawe czasy / Interesting times, Discworld series t. 14'), { cycle: null, volume: 14 });
-  assert.equal(cycleFromTitle('Złodziej czasu / Thief of time, Discworld series Wielka kolekcja ; 26'), null);
+  assert.deepEqual(cycleFromTitle('Ciekawe czasy / Interesting times, Discworld series t. 14'), {
+    cycle: null,
+    volume: 14,
+  });
+  assert.equal(
+    cycleFromTitle('Złodziej czasu / Thief of time, Discworld series Wielka kolekcja ; 26'),
+    null,
+  );
   assert.equal(cycleFromTitle('Kosiarz'), null);
 });
 
@@ -32,7 +56,10 @@ test('universe from title words or scan phrase', () => {
 test('series tree groups works by universe and cycle with missing volumes', () => {
   const repository = new SqliteCatalogRepository(':memory:');
   try {
-    for (const [title, volume] of [['Strumienie srebra / Streams of silver, Legenda Drizzta ; ks. 5 Forgotten Realms', 5], ['Dziedzictwo / Legacy, Legenda Drizzta ; ks. 7 Forgotten Realms', 7]]) {
+    for (const [title, volume] of [
+      ['Strumienie srebra / Streams of silver, Legenda Drizzta ; ks. 5 Forgotten Realms', 5],
+      ['Dziedzictwo / Legacy, Legenda Drizzta ; ks. 7 Forgotten Realms', 7],
+    ]) {
       const work = repository.createWork({ title, authors: ['R. A. Salvatore'] });
       repository.createEdition({ workId: work.id, title, publicationYear: 2000 + volume });
     }
@@ -53,7 +80,10 @@ test('series tree groups works by universe and cycle with missing volumes', () =
     const knaak = tree.filter((universe) => /Knaak/.test(universe.name));
     assert.equal(knaak.length, 1);
     assert.equal(knaak[0].works, 2);
-    assert.ok(!tree.some((universe) => universe.name === 'Jan Kowalski'), 'a single stray book is not a group');
+    assert.ok(
+      !tree.some((universe) => universe.name === 'Jan Kowalski'),
+      'a single stray book is not a group',
+    );
   } finally {
     repository.close?.();
   }
@@ -61,16 +91,27 @@ test('series tree groups works by universe and cycle with missing volumes', () =
 
 test('a scan phrase that misspells the author is shown as the author', () => {
   assert.equal(phraseLabel('Terry Prachet', ['Pratchett, Terry (1948-2015)']), 'Terry Pratchett');
-  assert.equal(phraseLabel('Terry Prachet', ['Pratchett, Terry (1948-2015) Cholewa, Piotr W. (1955- ) Prószyński i S-ka']), 'Terry Pratchett');
+  assert.equal(
+    phraseLabel('Terry Prachet', [
+      'Pratchett, Terry (1948-2015) Cholewa, Piotr W. (1955- ) Prószyński i S-ka',
+    ]),
+    'Terry Pratchett',
+  );
   assert.equal(phraseLabel('fantastyka', ['Pratchett, Terry']), 'Fantastyka');
 });
 
 test('operator moves a stray work to another universe and back', () => {
   const repo = new SqliteCatalogRepository(':memory:');
   try {
-    const work = repo.createWork({ title: 'Warcraft : wojna starożytnych', authors: ['Knaak, Richard A.'] });
+    const work = repo.createWork({
+      title: 'Warcraft : wojna starożytnych',
+      authors: ['Knaak, Richard A.'],
+    });
     repo.createEdition({ workId: work.id, title: 'Warcraft : wojna starożytnych' });
-    const universeOfWork = () => catalogSeries(repo).find((universe) => universe.cycles.some((cycle) => cycle.works.some((item) => item.id === work.id)))?.name;
+    const universeOfWork = () =>
+      catalogSeries(repo).find((universe) =>
+        universe.cycles.some((cycle) => cycle.works.some((item) => item.id === work.id)),
+      )?.name;
     assert.equal(universeOfWork(), 'Warcraft');
     setWorkUniverse(repo, work.id, { universe: 'Poza seriami' });
     assert.equal(universeOfWork(), 'Poza seriami');

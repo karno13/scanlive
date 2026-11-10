@@ -289,7 +289,12 @@ test('language exclusion completes review without classifying the offer as a non
     const detail = getCatalogOffer(repository, 'offer-1');
     assert.equal(detail.decisions[0].action, 'excluded');
     assert.equal(detail.decisions[0].reason, 'Niewłaściwy język');
-    assert.equal(listIdentificationJobs(repository, { status: 'review_required' }).items.some((row) => row.id === 'job-1'), false);
+    assert.equal(
+      listIdentificationJobs(repository, { status: 'review_required' }).items.some(
+        (row) => row.id === 'job-1',
+      ),
+      false,
+    );
   } finally {
     repository.close();
   }
@@ -298,22 +303,45 @@ test('language exclusion completes review without classifying the offer as a non
 test('offer sort order applies before SQLite pagination for every direction', () => {
   const { repository } = fixture();
   try {
-    repository.upsertOffer({ id: 'alpha', source: 'Zed', normalizedUrl: 'https://example.test/a', originalTitle: 'Alpha', currentPrice: 100, lastSeenAt: '2026-10-29T10:00:00.000Z' });
-    repository.upsertOffer({ id: 'zulu', source: 'Able', normalizedUrl: 'https://example.test/z', originalTitle: 'Zulu', currentPrice: 500, lastSeenAt: '2026-11-01T10:00:00.000Z' });
+    repository.upsertOffer({
+      id: 'alpha',
+      source: 'Zed',
+      normalizedUrl: 'https://example.test/a',
+      originalTitle: 'Alpha',
+      currentPrice: 100,
+      lastSeenAt: '2026-10-29T10:00:00.000Z',
+    });
+    repository.upsertOffer({
+      id: 'zulu',
+      source: 'Able',
+      normalizedUrl: 'https://example.test/z',
+      originalTitle: 'Zulu',
+      currentPrice: 500,
+      lastSeenAt: '2026-11-01T10:00:00.000Z',
+    });
     const cases = [
-      ['oldest', ['alpha','offer-1','zulu']],
-      ['newest', ['zulu','offer-1','alpha']],
-      ['title', ['alpha','offer-1','zulu']],
-      ['title-desc', ['zulu','offer-1','alpha']],
-      ['source', ['zulu','offer-1','alpha']],
-      ['source-desc', ['alpha','offer-1','zulu']],
-      ['price-asc', ['alpha','zulu','offer-1']],
-      ['price-desc', ['offer-1','zulu','alpha']],
+      ['oldest', ['alpha', 'offer-1', 'zulu']],
+      ['newest', ['zulu', 'offer-1', 'alpha']],
+      ['title', ['alpha', 'offer-1', 'zulu']],
+      ['title-desc', ['zulu', 'offer-1', 'alpha']],
+      ['source', ['zulu', 'offer-1', 'alpha']],
+      ['source-desc', ['alpha', 'offer-1', 'zulu']],
+      ['price-asc', ['alpha', 'zulu', 'offer-1']],
+      ['price-desc', ['offer-1', 'zulu', 'alpha']],
     ];
     for (const [sort, expected] of cases) {
-      const pages = [0,1,2].map((offset) => listCatalogOffers(repository, {sort,limit:1,offset}));
-      assert.deepEqual(pages.map((page) => page.items[0].id), expected, sort);
-      assert.ok(pages.every((page) => page.total === 3), sort);
+      const pages = [0, 1, 2].map((offset) =>
+        listCatalogOffers(repository, { sort, limit: 1, offset }),
+      );
+      assert.deepEqual(
+        pages.map((page) => page.items[0].id),
+        expected,
+        sort,
+      );
+      assert.ok(
+        pages.every((page) => page.total === 3),
+        sort,
+      );
     }
   } finally {
     repository.close();

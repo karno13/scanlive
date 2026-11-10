@@ -10,7 +10,9 @@ test('navigation uses querySelectorAll helper in both menu paths', () => {
   assert.doesNotMatch(shell, /(?<!\$)\$\('\.nav-item'\)\.forEach/);
 });
 test('settings view is initialized before diagnostic listener', () => {
-  const init = shell.indexOf('const { renderSettings, runDiagnostics, mountQueryStats } = createSettingsView(');
+  const init = shell.indexOf(
+    'const { renderSettings, runDiagnostics, mountQueryStats } = createSettingsView(',
+  );
   const handler = shell.indexOf("$('#runDiagnostics').addEventListener('click', runDiagnostics)");
   assert.ok(init >= 0 && handler > init);
   assert.match(shell, /import \{ createSettingsView \} from '\.\/views\/settings\.js'/);
@@ -20,5 +22,9 @@ test('scanner view and its run panel are created by the shell', () => {
   assert.match(shell, /const \{ startSearch \} = createScannerView\(/);
   assert.match(shell, /const scanRun = createScanRun\(/);
   for (const name of ['review', 'catalog', 'offers'])
-    assert.ok(shell.includes('const ' + name + 'View = create' + name[0].toUpperCase() + name.slice(1) + 'View('));
+    assert.ok(
+      shell.includes(
+        'const ' + name + 'View = create' + name[0].toUpperCase() + name.slice(1) + 'View(',
+      ),
+    );
 });

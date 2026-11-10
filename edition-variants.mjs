@@ -16,8 +16,24 @@ import { groupedPriceStats, vintedSoldStats } from './price-stats.mjs';
 
 const POLISH = /^(?:pol|pl|polski|polish)?$/i;
 // First words that say nothing about which publisher it is ("Dom Wydawniczy Rebis").
-const GENERIC_WORDS = new Set(['dom', 'wydawnictwo', 'wydawnictwa', 'wydawniczy', 'oficyna', 'grupa', 'the', 'editions', 'edition', 'i', 'media', 'publishing', 'books', 'ksiazka']);
-const SPECIAL = /kolekcjoner|limitowan|ekskluzywn|deluxe|ilustrowan|jubileusz|\bbox\b|komplet|pakiet|collector|illustrated/;
+const GENERIC_WORDS = new Set([
+  'dom',
+  'wydawnictwo',
+  'wydawnictwa',
+  'wydawniczy',
+  'oficyna',
+  'grupa',
+  'the',
+  'editions',
+  'edition',
+  'i',
+  'media',
+  'publishing',
+  'books',
+  'ksiazka',
+]);
+const SPECIAL =
+  /kolekcjoner|limitowan|ekskluzywn|deluxe|ilustrowan|jubileusz|\bbox\b|komplet|pakiet|collector|illustrated/;
 
 function fail(code, statusCode = 400) {
   throw Object.assign(Error(code), { statusCode });
@@ -65,10 +81,19 @@ export function computeVariants(editions, { workTitle = '', overrides = new Map(
   const real = editions.filter((edition) => !edition.isUnknown);
   const base = new Map();
   for (const edition of real) {
-    const special = SPECIAL.test(fold(`${edition.title ?? ''} ${edition.binding ?? ''}`)) ? 'special' : isOmnibus(edition, workTitle) ? 'omnibus' : '';
+    const special = SPECIAL.test(fold(`${edition.title ?? ''} ${edition.binding ?? ''}`))
+      ? 'special'
+      : isOmnibus(edition, workTitle)
+        ? 'omnibus'
+        : '';
     const language = String(edition.language ?? '').trim();
     const foreign = language && !POLISH.test(language) ? fold(language) : '';
-    base.set(edition.id, { publisher: publisherKey(edition.publisher) || 'unknown', binding: bindingClass(edition.binding), special, foreign });
+    base.set(edition.id, {
+      publisher: publisherKey(edition.publisher) || 'unknown',
+      binding: bindingClass(edition.binding),
+      special,
+      foreign,
+    });
   }
   const knownBindings = new Map();
   for (const [, item] of base) {
@@ -101,11 +126,18 @@ export function computeVariants(editions, { workTitle = '', overrides = new Map(
     label: variantLabel(key, members),
     manual: members.some((edition) => overrides.has(edition.id)),
     editionIds: members.map((edition) => edition.id),
-    years: [...new Set(members.map((edition) => edition.publicationYear).filter(Boolean))].sort((a, b) => a - b),
+    years: [...new Set(members.map((edition) => edition.publicationYear).filter(Boolean))].sort(
+      (a, b) => a - b,
+    ),
   }));
 }
 
-const BINDING_LABEL = { hard: 'oprawa twarda', soft: 'oprawa miękka', unknown: 'oprawa nieznana', any: '' };
+const BINDING_LABEL = {
+  hard: 'oprawa twarda',
+  soft: 'oprawa miękka',
+  unknown: 'oprawa nieznana',
+  any: '',
+};
 
 function variantLabel(key, members) {
   const publisher = displayPublisher(members) || 'wydawca nieznany';
@@ -121,7 +153,9 @@ function overridesFor(db, editionIds) {
   if (!editionIds.length) return new Map();
   return new Map(
     db
-      .prepare(`SELECT edition_id, variant_key FROM edition_variant_overrides WHERE edition_id IN (${editionIds.map(() => '?').join(',')})`)
+      .prepare(
+        `SELECT edition_id, variant_key FROM edition_variant_overrides WHERE edition_id IN (${editionIds.map(() => '?').join(',')})`,
+      )
       .all(...editionIds)
       .map((row) => [row.edition_id, row.variant_key]),
   );
@@ -129,7 +163,9 @@ function overridesFor(db, editionIds) {
 
 function workEditions(db, workId) {
   return db
-    .prepare('SELECT id, title, publisher, publication_year, language, binding, is_unknown FROM editions WHERE work_id=? ORDER BY publication_year, title')
+    .prepare(
+      'SELECT id, title, publisher, publication_year, language, binding, is_unknown FROM editions WHERE work_id=? ORDER BY publication_year, title',
+    )
     .all(workId)
     .map((row) => ({
       id: row.id,
@@ -143,7 +179,9 @@ function workEditions(db, workId) {
 }
 
 function liveWorkId(db, workId) {
-  const alias = db.prepare('SELECT target_id FROM catalog_work_merges WHERE source_id=?').get(String(workId));
+  const alias = db
+    .prepare('SELECT target_id FROM catalog_work_merges WHERE source_id=?')
+    .get(String(workId));
   return alias ? liveWorkId(db, alias.target_id) : String(workId);
 }
 
@@ -153,16 +191,34 @@ export function variantsOfWork(repository, workId) {
   const work = db.prepare('SELECT id, title FROM works WHERE id=?').get(id);
   if (!work) return null;
   const editions = workEditions(db, id);
-  return { work, editions, variants: computeVariants(editions, { workTitle: work.title, overrides: overridesFor(db, editions.map((e) => e.id)) }) };
+  return {
+    work,
+    editions,
+    variants: computeVariants(editions, {
+      workTitle: work.title,
+      overrides: overridesFor(
+        db,
+        editions.map((e) => e.id),
+      ),
+    }),
+  };
 }
 
 /** The work's placeholder edition, created on first use. */
-export function ensureUnknownEdition(repository, workId, { now = () => new Date(), idFactory = randomUUID } = {}) {
+export function ensureUnknownEdition(
+  repository,
+  workId,
+  { now = () => new Date(), idFactory = randomUUID } = {},
+) {
   const db = repository.database;
   const id = liveWorkId(db, workId);
   const work = db.prepare('SELECT id, title FROM works WHERE id=?').get(id);
   if (!work) fail('WORK_NOT_FOUND', 404);
-  const existing = db.prepare('SELECT id FROM editions WHERE work_id=? AND is_unknown=1 ORDER BY created_at, id LIMIT 1').get(id);
+  const existing = db
+    .prepare(
+      'SELECT id FROM editions WHERE work_id=? AND is_unknown=1 ORDER BY created_at, id LIMIT 1',
+    )
+    .get(id);
   if (existing) return existing.id;
   const editionId = `unknown_${idFactory()}`;
   const at = now().toISOString();
@@ -193,7 +249,10 @@ export function chooseEditionForOffer(repository, workId, offerId) {
   const id = liveWorkId(db, workId);
   const editions = workEditions(db, id).filter((edition) => !edition.isUnknown);
   if (!editions.length) return { editionId: null, reason: 'no_editions' };
-  const offer = db.prepare('SELECT original_title, observed_isbn FROM offers WHERE id=?').get(String(offerId)) || {};
+  const offer =
+    db
+      .prepare('SELECT original_title, observed_isbn FROM offers WHERE id=?')
+      .get(String(offerId)) || {};
   const keys = isbnKeys(offer.observed_isbn ?? '');
   if (keys.length) {
     const byIsbn = db
@@ -204,24 +263,37 @@ export function chooseEditionForOffer(repository, workId, offerId) {
     if (byIsbn) return { editionId: byIsbn.id, reason: 'isbn' };
   }
   if (editions.length === 1) return { editionId: editions[0].id, reason: 'only_edition' };
-  const description = db.prepare("SELECT text FROM offer_descriptions WHERE offer_id=? AND status='found'").get(String(offerId))?.text || '';
+  const description =
+    db
+      .prepare("SELECT text FROM offer_descriptions WHERE offer_id=? AND status='found'")
+      .get(String(offerId))?.text || '';
   const hints = listingHints(`${offer.original_title ?? ''} ${description}`);
   let pool = editions;
   const used = [];
   if (hints.years.length) {
     const byYear = pool.filter((edition) => hints.years.includes(edition.publicationYear));
-    if (byYear.length) { pool = byYear; used.push('year'); }
+    if (byYear.length) {
+      pool = byYear;
+      used.push('year');
+    }
   }
   if (hints.binding) {
     const byBinding = pool.filter((edition) => bindingClass(edition.binding) === hints.binding);
-    if (byBinding.length) { pool = byBinding; used.push('binding'); }
+    if (byBinding.length) {
+      pool = byBinding;
+      used.push('binding');
+    }
   }
   const named = pool.filter((edition) => {
     const key = publisherKey(edition.publisher);
     return key.length >= 4 && hints.folded.includes(key);
   });
-  if (named.length && named.length < pool.length) { pool = named; used.push('publisher'); }
-  if (pool.length === 1 && used.length) return { editionId: pool[0].id, reason: `listing:${used.join('+')}` };
+  if (named.length && named.length < pool.length) {
+    pool = named;
+    used.push('publisher');
+  }
+  if (pool.length === 1 && used.length)
+    return { editionId: pool[0].id, reason: `listing:${used.join('+')}` };
   return { editionId: null, reason: 'ambiguous' };
 }
 
@@ -229,10 +301,24 @@ export function chooseEditionForOffer(repository, workId, offerId) {
 export function editionForWorkAssignment(repository, workId, offerId, options = {}) {
   const chosen = chooseEditionForOffer(repository, workId, offerId);
   if (chosen.editionId) return chosen;
-  return { editionId: ensureUnknownEdition(repository, workId, options), reason: chosen.reason, unknown: true };
+  return {
+    editionId: ensureUnknownEdition(repository, workId, options),
+    reason: chosen.reason,
+    unknown: true,
+  };
 }
 
-const NO_STATS = { offers: 0, live: 0, median: null, min: null, max: null, sold: 0, soldMedian: null, soldMin: null, soldMax: null };
+const NO_STATS = {
+  offers: 0,
+  live: 0,
+  median: null,
+  min: null,
+  max: null,
+  sold: 0,
+  soldMedian: null,
+  soldMin: null,
+  soldMax: null,
+};
 
 /**
  * Prices of a book: every offer assigned to any of its editions, overall, per variant, per kind of
@@ -246,8 +332,11 @@ export function workPriceOverview(repository, workId) {
   if (!base) return null;
   const { work, editions, variants } = base;
   const variantOf = new Map();
-  for (const variant of variants) for (const editionId of variant.editionIds) variantOf.set(editionId, variant.key);
-  const unknownIds = new Set(editions.filter((edition) => edition.isUnknown).map((edition) => edition.id));
+  for (const variant of variants)
+    for (const editionId of variant.editionIds) variantOf.set(editionId, variant.key);
+  const unknownIds = new Set(
+    editions.filter((edition) => edition.isUnknown).map((edition) => edition.id),
+  );
   const rows = editions.length
     ? db
         .prepare(
@@ -269,7 +358,9 @@ export function workPriceOverview(repository, workId) {
     kind: offerKind({ source: row.source, sellerName: row.seller_name }),
     conditionClass: row.condition_class ?? 'unknown',
     editionId: row.edition_id,
-    variant: unknownIds.has(row.edition_id) ? 'unknown' : variantOf.get(row.edition_id) ?? 'unknown',
+    variant: unknownIds.has(row.edition_id)
+      ? 'unknown'
+      : (variantOf.get(row.edition_id) ?? 'unknown'),
   }));
   const history = offers.length
     ? db
@@ -281,7 +372,12 @@ export function workPriceOverview(repository, workId) {
   const variantOfOffer = new Map(offers.map((item) => [item.id, item.variant]));
   const currencyOf = new Map(offers.map((item) => [item.id, item.currency]));
   // The offers of this book with their variant, as an SQL source for the statistics.
-  const groups = Object.fromEntries(editions.map((edition) => [edition.id, unknownIds.has(edition.id) ? 'unknown' : variantOf.get(edition.id) ?? 'unknown']));
+  const groups = Object.fromEntries(
+    editions.map((edition) => [
+      edition.id,
+      unknownIds.has(edition.id) ? 'unknown' : (variantOf.get(edition.id) ?? 'unknown'),
+    ]),
+  );
   const selected = `SELECT m.offer_id, v.value AS grp FROM offer_matches m JOIN json_each(?) v ON v.key=m.edition_id WHERE m.status='active'`;
   const params = [JSON.stringify(groups)];
   const byGroup = groupedPriceStats(db, selected, params, 'grp');
@@ -293,14 +389,28 @@ export function workPriceOverview(repository, workId) {
     overall: { ...NO_STATS, ...groupedPriceStats(db, selected, params, 'all').all },
     // Vinted copies found sold: what this book resells for.
     vintedSold: vintedSoldStats(db, selected, params),
-    kinds: OFFER_KINDS.map((kind) => ({ kind, label: OFFER_KIND_LABELS[kind], ...NO_STATS, ...byKind[kind] })).filter((row) => row.offers),
-    conditions: CONDITION_CLASSES.map((condition) => ({ condition, ...NO_STATS, ...byCondition[condition] })).filter((row) => row.offers),
+    kinds: OFFER_KINDS.map((kind) => ({
+      kind,
+      label: OFFER_KIND_LABELS[kind],
+      ...NO_STATS,
+      ...byKind[kind],
+    })).filter((row) => row.offers),
+    conditions: CONDITION_CLASSES.map((condition) => ({
+      condition,
+      ...NO_STATS,
+      ...byCondition[condition],
+    })).filter((row) => row.offers),
     variants: variants.map((variant) => ({ ...variant, ...NO_STATS, ...byGroup[variant.key] })),
     unknown: { editionIds: [...unknownIds], ...NO_STATS, ...byGroup.unknown },
     offers,
     points: history
       .filter((point) => currencyOf.get(point.offer_id) === 'PLN')
-      .map((point) => ({ offerId: point.offer_id, price: point.price, observedAt: point.observed_at, variant: variantOfOffer.get(point.offer_id) })),
+      .map((point) => ({
+        offerId: point.offer_id,
+        price: point.price,
+        observedAt: point.observed_at,
+        variant: variantOfOffer.get(point.offer_id),
+      })),
   };
 }
 
@@ -308,9 +418,16 @@ export function workPriceOverview(repository, workId) {
  * Moves an edition to the variant `variantKey` (another variant's key), to a new variant of its
  * own (`'own'`), or back to the computed one (`null`).
  */
-export function setEditionVariant(repository, editionId, variantKey, { now = () => new Date() } = {}) {
+export function setEditionVariant(
+  repository,
+  editionId,
+  variantKey,
+  { now = () => new Date() } = {},
+) {
   const db = repository.database;
-  const edition = db.prepare('SELECT id, work_id, is_unknown FROM editions WHERE id=?').get(String(editionId ?? ''));
+  const edition = db
+    .prepare('SELECT id, work_id, is_unknown FROM editions WHERE id=?')
+    .get(String(editionId ?? ''));
   if (!edition) fail('EDITION_NOT_FOUND', 404);
   if (edition.is_unknown === 1) fail('UNKNOWN_EDITION_HAS_NO_VARIANT', 409);
   if (variantKey == null || variantKey === '') {
@@ -318,7 +435,11 @@ export function setEditionVariant(repository, editionId, variantKey, { now = () 
   } else {
     const key = variantKey === 'own' ? `own:${randomUUID()}` : String(variantKey);
     if (key.length > 200) fail('INVALID_VARIANT');
-    if (variantKey !== 'own' && !variantsOfWork(repository, edition.work_id).variants.some((variant) => variant.key === key)) fail('VARIANT_NOT_FOUND', 404);
+    if (
+      variantKey !== 'own' &&
+      !variantsOfWork(repository, edition.work_id).variants.some((variant) => variant.key === key)
+    )
+      fail('VARIANT_NOT_FOUND', 404);
     db.prepare(
       'INSERT INTO edition_variant_overrides(edition_id, variant_key, updated_at) VALUES(?,?,?) ON CONFLICT(edition_id) DO UPDATE SET variant_key=excluded.variant_key, updated_at=excluded.updated_at',
     ).run(edition.id, key, now().toISOString());
@@ -340,7 +461,8 @@ export function mergeVariants(repository, workId, fromKey, toKey, { now = () => 
       'INSERT INTO edition_variant_overrides(edition_id, variant_key, updated_at) VALUES(?,?,?) ON CONFLICT(edition_id) DO UPDATE SET variant_key=excluded.variant_key, updated_at=excluded.updated_at',
     );
     // Pin the target's members too: its computed key might otherwise change later.
-    for (const editionId of [...to.editionIds, ...from.editionIds]) upsert.run(editionId, to.key, at);
+    for (const editionId of [...to.editionIds, ...from.editionIds])
+      upsert.run(editionId, to.key, at);
     return variantsOfWork(repository, workId);
   });
 }

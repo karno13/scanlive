@@ -7,7 +7,10 @@ import { mergeWorkGroup } from './trading-api.mjs';
 import { findDuplicateWorkGroups } from './work-grouping.mjs';
 import { reviewAutomaticBundleMatches } from './bundle-detection.mjs';
 import { ensureStarterProfiles } from './starter-profiles.mjs';
-import { rejectRepeatsOfRejectedOffers, undoUnconfirmedRepeatRejections } from './rejected-offers.mjs';
+import {
+  rejectRepeatsOfRejectedOffers,
+  undoUnconfirmedRepeatRejections,
+} from './rejected-offers.mjs';
 import { rejectForeignEditions } from './language-policy.mjs';
 import { normalizeStoredPublishers, PUBLISHER_RULES_VERSION } from './publisher-names.mjs';
 import { applyNameAliases, loadNameAliases } from './name-aliases.mjs';
@@ -27,7 +30,10 @@ export function runOnce(repository, key, job, { now = () => new Date() } = {}) {
 
 function mergeAutomaticDuplicates(repository) {
   const manual = new Set(
-    repository.database.prepare("SELECT id FROM works WHERE verification_status='manual'").all().map((row) => row.id),
+    repository.database
+      .prepare("SELECT id FROM works WHERE verification_status='manual'")
+      .all()
+      .map((row) => row.id),
   );
   let merged = 0;
   for (const group of findDuplicateWorkGroups(repository)) {
@@ -58,14 +64,34 @@ export function runStartupJobs(repository, { now = () => new Date(), env = proce
   // Once: automatic repeat-rejections of the first rule version (8.11) that the fixed rule does not
   // confirm go back to identification; then copies of rejected offers saved before the rule.
   // Afterwards new offers are checked when they are saved, existing ones after each rejection.
-  report.repeatsUndone = runOnce(repository, 'repeat_rejections_undo_v1', () => undoUnconfirmedRepeatRejections(repository, { now }), { now });
-  report.repeats = runOnce(repository, 'repeat_rejections_v1', () => rejectRepeatsOfRejectedOffers(repository, { now }), { now });
+  report.repeatsUndone = runOnce(
+    repository,
+    'repeat_rejections_undo_v1',
+    () => undoUnconfirmedRepeatRejections(repository, { now }),
+    { now },
+  );
+  report.repeats = runOnce(
+    repository,
+    'repeat_rejections_v1',
+    () => rejectRepeatsOfRejectedOffers(repository, { now }),
+    { now },
+  );
   // Once: foreign editions found before "Tylko polskie wydania"; afterwards every identification
   // pass and switching the option on do it.
-  report.foreign = runOnce(repository, 'foreign_editions_v1', () => rejectForeignEditions(repository, { now }), { now });
+  report.foreign = runOnce(
+    repository,
+    'foreign_editions_v1',
+    () => rejectForeignEditions(repository, { now }),
+    { now },
+  );
   // Once per spelling-rule version: every write path normalizes publishers, so stored names need a
   // pass only when the rules in publisher-names.mjs change (bump PUBLISHER_RULES_VERSION).
-  report.publishers = runOnce(repository, `publisher_names_v${PUBLISHER_RULES_VERSION}`, () => normalizeStoredPublishers(repository, { now }), { now });
+  report.publishers = runOnce(
+    repository,
+    `publisher_names_v${PUBLISHER_RULES_VERSION}`,
+    () => normalizeStoredPublishers(repository, { now }),
+    { now },
+  );
   // Every start — series names are written by BN reads and by the listing inference without the
   // alias table; this one pass applies the operator's merges to them (idempotent, one query each).
   report.aliases = applyNameAliases(repository, { now });

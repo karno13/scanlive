@@ -63,7 +63,9 @@ export const MAX_PLAUSIBLE_PRICE_GROSZE = 1_000_000;
 /** @param {unknown} value */
 function integerPrice(value) {
   const price = Number(value);
-  return Number.isFinite(price) && price > 0 && price < MAX_PLAUSIBLE_PRICE_GROSZE ? Math.round(price) : null;
+  return Number.isFinite(price) && price > 0 && price < MAX_PLAUSIBLE_PRICE_GROSZE
+    ? Math.round(price)
+    : null;
 }
 
 /** @param {string} prefix @param {...unknown} values */
@@ -79,7 +81,12 @@ function stableId(prefix, ...values) {
  * @param {{ scanSummary?: { at: string } & Record<string, unknown> | null, now?: () => Date }} [options]
  * @returns {IngestReport}
  */
-export function ingestScannedOffers(repository, offers, observedAt, { scanSummary = null, now = () => new Date() } = {}) {
+export function ingestScannedOffers(
+  repository,
+  offers,
+  observedAt,
+  { scanSummary = null, now = () => new Date() } = {},
+) {
   /** @type {IngestReport} */
   const report = { offers: 0, evidence: 0, jobs: 0, skipped: 0 };
   const at = observedAt instanceof Date ? observedAt.toISOString() : String(observedAt);
@@ -111,17 +118,30 @@ export function ingestScannedOffers(repository, offers, observedAt, { scanSummar
         matchedQueries: offer.matchedQueries ?? [],
         firstSeenAt: offer.firstSeenAt ?? at,
         lastSeenAt: offer.lastSeenAt ?? at,
-        seenCount: Number.isSafeInteger(offer.seenCount) && Number(offer.seenCount) > 0 ? offer.seenCount : undefined,
+        seenCount:
+          Number.isSafeInteger(offer.seenCount) && Number(offer.seenCount) > 0
+            ? offer.seenCount
+            : undefined,
         at: observedAt,
       });
       if (price != null) repository.appendPriceObservation(stored.id, price, observedAt);
       report.offers += 1;
       // The raw listing objects (result list, listing page) at first sight and when they change.
-      if (offer.rawListing && saveRawSnapshot(repository, stored.id, 'listing', offer.rawListing, at)) report.snapshots = (report.snapshots || 0) + 1;
-      if (offer.rawDetail && saveRawSnapshot(repository, stored.id, 'detail', offer.rawDetail, at)) report.snapshots = (report.snapshots || 0) + 1;
+      if (
+        offer.rawListing &&
+        saveRawSnapshot(repository, stored.id, 'listing', offer.rawListing, at)
+      )
+        report.snapshots = (report.snapshots || 0) + 1;
+      if (offer.rawDetail && saveRawSnapshot(repository, stored.id, 'detail', offer.rawDetail, at))
+        report.snapshots = (report.snapshots || 0) + 1;
       // The description read with the listing page also serves sets (no second read of the page).
       if (typeof offer.listingDescription === 'string' && offer.listingDescription.trim())
-        saveOfferDescription(repository, stored.id, { text: offer.listingDescription.trim().slice(0, 8000), status: 'found' }, at);
+        saveOfferDescription(
+          repository,
+          stored.id,
+          { text: offer.listingDescription.trim().slice(0, 8000), status: 'found' },
+          at,
+        );
 
       const evidence = extractOfferISBN(offer);
       let newEvidence = false;
@@ -143,24 +163,34 @@ export function ingestScannedOffers(repository, offers, observedAt, { scanSummar
           newEvidence = true;
         }
       }
-      const job = repository.putIdentificationJob({ offerId: stored.id, status: 'queued', at: observedAt });
+      const job = repository.putIdentificationJob({
+        offerId: stored.id,
+        status: 'queued',
+        at: observedAt,
+      });
       if (job.created) {
         report.jobs += 1;
         newJobOffers.push(stored.id);
       }
       // The seller added or corrected the ISBN since the last scan: the offer waiting in review
       // with the old answer ("no ISBN") goes back to the resolver.
-      else if (newEvidence && requeueForNewEvidence(repository, stored.id, at)) report.requeued = (report.requeued || 0) + 1;
+      else if (newEvidence && requeueForNewEvidence(repository, stored.id, at))
+        report.requeued = (report.requeued || 0) + 1;
     }
     // A re-listed or duplicate copy of a rejected offer is rejected before the resolver sees it.
     if (newJobOffers.length) {
-      const { rejected } = rejectRepeatsOfRejectedOffers(repository, { now, offerIds: newJobOffers });
+      const { rejected } = rejectRepeatsOfRejectedOffers(repository, {
+        now,
+        offerIds: newJobOffers,
+      });
       if (rejected) report.autoRejected = rejected;
     }
     if (scanSummary) {
       if (scanSummary.at !== at) throw Error('INVALID_SCAN_SUMMARY_TIME');
       repository.database
-        .prepare('INSERT OR REPLACE INTO scan_runs(scanned_at,summary_json,created_at) VALUES(?,?,?)')
+        .prepare(
+          'INSERT OR REPLACE INTO scan_runs(scanned_at,summary_json,created_at) VALUES(?,?,?)',
+        )
         .run(at, JSON.stringify(scanSummary), at);
     }
   });

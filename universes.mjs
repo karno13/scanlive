@@ -14,16 +14,43 @@
 import { createHash } from 'node:crypto';
 
 export const DEFAULT_UNIVERSES = [
-  { name: 'Świat Dysku', names: ['Świat Dysku', 'Discworld', 'Discworld series'], lines: [], markers: [] },
-  { name: 'Warcraft', names: ['World of Warcraft', 'Warcraft', 'Blizzard Legends'], lines: [], markers: [] },
+  {
+    name: 'Świat Dysku',
+    names: ['Świat Dysku', 'Discworld', 'Discworld series'],
+    lines: [],
+    markers: [],
+  },
+  {
+    name: 'Warcraft',
+    names: ['World of Warcraft', 'Warcraft', 'Blizzard Legends'],
+    lines: [],
+    markers: [],
+  },
   {
     name: 'Warhammer',
-    names: ['Warhammer', 'Warhammer 40 000', 'Warhammer 40K', 'WH40K', 'W40K', '40K', '40 000', 'Warhammer Fantasy', 'Warhammer Chronicles', 'Warhammer Age of Sigmar', 'Age of Sigmar'],
+    names: [
+      'Warhammer',
+      'Warhammer 40 000',
+      'Warhammer 40K',
+      'WH40K',
+      'W40K',
+      '40K',
+      '40 000',
+      'Warhammer Fantasy',
+      'Warhammer Chronicles',
+      'Warhammer Age of Sigmar',
+      'Age of Sigmar',
+    ],
     lines: ['Black Library', 'Czarna Biblioteka'],
     markers: ['Herezja Horusa', 'Horus Heresy', 'Horus'],
   },
   { name: 'Dragonlance', names: ['Dragonlance', 'Dragonlance Saga'], lines: [], markers: [] },
-  { name: 'Forgotten Realms', names: ['Forgotten Realms', 'Zapomniane Krainy'], lines: [], markers: ['Drizzt'] },
+  {
+    name: 'Forgotten Realms',
+    names: ['Forgotten Realms', 'Zapomniane Krainy'],
+    lines: [],
+    markers: ['Drizzt'],
+  },
   { name: 'Diablo', names: ['Diablo'], lines: [], markers: [] },
   { name: 'StarCraft', names: ['StarCraft'], lines: [], markers: [] },
   { name: 'Star Wars', names: ['Star Wars'], lines: [], markers: [] },
@@ -43,21 +70,47 @@ const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const folded = (name) => escape(foldName(name)).replace(/(\d+) (000)\b/g, '$1 ?$2');
 const raw = (name) =>
   [...new Set([String(name).toLowerCase().trim(), foldName(name)])]
-    .map((text) => escape(text).replace(/(\d+)(?:\\?[ .,])?(000)\b/g, '$1[\\s.,]?$2').replace(/ +/g, '\\s+'))
+    .map((text) =>
+      escape(text)
+        .replace(/(\d+)(?:\\?[ .,])?(000)\b/g, '$1[\\s.,]?$2')
+        .replace(/ +/g, '\\s+'),
+    )
     .join('|');
-const longestFirst = (list) => [...new Set(list)].sort((a, b) => b.length - a.length || a.localeCompare(b));
+const longestFirst = (list) =>
+  [...new Set(list)].sort((a, b) => b.length - a.length || a.localeCompare(b));
 
 function clean(list, limit = 40) {
   if (!Array.isArray(list)) return [];
-  return [...new Set(list.map((value) => String(value ?? '').trim().replace(/\s+/g, ' ')).filter((value) => value && value.length <= 100 && foldName(value)))].slice(0, limit);
+  return [
+    ...new Set(
+      list
+        .map((value) =>
+          String(value ?? '')
+            .trim()
+            .replace(/\s+/g, ' '),
+        )
+        .filter((value) => value && value.length <= 100 && foldName(value)),
+    ),
+  ].slice(0, limit);
 }
 function normalize(record) {
-  const name = String(record?.name ?? '').trim().replace(/\s+/g, ' ');
+  const name = String(record?.name ?? '')
+    .trim()
+    .replace(/\s+/g, ' ');
   const names = clean([name, ...(record?.names || [])]);
   return { name, names, lines: clean(record?.lines), markers: clean(record?.markers) };
 }
 
-const GENERIC_WORDS = new Set(['of', 'the', 'fantasy', 'saga', 'series', 'chronicles', 'age', 'legends']);
+const GENERIC_WORDS = new Set([
+  'of',
+  'the',
+  'fantasy',
+  'saga',
+  'series',
+  'chronicles',
+  'age',
+  'legends',
+]);
 
 function derive(universes) {
   const names = universes.flatMap((u) => u.names);
@@ -69,21 +122,44 @@ function derive(universes) {
     // bn-marc: a series statement that is the universe (optionally with its line) names no cycle.
     series: new RegExp(`^(?:${foldedNames})(?: (?:${alt(lines, folded)}))?$`),
     // catalog-series: the universe a title belongs to, first match in table order.
-    labels: universes.map((u) => [new RegExp(`\\b(?:${alt([...u.names, ...u.lines, ...u.markers], folded)})\\b`), u.name]),
+    labels: universes.map((u) => [
+      new RegExp(`\\b(?:${alt([...u.names, ...u.lines, ...u.markers], folded)})\\b`),
+      u.name,
+    ]),
     brandOnly: new RegExp(`^(?:${foldedNames})$`),
     // edition-series: words around the cycle in listings (longest first, as word lists).
     phrases: longestFirst([...names, ...lines].map(foldName)),
     // offer-editions: the same in raw listing text.
     patterns: longestFirst([...names, ...lines].map(raw)),
     // rejected-offers: words that never tell one product from another.
-    words: [...new Set([...names, ...lines].flatMap((name) => foldName(name).replace(/(\d+) (000)\b/g, '$1$2 $1 $2').split(' ')))],
+    words: [
+      ...new Set(
+        [...names, ...lines].flatMap((name) =>
+          foldName(name)
+            .replace(/(\d+) (000)\b/g, '$1$2 $1 $2')
+            .split(' '),
+        ),
+      ),
+    ],
     // search-policy: a search for one name also finds the others (retrieval only).
     families: universes.filter((u) => u.names.length > 1).map((u) => u.names),
-    topics: universes.map((u) => ({ keys: [...u.names, ...u.markers].map(foldName), terms: [...u.names, ...u.markers] })),
+    topics: universes.map((u) => ({
+      keys: [...u.names, ...u.markers].map(foldName),
+      terms: [...u.names, ...u.markers],
+    })),
     // title-consistency: names, lines and markers of one universe stand for each other.
     synonyms: universes.map((u) => [...u.names, ...u.lines, ...u.markers].map(foldName)),
     // title-proposals: brand words that are on the cover but rarely in the catalogued title.
-    brandWords: new Set(names.flatMap((name) => foldName(name).split(' ')).filter((word) => !GENERIC_WORDS.has(word)).concat(names.map((name) => foldName(name).replace(/ /g, '')).filter((word) => /^\d+$/.test(word)))),
+    brandWords: new Set(
+      names
+        .flatMap((name) => foldName(name).split(' '))
+        .filter((word) => !GENERIC_WORDS.has(word))
+        .concat(
+          names
+            .map((name) => foldName(name).replace(/ /g, ''))
+            .filter((word) => /^\d+$/.test(word)),
+        ),
+    ),
     // work-grouping: the universe before ":" / "." or in brackets after the title is branding.
     prefix: new RegExp(`^\\s*(?:${rawNames})\\s*[:.]\\s+`, 'iu'),
     suffix: new RegExp(`\\s*[([](?:${rawNames})[)\\]]\\s*$`, 'iu'),
@@ -107,7 +183,10 @@ export function setUniverses(list) {
 /** Changes whenever the universes in use change (work keys depend on them). */
 export const universesVersion = () => version;
 export function currentUniverses() {
-  return records.map((record) => ({ ...record, names: record.names.filter((name) => name !== record.name) }));
+  return records.map((record) => ({
+    ...record,
+    names: record.names.filter((name) => name !== record.name),
+  }));
 }
 
 // The derived lists, for their single users (see the header).
@@ -126,7 +205,10 @@ export const universeSuffix = () => derived.suffix;
 /** Words a discovery phrase of a universe accepts in listing titles: all names and markers of it. */
 export function topicTerms(category) {
   const key = ` ${foldName(category)} `;
-  return derived.topics.find((topic) => topic.keys.some((name) => name && key.includes(` ${name} `)))?.terms ?? [];
+  return (
+    derived.topics.find((topic) => topic.keys.some((name) => name && key.includes(` ${name} `)))
+      ?.terms ?? []
+  );
 }
 
 // --- the table (migration 126)
@@ -134,11 +216,22 @@ export function topicTerms(category) {
 export function loadUniverses(repository) {
   let rows;
   try {
-    rows = repository.database.prepare('SELECT name, names_json, lines_json, markers_json FROM universes ORDER BY position, name').all();
+    rows = repository.database
+      .prepare(
+        'SELECT name, names_json, lines_json, markers_json FROM universes ORDER BY position, name',
+      )
+      .all();
   } catch {
     return currentUniverses();
   }
-  return setUniverses(rows.map((row) => ({ name: row.name, names: JSON.parse(row.names_json), lines: JSON.parse(row.lines_json), markers: JSON.parse(row.markers_json) })));
+  return setUniverses(
+    rows.map((row) => ({
+      name: row.name,
+      names: JSON.parse(row.names_json),
+      lines: JSON.parse(row.lines_json),
+      markers: JSON.parse(row.markers_json),
+    })),
+  );
 }
 
 function fail(code, statusCode = 400) {
@@ -153,30 +246,52 @@ export function listUniverses(repository) {
 export function saveUniverse(repository, input = {}, { now = () => new Date() } = {}) {
   const record = normalize(input);
   if (!record.name || record.name.length > 100) fail('INVALID_UNIVERSE_NAME');
-  for (const field of ['names', 'lines', 'markers']) if (input[field] != null && !Array.isArray(input[field])) fail('INVALID_UNIVERSE_FIELDS');
-  const previous = typeof input.previousName === 'string' && input.previousName.trim() ? input.previousName.trim() : record.name;
+  for (const field of ['names', 'lines', 'markers'])
+    if (input[field] != null && !Array.isArray(input[field])) fail('INVALID_UNIVERSE_FIELDS');
+  const previous =
+    typeof input.previousName === 'string' && input.previousName.trim()
+      ? input.previousName.trim()
+      : record.name;
   const db = repository.database;
   // A spelling may belong to one universe only: otherwise a title would be filed under two.
   const taken = new Map();
-  for (const other of loadUniverses(repository)) if (other.name !== previous) for (const name of [other.name, ...other.names]) taken.set(foldName(name), other.name);
+  for (const other of loadUniverses(repository))
+    if (other.name !== previous)
+      for (const name of [other.name, ...other.names]) taken.set(foldName(name), other.name);
   const clash = record.names.find((name) => taken.has(foldName(name)));
-  if (clash) throw Object.assign(Error('UNIVERSE_NAME_TAKEN'), { statusCode: 409, detail: `${clash} → ${taken.get(foldName(clash))}` });
+  if (clash)
+    throw Object.assign(Error('UNIVERSE_NAME_TAKEN'), {
+      statusCode: 409,
+      detail: `${clash} → ${taken.get(foldName(clash))}`,
+    });
   const at = now().toISOString();
   repository.transaction(() => {
     const old = db.prepare('SELECT position FROM universes WHERE name=?').get(previous);
-    const position = old?.position ?? Number(db.prepare('SELECT coalesce(max(position),-1)+1 AS next FROM universes').get().next);
-    if (old && previous !== record.name) db.prepare('DELETE FROM universes WHERE name=?').run(previous);
+    const position =
+      old?.position ??
+      Number(db.prepare('SELECT coalesce(max(position),-1)+1 AS next FROM universes').get().next);
+    if (old && previous !== record.name)
+      db.prepare('DELETE FROM universes WHERE name=?').run(previous);
     db.prepare(
       `INSERT INTO universes(name,names_json,lines_json,markers_json,position,updated_at) VALUES(?,?,?,?,?,?)
        ON CONFLICT(name) DO UPDATE SET names_json=excluded.names_json, lines_json=excluded.lines_json,
          markers_json=excluded.markers_json, updated_at=excluded.updated_at`,
-    ).run(record.name, JSON.stringify(record.names.filter((name) => name !== record.name)), JSON.stringify(record.lines), JSON.stringify(record.markers), position, at);
+    ).run(
+      record.name,
+      JSON.stringify(record.names.filter((name) => name !== record.name)),
+      JSON.stringify(record.lines),
+      JSON.stringify(record.markers),
+      position,
+      at,
+    );
   });
   return listUniverses(repository);
 }
 
 export function deleteUniverse(repository, name) {
-  const result = repository.database.prepare('DELETE FROM universes WHERE name=?').run(String(name ?? ''));
+  const result = repository.database
+    .prepare('DELETE FROM universes WHERE name=?')
+    .run(String(name ?? ''));
   if (!Number(result.changes)) fail('UNIVERSE_NOT_FOUND', 404);
   return listUniverses(repository);
 }

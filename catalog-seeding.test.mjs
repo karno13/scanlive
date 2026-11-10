@@ -49,7 +49,11 @@ test('a seed adds every Polish book with an ISBN as a reference edition, page by
       calls,
     );
     const seed = seeds.add({ kind: 'author', query: 'Guymer, David', publisher: 'Copernicus' });
-    assert.match(calls[0] ?? seedUrl({ kind: 'author', query: 'Guymer, David', publisher_filter: 'Copernicus' }), /author=Guymer/);
+    assert.match(
+      calls[0] ??
+        seedUrl({ kind: 'author', query: 'Guymer, David', publisher_filter: 'Copernicus' }),
+      /author=Guymer/,
+    );
     assert.equal((await seeds.step()).state, 'more');
     assert.equal(calls[1] ?? calls[0], calls[0]);
     assert.equal((await seeds.step()).state, 'done');
@@ -63,9 +67,12 @@ test('a seed adds every Polish book with an ISBN as a reference edition, page by
     assert.equal(listed.skipped, 3);
     const edition = repository.findEditionByISBN('9788382320084');
     assert.equal(edition.title, 'Zabójca krasnoludów');
-    assert.deepEqual(editionContributors(repository, edition.id).map((person) => person.name), ['David Guymer', 'Jacek Czuba']);
+    assert.deepEqual(
+      editionContributors(repository, edition.id).map((person) => person.name),
+      ['David Guymer', 'Jacek Czuba'],
+    );
     assert.equal(
-      repository.database.prepare("SELECT count(*) AS n FROM offer_matches").get().n,
+      repository.database.prepare('SELECT count(*) AS n FROM offer_matches').get().n,
       0,
       'seeding never assigns offers',
     );
@@ -77,7 +84,9 @@ test('a seed adds every Polish book with an ISBN as a reference edition, page by
 test('a BN outage pauses seeding without failing the seed', async () => {
   const repository = new SqliteCatalogRepository(':memory:');
   try {
-    const seeds = service(repository, [{ status: 'temporary_error', error: { code: 'CERT_HAS_EXPIRED' } }]);
+    const seeds = service(repository, [
+      { status: 'temporary_error', error: { code: 'CERT_HAS_EXPIRED' } },
+    ]);
     seeds.add({ kind: 'publisher', query: 'Copernicus Corporation' });
     const result = await seeds.step();
     assert.deepEqual(result, { state: 'outage', reason: 'CERT_HAS_EXPIRED' });
@@ -111,7 +120,9 @@ test('seed input is validated, deduplicated and can be paused or removed', () =>
 test('only BN pagination links are followed', async () => {
   const repository = new SqliteCatalogRepository(':memory:');
   try {
-    const seeds = service(repository, [{ status: 'found', payload: { bibs: [KINSLAYER], nextPage: 'https://evil.test/next' } }]);
+    const seeds = service(repository, [
+      { status: 'found', payload: { bibs: [KINSLAYER], nextPage: 'https://evil.test/next' } },
+    ]);
     seeds.add({ kind: 'title', query: 'Gotrek' });
     assert.equal((await seeds.step()).state, 'done');
   } finally {

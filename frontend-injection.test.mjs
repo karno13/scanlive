@@ -9,7 +9,10 @@ test('every workspace receives both DOM selector helpers', async () => {
     const source = await readFile(new URL('./app/views/' + name + '.js', import.meta.url), 'utf8');
     const title = name[0].toUpperCase() + name.slice(1);
     assert.ok(source.includes('({ state, $, $$, json'), name + ' declaration');
-    assert.ok(shell.includes('const ' + name + 'View = create' + title + 'View({ state, $, $$, json'), name + ' injection');
+    assert.ok(
+      shell.includes('const ' + name + 'View = create' + title + 'View({ state, $, $$, json'),
+      name + ' injection',
+    );
   }
   assert.ok(!shell.includes('state, $, $, json'));
 });

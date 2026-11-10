@@ -5,7 +5,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { proxiedImage } from './offer-images.mjs';
 import { authorTokens, scoreCandidate, titleTokens } from './title-proposals.mjs';
 import { createCatalogBundleDetector, looksLikeBundle } from './bundle-detection.mjs';
-import { chooseEditionForOffer, editionForWorkAssignment, variantsOfWork } from './edition-variants.mjs';
+import {
+  chooseEditionForOffer,
+  editionForWorkAssignment,
+  variantsOfWork,
+} from './edition-variants.mjs';
 
 const json = (value, fallback = null) => {
   try {
@@ -25,7 +29,8 @@ const page = (options = {}) => ({
   offset: number(options.offset, 0, 0, 1_000_000),
   query: String(options.query ?? '')
     .trim()
-    .normalize('NFC').toLocaleLowerCase('pl'),
+    .normalize('NFC')
+    .toLocaleLowerCase('pl'),
 });
 
 function identifierMap(database, editionIds) {
@@ -39,14 +44,12 @@ function identifierMap(database, editionIds) {
     .all(...editionIds);
   for (const row of rows) {
     if (!result.has(row.edition_id)) result.set(row.edition_id, []);
-    result
-      .get(row.edition_id)
-      .push({
-        scheme: row.scheme,
-        value: row.normalized_value,
-        source: row.source,
-        verificationStatus: row.verification_status,
-      });
+    result.get(row.edition_id).push({
+      scheme: row.scheme,
+      value: row.normalized_value,
+      source: row.source,
+      verificationStatus: row.verification_status,
+    });
   }
   return result;
 }
@@ -101,13 +104,18 @@ function editionCovers(database, editionIds) {
        ORDER BY CASE o.source WHEN 'Empik' THEN 0 WHEN 'Tezeusz.pl' THEN 1 WHEN 'Dedalus.pl' THEN 2 ELSE 3 END, o.last_seen_at DESC`,
     )
     .all(...editionIds);
-  for (const row of rows) if (!result.has(row.edition_id)) result.set(row.edition_id, proxiedImage(row.image_url));
+  for (const row of rows)
+    if (!result.has(row.edition_id)) result.set(row.edition_id, proxiedImage(row.image_url));
   return result;
 }
 
 // Bibliographic details from migration 112 (BN MARC): people with roles, series, original title.
 function hasBibliography(database) {
-  return Boolean(database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='edition_series'").get());
+  return Boolean(
+    database
+      .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='edition_series'")
+      .get(),
+  );
 }
 function editionBibliography(database, row) {
   if (!hasBibliography(database)) return {};
@@ -126,9 +134,16 @@ function editionBibliography(database, row) {
       .all(row.id)
       .map((item) => ({ id: item.id, name: item.name, role: item.role })),
     series: database
-      .prepare('SELECT name, kind, volume, source FROM edition_series WHERE edition_id=? ORDER BY position, name')
+      .prepare(
+        'SELECT name, kind, volume, source FROM edition_series WHERE edition_id=? ORDER BY position, name',
+      )
       .all(row.id)
-      .map((item) => ({ name: item.name, kind: item.kind, volume: item.volume, source: item.source })),
+      .map((item) => ({
+        name: item.name,
+        kind: item.kind,
+        volume: item.volume,
+        source: item.source,
+      })),
   };
 }
 
@@ -136,28 +151,49 @@ export function listCatalogWorks(repository, options = {}) {
   const { database } = repository,
     { limit, offset, query } = page(options),
     like = likeLiteral(query);
-  const conditions = ["NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id)"];
+  const conditions = ['NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id)'];
   const params = [];
   if (query) {
     // Also finds translators and original titles ("Cholewa", "Light fantastic").
     const extra = hasBibliography(database)
       ? " OR EXISTS (SELECT 1 FROM editions pe JOIN edition_contributors pc ON pc.edition_id=pe.id JOIN persons pp ON pp.id=pc.person_id WHERE pe.work_id=w.id AND bookflip_fold(pp.name) LIKE ? ESCAPE '!') OR EXISTS (SELECT 1 FROM editions oe WHERE oe.work_id=w.id AND bookflip_fold(oe.original_title) LIKE ? ESCAPE '!')"
       : '';
-    conditions.push("(bookflip_fold(w.title) LIKE ? ESCAPE '!' OR bookflip_fold(w.authors_json) LIKE ? ESCAPE '!' OR EXISTS (SELECT 1 FROM editions se JOIN edition_identifiers si ON si.edition_id=se.id WHERE se.work_id=w.id AND bookflip_fold(si.normalized_value) LIKE ? ESCAPE '!')" + extra + ')');
-    params.push(like,like,like);
+    conditions.push(
+      "(bookflip_fold(w.title) LIKE ? ESCAPE '!' OR bookflip_fold(w.authors_json) LIKE ? ESCAPE '!' OR EXISTS (SELECT 1 FROM editions se JOIN edition_identifiers si ON si.edition_id=se.id WHERE se.work_id=w.id AND bookflip_fold(si.normalized_value) LIKE ? ESCAPE '!')" +
+        extra +
+        ')',
+    );
+    params.push(like, like, like);
     if (extra) params.push(like, like);
   }
   if (options.person && hasBibliography(database)) {
-    conditions.push('EXISTS (SELECT 1 FROM editions xe JOIN edition_contributors xc ON xc.edition_id=xe.id WHERE xe.work_id=w.id AND xc.person_id=?)');
+    conditions.push(
+      'EXISTS (SELECT 1 FROM editions xe JOIN edition_contributors xc ON xc.edition_id=xe.id WHERE xe.work_id=w.id AND xc.person_id=?)',
+    );
     params.push(String(options.person));
   }
-  const editionFilters=[];
-  for(const [key,column] of [['language','language'],['publisher','publisher'],['binding','binding']]) {
-    if(options[key]) {editionFilters.push('bookflip_fold(fe.'+column+')=bookflip_fold(?)');params.push(String(options[key]));}
+  const editionFilters = [];
+  for (const [key, column] of [
+    ['language', 'language'],
+    ['publisher', 'publisher'],
+    ['binding', 'binding'],
+  ]) {
+    if (options[key]) {
+      editionFilters.push('bookflip_fold(fe.' + column + ')=bookflip_fold(?)');
+      params.push(String(options[key]));
+    }
   }
-  if(options.year) {editionFilters.push('fe.publication_year=?');params.push(Number(options.year));}
-  if(editionFilters.length) conditions.push('EXISTS (SELECT 1 FROM editions fe WHERE fe.work_id=w.id AND '+editionFilters.join(' AND ')+')');
-  const where = 'WHERE '+conditions.join(' AND ');
+  if (options.year) {
+    editionFilters.push('fe.publication_year=?');
+    params.push(Number(options.year));
+  }
+  if (editionFilters.length)
+    conditions.push(
+      'EXISTS (SELECT 1 FROM editions fe WHERE fe.work_id=w.id AND ' +
+        editionFilters.join(' AND ') +
+        ')',
+    );
+  const where = 'WHERE ' + conditions.join(' AND ');
   const total = Number(
     database.prepare(`SELECT count(*) AS count FROM works w ${where}`).get(...params).count,
   );
@@ -180,24 +216,25 @@ export function listCatalogWorks(repository, options = {}) {
       database,
       editionRows.map((row) => row.id),
     ),
-    covers = editionCovers(database, editionRows.map((row) => row.id)),
+    covers = editionCovers(
+      database,
+      editionRows.map((row) => row.id),
+    ),
     byWork = new Map();
   for (const row of editionRows) {
     if (!byWork.has(row.work_id)) byWork.set(row.work_id, []);
-    byWork
-      .get(row.work_id)
-      .push({
-        id: row.id,
-        title: row.title,
-        publisher: row.publisher,
-        publicationYear: row.publication_year,
-        language: row.language,
-        binding: row.binding,
-        verificationStatus: row.verification_status,
-        identifiers: identifiers.get(row.id) ?? [],
-        cover: covers.get(row.id) ?? null,
-        ...editionBibliography(database, row),
-      });
+    byWork.get(row.work_id).push({
+      id: row.id,
+      title: row.title,
+      publisher: row.publisher,
+      publicationYear: row.publication_year,
+      language: row.language,
+      binding: row.binding,
+      verificationStatus: row.verification_status,
+      identifiers: identifiers.get(row.id) ?? [],
+      cover: covers.get(row.id) ?? null,
+      ...editionBibliography(database, row),
+    });
   }
   return {
     total,
@@ -218,8 +255,10 @@ export function listCatalogWorks(repository, options = {}) {
 }
 
 export function getCatalogWork(repository, workId) {
-  const alias=repository.database.prepare('SELECT target_id FROM catalog_work_merges WHERE source_id=?').get(String(workId));
-  if(alias) return getCatalogWork(repository,alias.target_id);
+  const alias = repository.database
+    .prepare('SELECT target_id FROM catalog_work_merges WHERE source_id=?')
+    .get(String(workId));
+  if (alias) return getCatalogWork(repository, alias.target_id);
   const { database } = repository,
     row = database.prepare('SELECT * FROM works WHERE id=?').get(String(workId));
   if (!row) return null;
@@ -229,12 +268,17 @@ export function getCatalogWork(repository, workId) {
   const editions = allEditions.filter((item) => item.is_unknown !== 1);
   const unknownIds = allEditions.filter((item) => item.is_unknown === 1).map((item) => item.id);
   const { variants } = variantsOfWork(repository, row.id);
-  const variantOf = new Map(variants.flatMap((variant) => variant.editionIds.map((id) => [id, variant.key])));
+  const variantOf = new Map(
+    variants.flatMap((variant) => variant.editionIds.map((id) => [id, variant.key])),
+  );
   const identifiers = identifierMap(
     database,
     editions.map((item) => item.id),
   );
-  const covers = editionCovers(database, editions.map((item) => item.id));
+  const covers = editionCovers(
+    database,
+    editions.map((item) => item.id),
+  );
   const external = database
     .prepare(
       `SELECT DISTINCT r.provider,r.external_id,r.record_type,r.status,r.fetched_at,r.payload_hash
@@ -268,7 +312,13 @@ export function getCatalogWork(repository, workId) {
           .get(item.id).count,
       ),
     })),
-    variants: variants.map(({ key, label, manual, editionIds, years }) => ({ key, label, manual, editionIds, years })),
+    variants: variants.map(({ key, label, manual, editionIds, years }) => ({
+      key,
+      label,
+      manual,
+      editionIds,
+      years,
+    })),
     // Offers assigned to the book without a named edition.
     unknownEdition: unknownIds.length
       ? {
@@ -276,7 +326,9 @@ export function getCatalogWork(repository, workId) {
           editionIds: unknownIds,
           activeOfferCount: Number(
             database
-              .prepare(`SELECT count(*) AS count FROM offer_matches WHERE status='active' AND edition_id IN (${unknownIds.map(() => '?').join(',')})`)
+              .prepare(
+                `SELECT count(*) AS count FROM offer_matches WHERE status='active' AND edition_id IN (${unknownIds.map(() => '?').join(',')})`,
+              )
               .get(...unknownIds).count,
           ),
         }
@@ -364,27 +416,49 @@ function offerQueryParts(options) {
     params.push(source);
   }
   // Rejected in review (by hand or as a copy of a rejected offer): out of every list unless asked for.
-  const rejectedSql = "(j.status='completed' AND json_valid(j.result_json) AND json_extract(j.result_json,'$.manualDecision') IN ('excluded','not_book'))";
+  const rejectedSql =
+    "(j.status='completed' AND json_valid(j.result_json) AND json_extract(j.result_json,'$.manualDecision') IN ('excluded','not_book'))";
   if (status === 'rejected') conditions.push(rejectedSql);
   else if (status !== 'all') conditions.push(`NOT coalesce(${rejectedSql},0)`);
   if (status === 'matched') conditions.push('m.id IS NOT NULL');
   if (status === 'review')
     conditions.push("j.status IN ('queued','running','retry_wait','review_required','failed')");
   // Listings first seen after a moment (e.g. the operator's previous visit).
-  if (options.since && !Number.isNaN(Date.parse(String(options.since)))) { conditions.push('o.first_seen_at>?'); params.push(new Date(String(options.since)).toISOString()); }
+  if (options.since && !Number.isNaN(Date.parse(String(options.since)))) {
+    conditions.push('o.first_seen_at>?');
+    params.push(new Date(String(options.since)).toISOString());
+  }
   if (options.watched === '1') conditions.push('ow.watched=1');
-  if (options.target === '1') conditions.push("ow.watched=1 AND ow.target_price IS NOT NULL AND o.currency='PLN' AND o.current_price<=round(ow.target_price*100)");
-  if (options.purchaseStatus) {conditions.push('ow.purchase_status=?');params.push(String(options.purchaseStatus));}
+  if (options.target === '1')
+    conditions.push(
+      "ow.watched=1 AND ow.target_price IS NOT NULL AND o.currency='PLN' AND o.current_price<=round(ow.target_price*100)",
+    );
+  if (options.purchaseStatus) {
+    conditions.push('ow.purchase_status=?');
+    params.push(String(options.purchaseStatus));
+  }
   if (options.scan) {
-    conditions.push('EXISTS (SELECT 1 FROM scan_offer_results sr WHERE sr.offer_id=o.id AND sr.scanned_at=?'+
-      (options.scanChange==='new'?' AND sr.is_new=1':options.scanChange==='price'?' AND sr.price_changed=1':'')+')');
+    conditions.push(
+      'EXISTS (SELECT 1 FROM scan_offer_results sr WHERE sr.offer_id=o.id AND sr.scanned_at=?' +
+        (options.scanChange === 'new'
+          ? ' AND sr.is_new=1'
+          : options.scanChange === 'price'
+            ? ' AND sr.price_changed=1'
+            : '') +
+        ')',
+    );
     params.push(String(options.scan));
   }
-  for (const [key,operator] of [['minPrice','>='],['maxPrice','<=']]) {
-    if (options[key]!==undefined && options[key]!=='') {
-      const value=Number(options[key]);
-      if(!Number.isFinite(value)||value<0||value>100000000) throw Object.assign(Error('INVALID_PRICE_FILTER'),{statusCode:400});
-      conditions.push("o.currency='PLN' AND o.current_price"+operator+'?');params.push(Math.round(value*100));
+  for (const [key, operator] of [
+    ['minPrice', '>='],
+    ['maxPrice', '<='],
+  ]) {
+    if (options[key] !== undefined && options[key] !== '') {
+      const value = Number(options[key]);
+      if (!Number.isFinite(value) || value < 0 || value > 100000000)
+        throw Object.assign(Error('INVALID_PRICE_FILTER'), { statusCode: 400 });
+      conditions.push("o.currency='PLN' AND o.current_price" + operator + '?');
+      params.push(Math.round(value * 100));
     }
   }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -430,9 +504,17 @@ export function listCatalogOffers(repository, options = {}) {
     offset,
     items: rows.map((row) => ({
       ...offer(row),
-      purchaseStatus:row.purchase_status || null,watched:Boolean(row.watched),targetPrice:row.target_price ?? null,
-      actualPurchase:row.actual_purchase ?? null,
-      targetReached:Boolean(row.watched && row.target_price!==null && row.currency==='PLN' && row.current_price!==null && row.current_price<=Math.round(row.target_price*100)),
+      purchaseStatus: row.purchase_status || null,
+      watched: Boolean(row.watched),
+      targetPrice: row.target_price ?? null,
+      actualPurchase: row.actual_purchase ?? null,
+      targetReached: Boolean(
+        row.watched &&
+        row.target_price !== null &&
+        row.currency === 'PLN' &&
+        row.current_price !== null &&
+        row.current_price <= Math.round(row.target_price * 100),
+      ),
       match: row.match_id
         ? {
             id: row.match_id,
@@ -458,19 +540,28 @@ export function listCatalogOfferGroups(repository, options = {}) {
     { limit, offset } = page(options),
     { from, where, params } = offerQueryParts(options);
   const grouped = `${where ? where + ' AND' : 'WHERE'} m.id IS NOT NULL`;
-  const total = Number(database.prepare(`SELECT count(DISTINCT m.edition_id) AS count ${from} ${grouped}`).get(...params).count);
-  const unassigned = Number(
-    database.prepare(`SELECT count(DISTINCT o.id) AS count ${from} ${where ? where + ' AND' : 'WHERE'} m.id IS NULL`).get(...params).count,
+  const total = Number(
+    database
+      .prepare(`SELECT count(DISTINCT m.edition_id) AS count ${from} ${grouped}`)
+      .get(...params).count,
   );
-  const order = {
-    newest: 'newest DESC',
-    oldest: 'newest ASC',
-    'price-asc': 'min_price IS NULL, min_price ASC',
-    'price-desc': 'max_price IS NULL, max_price DESC',
-    title: 'bookflip_fold(w.title) ASC',
-    'title-desc': 'bookflip_fold(w.title) DESC',
-    offers: 'offers DESC',
-  }[String(options.sort || 'offers')] || 'offers DESC';
+  const unassigned = Number(
+    database
+      .prepare(
+        `SELECT count(DISTINCT o.id) AS count ${from} ${where ? where + ' AND' : 'WHERE'} m.id IS NULL`,
+      )
+      .get(...params).count,
+  );
+  const order =
+    {
+      newest: 'newest DESC',
+      oldest: 'newest ASC',
+      'price-asc': 'min_price IS NULL, min_price ASC',
+      'price-desc': 'max_price IS NULL, max_price DESC',
+      title: 'bookflip_fold(w.title) ASC',
+      'title-desc': 'bookflip_fold(w.title) DESC',
+      offers: 'offers DESC',
+    }[String(options.sort || 'offers')] || 'offers DESC';
   const rows = database
     .prepare(
       `SELECT e.id AS edition_id, w.id AS work_id, w.title AS work_title, w.authors_json, e.title AS edition_title,
@@ -482,7 +573,10 @@ export function listCatalogOfferGroups(repository, options = {}) {
        ${from} ${grouped} GROUP BY e.id ORDER BY ${order}, e.id LIMIT ? OFFSET ?`,
     )
     .all(...params, limit, offset);
-  const covers = editionCovers(database, rows.map((row) => row.edition_id));
+  const covers = editionCovers(
+    database,
+    rows.map((row) => row.edition_id),
+  );
   return {
     total,
     unassigned,
@@ -500,7 +594,9 @@ export function listCatalogOfferGroups(repository, options = {}) {
       offers: Number(row.offers),
       minPrice: row.min_price ?? null,
       maxPrice: row.max_price ?? null,
-      sources: String(row.sources || '').split(',').filter(Boolean),
+      sources: String(row.sources || '')
+        .split(',')
+        .filter(Boolean),
       newest: row.newest,
       cover: covers.get(row.edition_id) || null,
     })),
@@ -586,7 +682,8 @@ export function getCatalogOffer(repository, offerId) {
 export const REVIEW_BUCKETS = ['quick', 'add', 'noisbn', 'bundle', 'games', 'other'];
 export const GAME_REASONS = ['game_rulebook', 'foreign_edition'];
 export const ADD_REASONS = ['isbn_not_found_in_metadata_sources', 'multiple_metadata_records'];
-const REASON_SQL = "json_extract(CASE WHEN json_valid(j.result_json) THEN j.result_json ELSE '{}' END,'$.reason[0]')";
+const REASON_SQL =
+  "json_extract(CASE WHEN json_valid(j.result_json) THEN j.result_json ELSE '{}' END,'$.reason[0]')";
 // One placeholder: the JSON list of "quick" job ids.
 // Parameters: the bundle job ids, then the quick job ids (both JSON arrays from reviewGroups).
 const BUCKET_SQL = `(CASE WHEN ${REASON_SQL} IN ('game_rulebook','foreign_edition') THEN 'games'
@@ -650,7 +747,11 @@ export function sureReviewPlan(repository, { jobIds = null } = {}) {
   let skipped = 0;
   for (const row of rows) {
     // 0.9: a weaker title match ("Mroczne Imperium" vs the trilogy's third book) is not sure.
-    const local = localEditionCandidates(repository, row.original_title, { limit: 6, minScore: 0.9, matcher });
+    const local = localEditionCandidates(repository, row.original_title, {
+      limit: 6,
+      minScore: 0.9,
+      matcher,
+    });
     const works = new Set(local.map((item) => item.workId));
     if (local.length && works.size === 1) {
       // The edition only when the listing points at it; otherwise the book with an unknown edition.
@@ -658,10 +759,20 @@ export function sureReviewPlan(repository, { jobIds = null } = {}) {
       const best = local.find((item) => item.editionId === choice.editionId) || null;
       const shown = best || local[0];
       items.push({
-        jobId: row.id, offerTitle: row.original_title, source: row.source, kind: 'edition',
-        editionId: best?.editionId ?? null, workId: shown.workId, editionReason: choice.reason,
-        title: shown.title, authors: shown.authors, publisher: best?.publisher ?? '', year: best?.publicationYear ?? null, isbn: best?.isbn ?? '',
-        score: shown.score, editions: local.length,
+        jobId: row.id,
+        offerTitle: row.original_title,
+        source: row.source,
+        kind: 'edition',
+        editionId: best?.editionId ?? null,
+        workId: shown.workId,
+        editionReason: choice.reason,
+        title: shown.title,
+        authors: shown.authors,
+        publisher: best?.publisher ?? '',
+        year: best?.publicationYear ?? null,
+        isbn: best?.isbn ?? '',
+        score: shown.score,
+        editions: local.length,
       });
       continue;
     }
@@ -669,10 +780,18 @@ export function sureReviewPlan(repository, { jobIds = null } = {}) {
     // A catalogue work that resembles the title (even weakly) makes a new ISBN a real choice.
     if (!local.length && candidate?.isbn && !matcher(row.original_title, { limit: 1 }).length) {
       items.push({
-        jobId: row.id, offerTitle: row.original_title, source: row.source, kind: 'isbn', isbn: candidate.isbn,
-        title: candidate.title, authors: candidate.authors?.length ? candidate.authors : [candidate.authorText].filter(Boolean),
+        jobId: row.id,
+        offerTitle: row.original_title,
+        source: row.source,
+        kind: 'isbn',
+        isbn: candidate.isbn,
+        title: candidate.title,
+        authors: candidate.authors?.length
+          ? candidate.authors
+          : [candidate.authorText].filter(Boolean),
         publisher: candidate.publisher ?? '',
-        year: candidate.publicationYear ?? null, score: candidate.score ?? null,
+        year: candidate.publicationYear ?? null,
+        score: candidate.score ?? null,
       });
       continue;
     }
@@ -689,16 +808,30 @@ export async function applySureReviewPlan(catalog, items = []) {
     try {
       if (item?.editionId || item?.workId) {
         decideIdentificationJob(catalog.repository, jobId, {
-          action: 'approved', ...(item.editionId ? { editionId: String(item.editionId) } : { workId: String(item.workId) }),
+          action: 'approved',
+          ...(item.editionId
+            ? { editionId: String(item.editionId) }
+            : { workId: String(item.workId) }),
           reason: 'Zatwierdzono hurtowo: tytuł jednoznacznie pasuje do dzieła z katalogu.',
         });
         results.push({ jobId, ok: true });
       } else if (item?.isbn) {
-        const result = await matchIdentificationJobByIsbn(catalog, jobId, { isbn: String(item.isbn), confirm: true });
-        results.push(result.matched ? { jobId, ok: true } : { jobId, ok: false, error: [].concat(result.reason ?? ['NOT_MATCHED'])[0] });
+        const result = await matchIdentificationJobByIsbn(catalog, jobId, {
+          isbn: String(item.isbn),
+          confirm: true,
+        });
+        results.push(
+          result.matched
+            ? { jobId, ok: true }
+            : { jobId, ok: false, error: [].concat(result.reason ?? ['NOT_MATCHED'])[0] },
+        );
       } else results.push({ jobId, ok: false, error: 'INVALID_ITEM' });
     } catch (error) {
-      results.push({ jobId, ok: false, error: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'DECISION_FAILED' });
+      results.push({
+        jobId,
+        ok: false,
+        error: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'DECISION_FAILED',
+      });
     }
   }
   return { results, approved: results.filter((row) => row.ok).length };
@@ -717,7 +850,10 @@ export function listIdentificationJobs(repository, options = {}) {
       : "j.status IN ('queued','running','retry_wait','review_required','failed')",
   );
   if (status) params.push(status);
-  if(options.offerId){conditions.push('o.id=?');params.push(String(options.offerId));}
+  if (options.offerId) {
+    conditions.push('o.id=?');
+    params.push(String(options.offerId));
+  }
   if (source) {
     conditions.push('o.source=?');
     params.push(source);
@@ -731,7 +867,12 @@ export function listIdentificationJobs(repository, options = {}) {
     );
     params.push(likeLiteral(query), likeLiteral(query), likeLiteral(query));
   }
-  if(options.scan) { conditions.push('EXISTS (SELECT 1 FROM scan_offer_results sr WHERE sr.offer_id=o.id AND sr.scanned_at=?)');params.push(String(options.scan)); }
+  if (options.scan) {
+    conditions.push(
+      'EXISTS (SELECT 1 FROM scan_offer_results sr WHERE sr.offer_id=o.id AND sr.scanned_at=?)',
+    );
+    params.push(String(options.scan));
+  }
   // The title matcher reads every work: built at most once per request.
   let matcherInstance = null;
   const lazyMatcher = () => (matcherInstance ||= createLocalWorkMatcher(repository));
@@ -753,7 +894,11 @@ export function listIdentificationJobs(repository, options = {}) {
       buckets[row.bucket] = Number(row.count);
     if (REVIEW_BUCKETS.includes(String(options.bucket || ''))) {
       conditions.push(`${BUCKET_SQL}=?`);
-      params.push(JSON.stringify(groups.bundle), JSON.stringify(groups.quick), String(options.bucket));
+      params.push(
+        JSON.stringify(groups.bundle),
+        JSON.stringify(groups.quick),
+        String(options.bucket),
+      );
     }
   }
   const where = `WHERE ${conditions.join(' AND ')}`;
@@ -769,12 +914,12 @@ export function listIdentificationJobs(repository, options = {}) {
     options.sort === 'price'
       ? 'o.current_price IS NULL,o.current_price ASC,j.id'
       : options.sort === 'price-desc'
-      ? 'o.current_price IS NULL,o.current_price DESC,j.id'
-      : options.sort === 'group'
-      ? "bookflip_fold(COALESCE(json_extract(o.matched_queries_json,'$[0]'),'~')),CASE p.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,bookflip_fold(o.original_title),j.id"
-      : options.sort === 'proposal'
-      ? "CASE p.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,p.best_score DESC,j.id"
-      : "CASE j.status WHEN 'review_required' THEN 0 WHEN 'failed' THEN 1 ELSE 2 END,j.updated_at DESC,j.id";
+        ? 'o.current_price IS NULL,o.current_price DESC,j.id'
+        : options.sort === 'group'
+          ? "bookflip_fold(COALESCE(json_extract(o.matched_queries_json,'$[0]'),'~')),CASE p.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,bookflip_fold(o.original_title),j.id"
+          : options.sort === 'proposal'
+            ? "CASE p.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,p.best_score DESC,j.id"
+            : "CASE j.status WHEN 'review_required' THEN 0 WHEN 'failed' THEN 1 ELSE 2 END,j.updated_at DESC,j.id";
   const rows = database
     .prepare(
       `SELECT j.*,o.source,o.original_title,o.current_price,o.currency,o.normalized_url,o.observed_isbn,o.last_seen_at,o.availability,o.image_url,o.matched_queries_json,o.first_seen_at,
@@ -789,7 +934,9 @@ export function listIdentificationJobs(repository, options = {}) {
     database
       .prepare(
         `SELECT count(*) AS count FROM identification_jobs j WHERE ${
-          status ? 'j.status=?' : "j.status IN ('queued','running','retry_wait','review_required','failed')"
+          status
+            ? 'j.status=?'
+            : "j.status IN ('queued','running','retry_wait','review_required','failed')"
         }`,
       )
       .get(...(status ? [status] : [])).count,
@@ -814,7 +961,11 @@ export function listIdentificationJobs(repository, options = {}) {
       result: json(row.result_json),
       updatedAt: row.updated_at,
       proposal: row.proposal_confidence
-        ? { confidence: row.proposal_confidence, isbn: row.proposal_isbn, score: row.proposal_score }
+        ? {
+            confidence: row.proposal_confidence,
+            isbn: row.proposal_isbn,
+            score: row.proposal_score,
+          }
         : null,
       offer: {
         id: row.offer_id,
@@ -852,23 +1003,30 @@ export async function matchIdentificationJobByIsbn(
   if (!job) throw Object.assign(Error('IDENTIFICATION_JOB_NOT_FOUND'), { statusCode: 404 });
   if (job.status !== 'review_required')
     throw Object.assign(Error('REVIEW_JOB_NOT_PENDING'), { statusCode: 409 });
-  const offer = repository.database.prepare(
-    'SELECT observed_isbn FROM offers WHERE id=?',
-  ).get(job.offer_id);
+  const offer = repository.database
+    .prepare('SELECT observed_isbn FROM offers WHERE id=?')
+    .get(job.offer_id);
   const raw = String(input.isbn ?? offer?.observed_isbn ?? '').trim();
   if (!raw) throw Object.assign(Error('ISBN_REQUIRED'), { statusCode: 400 });
   const isbn = normalizeISBN(raw);
   if (!isbn) throw Object.assign(Error('INVALID_ISBN'), { statusCode: 400 });
   if (input.preview === true) {
     const existing = repository.findEditionByISBN(isbn);
-    if (existing) return {
-      isbn, preview: true, matched: false, canConfirm: true, source: 'catalog',
-      editionId: existing.id, candidate: getCatalogEdition(repository, existing.id),
-    };
+    if (existing)
+      return {
+        isbn,
+        preview: true,
+        matched: false,
+        canConfirm: true,
+        source: 'catalog',
+        editionId: existing.id,
+        candidate: getCatalogEdition(repository, existing.id),
+      };
   }
   // A typed ISBN is an explicit operator assertion, not evidence extracted
   // from an unrelated advertisement. Matching uses ISBN alone.
-  const recordId = typeof input.recordId === 'string' && input.recordId.length <= 200 ? input.recordId : null;
+  const recordId =
+    typeof input.recordId === 'string' && input.recordId.length <= 200 ? input.recordId : null;
   const result = await catalog.resolver.resolve({
     offerId: job.offer_id,
     dryRun: input.preview === true,
@@ -884,24 +1042,37 @@ export async function matchIdentificationJobByIsbn(
       observations: [{ value: isbn, classification: 'structured', source: 'review:operator' }],
     },
   });
-  const matched = ['matched_existing', 'created_edition', 'created_work_and_edition']
-    .includes(result.decision);
-  if(input.preview===true) {
-    const existing=repository.findEditionByISBN(isbn);
-    return {...result,isbn,preview:true,canConfirm:matched,matched:false,
+  const matched = ['matched_existing', 'created_edition', 'created_work_and_edition'].includes(
+    result.decision,
+  );
+  if (input.preview === true) {
+    const existing = repository.findEditionByISBN(isbn);
+    return {
+      ...result,
+      isbn,
+      preview: true,
+      canConfirm: matched,
+      matched: false,
       source: existing ? 'catalog' : 'api',
-      candidate:existing ? getCatalogEdition(repository,existing.id) : result.candidate ?? null};
+      candidate: existing ? getCatalogEdition(repository, existing.id) : (result.candidate ?? null),
+    };
   }
-  if(input.confirm===true && matched) {
-    decideIdentificationJob(repository,job.id,{action:'approved',editionId:result.editionId,reason:'Zatwierdzono po podglądzie dopasowania ISBN.'});
-    return {...result,isbn,matched:true,status:'completed'};
+  if (input.confirm === true && matched) {
+    decideIdentificationJob(repository, job.id, {
+      action: 'approved',
+      editionId: result.editionId,
+      reason: 'Zatwierdzono po podglądzie dopasowania ISBN.',
+    });
+    return { ...result, isbn, matched: true, status: 'completed' };
   }
   const at = now().toISOString();
   // Do not mark the job completed for temporary API errors, missing metadata,
   // or mismatched bibliographic information.
-  const saved = repository.database.prepare(
-    "UPDATE identification_jobs SET status=?,result_json=?,updated_at=?,last_error=NULL WHERE id=? AND status='review_required'",
-  ).run(matched ? 'completed' : 'review_required', JSON.stringify(result), at, job.id);
+  const saved = repository.database
+    .prepare(
+      "UPDATE identification_jobs SET status=?,result_json=?,updated_at=?,last_error=NULL WHERE id=? AND status='review_required'",
+    )
+    .run(matched ? 'completed' : 'review_required', JSON.stringify(result), at, job.id);
   if (Number(saved.changes) !== 1)
     throw Object.assign(Error('REVIEW_JOB_CHANGED'), { statusCode: 409 });
   return { ...result, isbn, matched, status: matched ? 'completed' : 'review_required' };
@@ -926,7 +1097,9 @@ export function decideIdentificationJob(
     // Approved as a book only: the edition the listing points at, or the book's unknown edition.
     let editionChoice = null;
     if (action === 'approved' && !editionId && input.workId) {
-      editionChoice = editionForWorkAssignment(repository, String(input.workId), job.offer_id, { now });
+      editionChoice = editionForWorkAssignment(repository, String(input.workId), job.offer_id, {
+        now,
+      });
       editionId = editionChoice.editionId;
     }
     const active = repository.database
@@ -939,9 +1112,11 @@ export function decideIdentificationJob(
     )
       throw Object.assign(Error('MANUAL_ASSIGNMENT_PROTECTED'), { statusCode: 409 });
     if (['not_book', 'excluded'].includes(action) && active)
-      repository.database.prepare(
-        "UPDATE offer_matches SET status='superseded',valid_to=? WHERE offer_id=? AND status='active'",
-      ).run(at, job.offer_id);
+      repository.database
+        .prepare(
+          "UPDATE offer_matches SET status='superseded',valid_to=? WHERE offer_id=? AND status='active'",
+        )
+        .run(at, job.offer_id);
     if (action === 'approved') {
       if (
         !editionId ||
@@ -1004,9 +1179,18 @@ export function decideIdentificationJob(
       .run(status, action === 'requeued' ? 1 : 0, JSON.stringify(result), at, job.id);
     // Copies of a just-rejected offer already waiting in review are rejected now (reversibly, see
     // rejected-offers.mjs) instead of at the next start of the app.
-    if (['not_book', 'excluded'].includes(action)) rejectRepeatsOfRejectedOffers(repository, { now });
+    if (['not_book', 'excluded'].includes(action))
+      rejectRepeatsOfRejectedOffers(repository, { now });
     return {
-      decision: { id: decisionId, action, editionId, createdAt: at, ...(editionChoice ? { editionReason: editionChoice.reason, unknownEdition: Boolean(editionChoice.unknown) } : {}) },
+      decision: {
+        id: decisionId,
+        action,
+        editionId,
+        createdAt: at,
+        ...(editionChoice
+          ? { editionReason: editionChoice.reason, unknownEdition: Boolean(editionChoice.unknown) }
+          : {}),
+      },
       job: {
         ...repository.database.prepare('SELECT * FROM identification_jobs WHERE id=?').get(job.id),
         result,
@@ -1049,11 +1233,17 @@ export function createLocalWorkMatcher(repository) {
     const offerWords = new Set(titleTokens(offerTitle, { dropBrand: true }));
     const pool = new Set([...offerWords].flatMap((word) => index.get(word) || []));
     return [...pool]
-      .filter((item) => item.own.filter((word) => offerWords.has(word)).length / item.own.length >= 0.6)
+      .filter(
+        (item) => item.own.filter((word) => offerWords.has(word)).length / item.own.length >= 0.6,
+      )
       .map((item) => ({
         work: item.work,
         authors: item.authors,
-        score: scoreCandidate(offerTitle, { title: item.work.title, authors: item.authors }, { knownAuthors }),
+        score: scoreCandidate(
+          offerTitle,
+          { title: item.work.title, authors: item.authors },
+          { knownAuthors },
+        ),
       }))
       .filter((item) => item.score >= minScore)
       .sort((a, b) => b.score - a.score)
@@ -1061,7 +1251,11 @@ export function createLocalWorkMatcher(repository) {
   };
 }
 
-export function localEditionCandidates(repository, offerTitle, { limit = 4, minScore = 0.6, matcher } = {}) {
+export function localEditionCandidates(
+  repository,
+  offerTitle,
+  { limit = 4, minScore = 0.6, matcher } = {},
+) {
   const { database } = repository;
   const scored = (matcher || createLocalWorkMatcher(repository))(offerTitle, { limit, minScore });
   if (!scored.length) return [];
@@ -1073,35 +1267,40 @@ export function localEditionCandidates(repository, offerTitle, { limit = 4, minS
        FROM editions e WHERE e.is_unknown=0 AND e.work_id IN (${scored.map(() => '?').join(',')})`,
     )
     .all(...scored.map((item) => item.work.id));
-  const covers = editionCovers(database, editions.map((row) => row.id));
+  const covers = editionCovers(
+    database,
+    editions.map((row) => row.id),
+  );
   const rank = new Map(scored.map((item, index) => [item.work.id, index]));
-  return editions
-    .map((row) => {
-      const { work, authors, score } = scored[rank.get(row.work_id)];
-      return {
-        editionId: row.id,
-        workId: work.id,
-        title: work.title,
-        authors,
-        publisher: row.publisher || '',
-        publicationYear: row.publication_year || null,
-        language: row.language || '',
-        isbn: row.isbn || '',
-        offers: Number(row.offers || 0),
-        cover: covers.get(row.id) || null,
-        score,
-      };
-    })
-    // Among good matches the edition the operator already uses most (and Polish ones) goes first.
-    .sort(
-      (a, b) =>
-        (b.score >= 0.8) - (a.score >= 0.8) ||
-        (!/^(?:pol|pl|polski)?$/i.test(a.language)) - (!/^(?:pol|pl|polski)?$/i.test(b.language)) ||
-        b.offers - a.offers ||
-        b.score - a.score ||
-        (b.publicationYear || 0) - (a.publicationYear || 0),
-    )
-    .slice(0, limit);
+  return (
+    editions
+      .map((row) => {
+        const { work, authors, score } = scored[rank.get(row.work_id)];
+        return {
+          editionId: row.id,
+          workId: work.id,
+          title: work.title,
+          authors,
+          publisher: row.publisher || '',
+          publicationYear: row.publication_year || null,
+          language: row.language || '',
+          isbn: row.isbn || '',
+          offers: Number(row.offers || 0),
+          cover: covers.get(row.id) || null,
+          score,
+        };
+      })
+      // Among good matches the edition the operator already uses most (and Polish ones) goes first.
+      .sort(
+        (a, b) =>
+          (b.score >= 0.8) - (a.score >= 0.8) ||
+          !/^(?:pol|pl|polski)?$/i.test(a.language) - !/^(?:pol|pl|polski)?$/i.test(b.language) ||
+          b.offers - a.offers ||
+          b.score - a.score ||
+          (b.publicationYear || 0) - (a.publicationYear || 0),
+      )
+      .slice(0, limit)
+  );
 }
 
 /**
@@ -1110,34 +1309,44 @@ export function localEditionCandidates(repository, offerTitle, { limit = 4, minS
  * from the listing); otherwise `editionId` is null and approving assigns the book with an
  * unknown edition, which the operator can name later.
  */
-export function localWorkCandidates(repository, offerTitle, { offerId = null, limit = 4, minScore = 0.6, matcher } = {}) {
+export function localWorkCandidates(
+  repository,
+  offerTitle,
+  { offerId = null, limit = 4, minScore = 0.6, matcher } = {},
+) {
   const editions = localEditionCandidates(repository, offerTitle, { limit: 60, minScore, matcher });
   const byWork = new Map();
   for (const item of editions) {
     if (!byWork.has(item.workId)) byWork.set(item.workId, []);
     byWork.get(item.workId).push(item);
   }
-  return [...byWork.values()].sort((a, b) => b[0].score - a[0].score).slice(0, limit).map((items) => {
-    const [first] = items;
-    const choice = offerId
-      ? chooseEditionForOffer(repository, first.workId, offerId)
-      : { editionId: items.length === 1 ? first.editionId : null, reason: items.length === 1 ? 'only_edition' : 'ambiguous' };
-    const chosen = items.find((item) => item.editionId === choice.editionId) || null;
-    const shown = chosen || first;
-    return {
-      workId: first.workId,
-      editionId: chosen?.editionId ?? null,
-      editionReason: choice.reason,
-      editionCount: items.length,
-      title: first.title,
-      authors: first.authors,
-      publisher: chosen ? chosen.publisher : '',
-      publicationYear: chosen ? chosen.publicationYear : null,
-      language: shown.language,
-      isbn: chosen ? chosen.isbn : '',
-      offers: items.reduce((sum, item) => sum + item.offers, 0),
-      cover: shown.cover || items.find((item) => item.cover)?.cover || null,
-      score: first.score,
-    };
-  });
+  return [...byWork.values()]
+    .sort((a, b) => b[0].score - a[0].score)
+    .slice(0, limit)
+    .map((items) => {
+      const [first] = items;
+      const choice = offerId
+        ? chooseEditionForOffer(repository, first.workId, offerId)
+        : {
+            editionId: items.length === 1 ? first.editionId : null,
+            reason: items.length === 1 ? 'only_edition' : 'ambiguous',
+          };
+      const chosen = items.find((item) => item.editionId === choice.editionId) || null;
+      const shown = chosen || first;
+      return {
+        workId: first.workId,
+        editionId: chosen?.editionId ?? null,
+        editionReason: choice.reason,
+        editionCount: items.length,
+        title: first.title,
+        authors: first.authors,
+        publisher: chosen ? chosen.publisher : '',
+        publicationYear: chosen ? chosen.publicationYear : null,
+        language: shown.language,
+        isbn: chosen ? chosen.isbn : '',
+        offers: items.reduce((sum, item) => sum + item.offers, 0),
+        cover: shown.cover || items.find((item) => item.cover)?.cover || null,
+        score: first.score,
+      };
+    });
 }

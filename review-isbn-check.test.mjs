@@ -27,14 +27,19 @@ test('review lookup is read-only and does not silently approve an edition', asyn
   assert.match(frontend, /response\.canConfirm/);
   assert.match(server, /\.add\('POST', '\/api\/catalog\/isbn-check'/);
   assert.match(server, /repository\.findEditionByISBN\(isbn\)/);
-  assert.doesNotMatch(frontend.match(/reviewIsbnCheckButton'\)\.addEventListener[\s\S]*?\n  \}\);/)?.[0] ?? '', /decideReview\(|approveReview\(/);
+  assert.doesNotMatch(
+    frontend.match(/reviewIsbnCheckButton'\)\.addEventListener[\s\S]*?\n  \}\);/)?.[0] ?? '',
+    /decideReview\(|approveReview\(/,
+  );
 });
 
 test('top ISBN matching uses the offer-aware catalog resolver', async () => {
   const frontend = await readFile(new URL('./app/views/review.js', import.meta.url), 'utf8');
   const server = await readFile(new URL('./local-app.mjs', import.meta.url), 'utf8');
   assert.match(frontend, /id="reviewIsbnMatchButton"/);
-  const handler = frontend.split("$('#reviewIsbnMatchButton').addEventListener('click'")[1]?.split("$('#reviewBookSearch').addEventListener('input',()=>")[0];
+  const handler = frontend
+    .split("$('#reviewIsbnMatchButton').addEventListener('click'")[1]
+    ?.split("$('#reviewBookSearch').addEventListener('input',()=>")[0];
   assert.ok(handler, 'ISBN match handler is present');
   assert.match(handler, /match-isbn/);
   assert.match(handler, /response\.canConfirm/);

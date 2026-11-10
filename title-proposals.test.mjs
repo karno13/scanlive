@@ -60,21 +60,39 @@ test('foreign-language catalogue records are down-weighted for a Polish listing'
 
 test('a close rival with a different title makes the proposal ambiguous, other editions do not', () => {
   const offer = 'Alfa Beta Gamma Delta Epsilon';
-  const book = { isbn: '9788375060041', title: 'Alfa beta gamma delta epsilon', language: 'polski' };
-  const reprint = { isbn: '9788375060874', title: 'Alfa beta gamma delta epsilon', language: 'polski' };
-  const rival = { isbn: '9788386758289', title: 'Alfa beta gamma delta epsilon zeta', language: 'polski' };
+  const book = {
+    isbn: '9788375060041',
+    title: 'Alfa beta gamma delta epsilon',
+    language: 'polski',
+  };
+  const reprint = {
+    isbn: '9788375060874',
+    title: 'Alfa beta gamma delta epsilon',
+    language: 'polski',
+  };
+  const rival = {
+    isbn: '9788386758289',
+    title: 'Alfa beta gamma delta epsilon zeta',
+    language: 'polski',
+  };
   assert.equal(rankCandidates(offer, [book, reprint]).confidence, 'high');
   assert.notEqual(rankCandidates(offer, [book, rival]).confidence, 'high');
 });
 
 test('search variants drop seller noise and universe names, most specific first', () => {
-  const variants = searchVariants('Książka Warhammer Herezja Horusa Vulkan Żyje | Dan Abnett | Tom 26 (nowa)');
+  const variants = searchVariants(
+    'Książka Warhammer Herezja Horusa Vulkan Żyje | Dan Abnett | Tom 26 (nowa)',
+  );
   assert.ok(variants.length >= 2 && variants.length <= 4);
   assert.ok(variants.every((phrase) => !/\(nowa\)/i.test(phrase)));
   assert.ok(variants.some((phrase) => /vulkan/i.test(phrase) && !/warhammer/i.test(phrase)));
   assert.deepEqual(searchVariants('ab'), []);
   // Author tail removed: the catalogue title is "Cisza przed burzą".
-  assert.ok(searchVariants('Cisza przed burzą Warcraft Christie Golden').includes('Cisza przed burzą Warcraft'));
+  assert.ok(
+    searchVariants('Cisza przed burzą Warcraft Christie Golden').includes(
+      'Cisza przed burzą Warcraft',
+    ),
+  );
 });
 
 function setup() {
@@ -101,7 +119,9 @@ test('a proposal is computed once, stored, and the job no longer needs one', asy
   };
   assert.equal(jobsNeedingProposal(repository).length, 1);
   const row = repository.database
-    .prepare('SELECT j.id,j.offer_id,o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id')
+    .prepare(
+      'SELECT j.id,j.offer_id,o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id',
+    )
     .get();
   const result = await computeProposal(catalog, row);
   assert.equal(result.confidence, 'high');
@@ -113,9 +133,14 @@ test('a proposal is computed once, stored, and the job no longer needs one', asy
 
 test('a source outage is not cached as "no proposal"', async () => {
   const { repository } = setup();
-  const catalog = { repository, findIsbnsByTitle: async () => ({ candidates: [], unavailable: ['bn'] }) };
+  const catalog = {
+    repository,
+    findIsbnsByTitle: async () => ({ candidates: [], unavailable: ['bn'] }),
+  };
   const row = repository.database
-    .prepare('SELECT j.id,j.offer_id,o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id')
+    .prepare(
+      'SELECT j.id,j.offer_id,o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id',
+    )
     .get();
   const result = await computeProposal(catalog, row);
   assert.equal(result.stored, false);
@@ -123,10 +148,24 @@ test('a source outage is not cached as "no proposal"', async () => {
 });
 
 test('a companion product is not the book it is about', () => {
-  const novel = { isbn: '9788382809411', title: 'Fourth wing = Czwarte skrzydło', authorText: 'Yarros, Rebecca', language: 'polski' };
+  const novel = {
+    isbn: '9788382809411',
+    title: 'Fourth wing = Czwarte skrzydło',
+    authorText: 'Yarros, Rebecca',
+    language: 'polski',
+  };
   assert.equal(derivativeMarker('Dziennik Fourth Wing. Czwarte Skrzydło', novel.title), 'dziennik');
-  assert.equal(derivativeMarker('Fourth Wing. Czwarte Skrzydło: Oficjalna kolorowanka z naklejkami', novel.title), 'kolorowanka');
-  assert.equal(derivativeMarker('Forgotten Realms Zapomniane Krainy Opis Świata dnd', 'Zapomniane Krainy'), 'opis swiata');
+  assert.equal(
+    derivativeMarker(
+      'Fourth Wing. Czwarte Skrzydło: Oficjalna kolorowanka z naklejkami',
+      novel.title,
+    ),
+    'kolorowanka',
+  );
+  assert.equal(
+    derivativeMarker('Forgotten Realms Zapomniane Krainy Opis Świata dnd', 'Zapomniane Krainy'),
+    'opis swiata',
+  );
   assert.equal(derivativeMarker('Dziennik Bridget Jones', 'Dziennik Bridget Jones'), null);
   assert.ok(scoreCandidate('Dziennik Fourth Wing. Czwarte Skrzydło', novel) < 0.6);
   assert.ok(scoreCandidate('Fourth Wing. Czwarte Skrzydło', novel) >= 0.85);
@@ -134,10 +173,24 @@ test('a companion product is not the book it is about', () => {
 
 test('stored proposals are re-ranked with the current scoring without any lookup', () => {
   const repository = new SqliteCatalogRepository(':memory:');
-  const offer = repository.upsertOffer({ source: 'Empik', normalizedUrl: 'https://www.empik.com/d', originalTitle: 'Dziennik Fourth Wing. Czwarte Skrzydło', currentPrice: 2999 });
+  const offer = repository.upsertOffer({
+    source: 'Empik',
+    normalizedUrl: 'https://www.empik.com/d',
+    originalTitle: 'Dziennik Fourth Wing. Czwarte Skrzydło',
+    currentPrice: 2999,
+  });
   const job = repository.putIdentificationJob({ offerId: offer.id, status: 'review_required' });
-  const novel = { isbn: '9788382809411', title: 'Fourth wing = Czwarte skrzydło', language: 'polski', score: 1 };
-  saveProposal(repository, { id: job.id, offer_id: offer.id }, { queries: ['x'], candidates: [novel], confidence: 'high' });
+  const novel = {
+    isbn: '9788382809411',
+    title: 'Fourth wing = Czwarte skrzydło',
+    language: 'polski',
+    score: 1,
+  };
+  saveProposal(
+    repository,
+    { id: job.id, offer_id: offer.id },
+    { queries: ['x'], candidates: [novel], confidence: 'high' },
+  );
   assert.equal(rescoreStoredProposals(repository), 1);
   const stored = loadProposal(repository, job.id);
   assert.notEqual(stored.confidence, 'high');

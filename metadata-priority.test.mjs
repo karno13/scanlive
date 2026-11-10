@@ -7,14 +7,20 @@ for (const status of ['found', 'temporary_error', 'invalid_response', 'not_found
   test(`BN ${status}: Open Library is called only after absence or outage`, async () => {
     const calls = [];
     const result = await lookupISBN('9780306406157', {
-      bnAdapter: { source: 'bn', lookup: async () => {
-        calls.push('bn');
-        return { status, records: status === 'found' ? [{ title: 'Physics' }] : [] };
-      } },
-      openLibraryAdapter: { source: 'open_library', lookup: async () => {
-        calls.push('ol');
-        return { status: 'not_found', records: [] };
-      } },
+      bnAdapter: {
+        source: 'bn',
+        lookup: async () => {
+          calls.push('bn');
+          return { status, records: status === 'found' ? [{ title: 'Physics' }] : [] };
+        },
+      },
+      openLibraryAdapter: {
+        source: 'open_library',
+        lookup: async () => {
+          calls.push('ol');
+          return { status: 'not_found', records: [] };
+        },
+      },
     });
     const fallback = ['not_found', 'temporary_error'].includes(status);
     assert.deepEqual(calls, fallback ? ['bn', 'ol'] : ['bn']);
@@ -25,10 +31,19 @@ for (const status of ['found', 'temporary_error', 'invalid_response', 'not_found
 test('title discovery falls back after an empty BN response', async () => {
   const calls = [];
   const result = await findTitleIsbnCandidates('Physics', {
-    requestBn: async () => { calls.push('bn'); return { status: 'found', payload: { bibs: [] } }; },
-    requestOpenLibrary: async () => { calls.push('ol'); return { status: 'found', payload: {
-      docs: [{ title: 'Physics', isbn: ['9780306406157'] }],
-    } }; },
+    requestBn: async () => {
+      calls.push('bn');
+      return { status: 'found', payload: { bibs: [] } };
+    },
+    requestOpenLibrary: async () => {
+      calls.push('ol');
+      return {
+        status: 'found',
+        payload: {
+          docs: [{ title: 'Physics', isbn: ['9780306406157'] }],
+        },
+      };
+    },
   });
   assert.deepEqual(calls, ['bn', 'ol']);
   assert.equal(result.candidates[0].source, 'open_library');

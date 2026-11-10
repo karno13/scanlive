@@ -39,7 +39,7 @@ export async function benchmarkScan({ offerCount = 1000, matched = false } = {})
     if (matched) {
       // Each offer gets a different edition: exercise the many-group path
       // omitted by the unassigned benchmark. Setup is outside measured scans.
-      catalog.repository.transaction(repo => {
+      catalog.repository.transaction((repo) => {
         for (const offer of repo.database.prepare('SELECT id,original_title FROM offers').all()) {
           const work = repo.createWork({ title: offer.original_title });
           const edition = repo.createEdition({ workId: work.id, title: offer.original_title });
@@ -47,16 +47,25 @@ export async function benchmarkScan({ offerCount = 1000, matched = false } = {})
         }
       });
     }
-    const changed = offers.map((offer, i) => i % 10 === 0
-      ? { ...offer, price: offer.price - 100 } : offer);
-    const repeat = record('repeat-with-10-percent-price-changes', changed,
-      '2026-11-01T13:00:00.000Z');
+    const changed = offers.map((offer, i) =>
+      i % 10 === 0 ? { ...offer, price: offer.price - 100 } : offer,
+    );
+    const repeat = record(
+      'repeat-with-10-percent-price-changes',
+      changed,
+      '2026-11-01T13:00:00.000Z',
+    );
     const expectedChanges = Math.ceil(offerCount / 10);
-    if (first.newOffers !== offerCount || repeat.newOffers !== 0 ||
-        repeat.priceChanges !== expectedChanges || repeat.totalStoredOffers !== offerCount)
+    if (
+      first.newOffers !== offerCount ||
+      repeat.newOffers !== 0 ||
+      repeat.priceChanges !== expectedChanges ||
+      repeat.totalStoredOffers !== offerCount
+    )
       throw Error('BENCHMARK_INCORRECT_SCAN_COUNTS');
     const historyCount = catalog.repository.database
-      .prepare('SELECT count(*) AS n FROM offer_price_history').get().n;
+      .prepare('SELECT count(*) AS n FROM offer_price_history')
+      .get().n;
     if (historyCount !== offerCount + expectedChanges)
       throw Error('BENCHMARK_INCORRECT_PRICE_HISTORY');
     return {
@@ -69,16 +78,21 @@ export async function benchmarkScan({ offerCount = 1000, matched = false } = {})
       repeat,
       priceObservations: historyCount,
       // WAL mode may keep nearly all newly written pages outside the main .sqlite.
-      databaseBytes: (await stat(dbPath)).size +
-        (await stat(dbPath + '-wal').then(info => info.size).catch(error => {
+      databaseBytes:
+        (await stat(dbPath)).size +
+        (await stat(dbPath + '-wal')
+          .then((info) => info.size)
+          .catch((error) => {
+            if (error.code === 'ENOENT') return 0;
+            throw error;
+          })),
+      mainDatabaseBytes: (await stat(dbPath)).size,
+      walBytes: await stat(dbPath + '-wal')
+        .then((info) => info.size)
+        .catch((error) => {
           if (error.code === 'ENOENT') return 0;
           throw error;
-        })),
-      mainDatabaseBytes: (await stat(dbPath)).size,
-      walBytes: await stat(dbPath + '-wal').then(info => info.size).catch(error => {
-        if (error.code === 'ENOENT') return 0;
-        throw error;
-      }),
+        }),
       rssBytes: process.memoryUsage().rss,
     };
   } finally {
@@ -90,6 +104,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const arg = process.argv.indexOf('--offers');
   const count = arg < 0 ? 1000 : Number(process.argv[arg + 1]);
   benchmarkScan({ offerCount: count, matched: process.argv.includes('--matched') })
-    .then(result => console.log(JSON.stringify(result, null, 2)))
-    .catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
+    .then((result) => console.log(JSON.stringify(result, null, 2)))
+    .catch((error) => {
+      console.error(error.stack || error.message);
+      process.exitCode = 1;
+    });
 }

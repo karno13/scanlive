@@ -17,7 +17,7 @@ test('scan status and catalog summary endpoints return lightweight JSON', async 
     assert.equal(typeof (await status.json()).status, 'string');
   } finally {
     await new Promise((resolve, reject) =>
-      server.close((error) => error ? reject(error) : resolve()),
+      server.close((error) => (error ? reject(error) : resolve())),
     );
   }
 });

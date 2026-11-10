@@ -5,7 +5,8 @@
 import { fold } from './title-proposals.mjs';
 
 const hasLetters = (text) => /\p{L}/u.test(text);
-const isShouted = (text) => hasLetters(text) && text === text.toLocaleUpperCase('pl') && /\p{Lu}{3}/u.test(text);
+const isShouted = (text) =>
+  hasLetters(text) && text === text.toLocaleUpperCase('pl') && /\p{Lu}{3}/u.test(text);
 const lacksPolish = (text) => !/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(text);
 
 /**
@@ -27,10 +28,17 @@ export function titleFromListing(title, listing) {
       const source = words[start + index];
       const mine = match[0];
       let word;
-      if (shouted) word = source.length > 1 && isShouted(source) ? source.toLocaleLowerCase('pl') : source;
+      if (shouted)
+        word = source.length > 1 && isShouted(source) ? source.toLocaleLowerCase('pl') : source;
       else if (source.length === mine.length)
         // Same letters: keep the stored case, take the listing's diacritics.
-        word = [...source].map((char, i) => (mine[i] === mine[i].toLocaleUpperCase('pl') ? char.toLocaleUpperCase('pl') : char.toLocaleLowerCase('pl'))).join('');
+        word = [...source]
+          .map((char, i) =>
+            mine[i] === mine[i].toLocaleUpperCase('pl')
+              ? char.toLocaleUpperCase('pl')
+              : char.toLocaleLowerCase('pl'),
+          )
+          .join('');
       else word = mine;
       out += String(title).slice(last, match.index) + word;
       last = match.index + mine.length;
@@ -49,7 +57,11 @@ export function repairedTitle(title, listings = []) {
     const candidate = titleFromListing(text, listing);
     if (!candidate || candidate === text) continue;
     // Only an improvement: Polish letters gained, or a shouted title calmed down.
-    if ((lacksPolish(text) && !lacksPolish(candidate)) || (isShouted(text) && !isShouted(candidate))) return candidate;
+    if (
+      (lacksPolish(text) && !lacksPolish(candidate)) ||
+      (isShouted(text) && !isShouted(candidate))
+    )
+      return candidate;
   }
   // No listing helps: at least stop shouting.
   if (isShouted(text)) return text.charAt(0) + text.slice(1).toLocaleLowerCase('pl');
@@ -66,13 +78,21 @@ export function repairCatalogTitles(repository, now = () => new Date()) {
   let changed = 0;
   const at = now().toISOString();
   for (const edition of database.prepare('SELECT id, work_id, title FROM editions').all()) {
-    const better = repairedTitle(edition.title, listingsOf.all(edition.id, '').map((row) => row.original_title));
+    const better = repairedTitle(
+      edition.title,
+      listingsOf.all(edition.id, '').map((row) => row.original_title),
+    );
     if (!better) continue;
-    database.prepare('UPDATE editions SET title=?, updated_at=? WHERE id=?').run(better, at, edition.id);
+    database
+      .prepare('UPDATE editions SET title=?, updated_at=? WHERE id=?')
+      .run(better, at, edition.id);
     changed += 1;
   }
   for (const work of database.prepare('SELECT id, title FROM works').all()) {
-    const better = repairedTitle(work.title, listingsOf.all('', work.id).map((row) => row.original_title));
+    const better = repairedTitle(
+      work.title,
+      listingsOf.all('', work.id).map((row) => row.original_title),
+    );
     if (!better) continue;
     database.prepare('UPDATE works SET title=?, updated_at=? WHERE id=?').run(better, at, work.id);
     changed += 1;

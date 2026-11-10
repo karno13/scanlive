@@ -69,7 +69,13 @@ function isPolish(record) {
 
 export function createSeedService(
   repository,
-  { requestBn, now = () => new Date(), setTimer = setTimeout, clearTimer = clearTimeout, log = () => {} } = {},
+  {
+    requestBn,
+    now = () => new Date(),
+    setTimer = setTimeout,
+    clearTimer = clearTimeout,
+    log = () => {},
+  } = {},
 ) {
   if (typeof requestBn !== 'function') throw new TypeError('requestBn is required');
   const db = repository.database;
@@ -80,7 +86,10 @@ export function createSeedService(
 
   function list() {
     return {
-      seeds: db.prepare('SELECT * FROM catalog_seeds ORDER BY created_at DESC').all().map(rowToSeed),
+      seeds: db
+        .prepare('SELECT * FROM catalog_seeds ORDER BY created_at DESC')
+        .all()
+        .map(rowToSeed),
       pausedUntil: pausedUntil > now().getTime() ? new Date(pausedUntil).toISOString() : null,
       lastOutage,
       running: Boolean(running),
@@ -89,8 +98,12 @@ export function createSeedService(
 
   function add(input = {}) {
     const kind = String(input.kind ?? '');
-    const query = String(input.query ?? '').replace(/\s+/g, ' ').trim();
-    const publisher = String(input.publisher ?? '').replace(/\s+/g, ' ').trim();
+    const query = String(input.query ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const publisher = String(input.publisher ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (!KINDS.has(kind)) fail('INVALID_SEED_KIND');
     if (query.length < 2 || query.length > 120) fail('INVALID_SEED_QUERY');
     if (publisher.length > 120) fail('INVALID_SEED_PUBLISHER');
@@ -100,7 +113,9 @@ export function createSeedService(
       .get(kind, query, publisher);
     if (existing) {
       // Adding the same seed again restarts it from the first page (new BN records appear).
-      db.prepare("UPDATE catalog_seeds SET status='active', next_url=NULL, last_error=NULL, updated_at=? WHERE id=?").run(at, existing.id);
+      db.prepare(
+        "UPDATE catalog_seeds SET status='active', next_url=NULL, last_error=NULL, updated_at=? WHERE id=?",
+      ).run(at, existing.id);
       schedule(0);
       return rowToSeed(db.prepare('SELECT * FROM catalog_seeds WHERE id=?').get(existing.id));
     }
@@ -115,7 +130,9 @@ export function createSeedService(
 
   function setStatus(id, status) {
     if (!['active', 'paused'].includes(status)) fail('INVALID_SEED_STATUS');
-    const changed = db.prepare('UPDATE catalog_seeds SET status=?, updated_at=? WHERE id=?').run(status, now().toISOString(), String(id));
+    const changed = db
+      .prepare('UPDATE catalog_seeds SET status=?, updated_at=? WHERE id=?')
+      .run(status, now().toISOString(), String(id));
     if (!Number(changed.changes)) fail('SEED_NOT_FOUND', 404);
     if (status === 'active') schedule(0);
     return rowToSeed(db.prepare('SELECT * FROM catalog_seeds WHERE id=?').get(String(id)));
@@ -149,7 +166,9 @@ export function createSeedService(
         classification: 'structured',
         autoAssignable: true,
         reviewRequired: false,
-        observations: [{ value: isbn, classification: 'structured', valid: true, source: 'seed:bn' }],
+        observations: [
+          { value: isbn, classification: 'structured', valid: true, source: 'seed:bn' },
+        ],
       },
     });
     if (['created_work_and_edition', 'created_edition'].includes(result.decision)) {
@@ -157,11 +176,16 @@ export function createSeedService(
       for (const other of isbns)
         for (const key of isbnKeys(other))
           try {
-            repository.attachIdentifier(result.editionId, key.length === 10 ? 'isbn10' : 'isbn13', key, {
-              source: 'catalog_seed',
-              verificationStatus: 'verified',
-              at: now(),
-            });
+            repository.attachIdentifier(
+              result.editionId,
+              key.length === 10 ? 'isbn10' : 'isbn13',
+              key,
+              {
+                source: 'catalog_seed',
+                verificationStatus: 'verified',
+                at: now(),
+              },
+            );
           } catch {
             // Another edition already owns this ISBN: leave it there.
           }
@@ -179,7 +203,9 @@ export function createSeedService(
     running = (async () => {
       if (pausedUntil > now().getTime()) return { state: 'paused' };
       const seed = db
-        .prepare("SELECT * FROM catalog_seeds WHERE status='active' ORDER BY coalesce(last_run_at,''), created_at LIMIT 1")
+        .prepare(
+          "SELECT * FROM catalog_seeds WHERE status='active' ORDER BY coalesce(last_run_at,''), created_at LIMIT 1",
+        )
         .get();
       if (!seed) return { state: 'idle' };
       const url = seed.next_url || seedUrl(seed);
@@ -189,20 +215,29 @@ export function createSeedService(
         pausedUntil = now().getTime() + OUTAGE_PAUSE_MS;
         lastOutage = {
           at,
-          reason: response.error?.code || response.error?.message || (response.httpStatus ? `HTTP ${response.httpStatus}` : 'temporary_error'),
+          reason:
+            response.error?.code ||
+            response.error?.message ||
+            (response.httpStatus ? `HTTP ${response.httpStatus}` : 'temporary_error'),
         };
-        db.prepare('UPDATE catalog_seeds SET last_error=?, last_run_at=?, updated_at=? WHERE id=?').run(lastOutage.reason, at, at, seed.id);
+        db.prepare(
+          'UPDATE catalog_seeds SET last_error=?, last_run_at=?, updated_at=? WHERE id=?',
+        ).run(lastOutage.reason, at, at, seed.id);
         return { state: 'outage', reason: lastOutage.reason };
       }
       lastOutage = null;
       if (response.status === 'not_found') {
-        db.prepare("UPDATE catalog_seeds SET status='done', next_url=NULL, last_error=NULL, last_run_at=?, updated_at=? WHERE id=?").run(at, at, seed.id);
+        db.prepare(
+          "UPDATE catalog_seeds SET status='done', next_url=NULL, last_error=NULL, last_run_at=?, updated_at=? WHERE id=?",
+        ).run(at, at, seed.id);
         return { state: 'done', seedId: seed.id };
       }
       const records = response.status === 'found' ? response.payload?.bibs : null;
       if (!Array.isArray(records)) {
         const reason = response.reason || response.error?.code || 'invalid_response';
-        db.prepare("UPDATE catalog_seeds SET status='error', last_error=?, last_run_at=?, updated_at=? WHERE id=?").run(reason, at, at, seed.id);
+        db.prepare(
+          "UPDATE catalog_seeds SET status='error', last_error=?, last_run_at=?, updated_at=? WHERE id=?",
+        ).run(reason, at, at, seed.id);
         return { state: 'error', reason };
       }
       const counts = { created: 0, known: 0, skipped: 0 };
@@ -223,7 +258,17 @@ export function createSeedService(
       db.prepare(
         `UPDATE catalog_seeds SET status=?, next_url=?, pages=pages+1, records_seen=?, editions_created=editions_created+?,
            already_known=already_known+?, skipped=skipped+?, last_error=NULL, last_run_at=?, updated_at=? WHERE id=?`,
-      ).run(next ? 'active' : 'done', next, seen, counts.created, counts.known, counts.skipped, at, at, seed.id);
+      ).run(
+        next ? 'active' : 'done',
+        next,
+        seen,
+        counts.created,
+        counts.known,
+        counts.skipped,
+        at,
+        at,
+        seed.id,
+      );
       return { state: next ? 'more' : 'done', seedId: seed.id, ...counts };
     })();
     try {
@@ -244,13 +289,19 @@ export function createSeedService(
         log('CATALOG_SEED_STEP_FAILED', error?.message ?? error);
       }
       const active = db.prepare("SELECT 1 FROM catalog_seeds WHERE status='active' LIMIT 1").get();
-      if (active) schedule(result?.state === 'outage' || result?.state === 'paused' ? OUTAGE_PAUSE_MS : SEED_INTERVAL_MS);
+      if (active)
+        schedule(
+          result?.state === 'outage' || result?.state === 'paused'
+            ? OUTAGE_PAUSE_MS
+            : SEED_INTERVAL_MS,
+        );
     }, delay);
     timer?.unref?.();
   }
 
   function start() {
-    if (db.prepare("SELECT 1 FROM catalog_seeds WHERE status='active' LIMIT 1").get()) schedule(5_000);
+    if (db.prepare("SELECT 1 FROM catalog_seeds WHERE status='active' LIMIT 1").get())
+      schedule(5_000);
   }
 
   function stop() {

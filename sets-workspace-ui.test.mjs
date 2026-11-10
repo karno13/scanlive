@@ -5,7 +5,13 @@ import { readFile } from 'node:fs/promises';
 test('Sets uses master-detail navigation and accessible inline search', async () => {
   const html = await readFile(new URL('./app/index.html', import.meta.url), 'utf8');
   const js = await readFile(new URL('./app/views/sets.js', import.meta.url), 'utf8');
-  for (const id of ['setList','setFilter','setSelectedTitle','setMembers','setEditionResults']) {
+  for (const id of [
+    'setList',
+    'setFilter',
+    'setSelectedTitle',
+    'setMembers',
+    'setEditionResults',
+  ]) {
     assert.match(html, new RegExp('id="' + id + '"'));
   }
   assert.match(js, /data-set-id/);

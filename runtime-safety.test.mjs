@@ -9,10 +9,7 @@ const root = dirname(fileURLToPath(import.meta.url));
 const read = (name) => readFileSync(join(root, name), 'utf8');
 test('legacy history remains stable while catalog is stored in user data directory', () => {
   assert.equal(defaultHistoryPath, join(root, 'scan-results', 'local-offer-history.json'));
-  assert.match(
-    read('catalog-production.mjs'),
-    /databasePath = defaultCatalogPath\(\)/,
-  );
+  assert.match(read('catalog-production.mjs'), /databasePath = defaultCatalogPath\(\)/);
   assert.match(read('local-app.mjs'), /join\(runtimeDataDirectory, 'local-app\.log'\)/);
   assert.match(read('local-app.mjs'), /mkdir\(runtimeDataDirectory, \{ recursive: true \}\)/);
 });

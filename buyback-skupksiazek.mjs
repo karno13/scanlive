@@ -30,23 +30,50 @@ const digits = (value) => String(value ?? '').replace(/\D/g, '');
 export function quoteFromCart(body, isbn) {
   const items = body?.cart?.items || [];
   const item = items.find((entry) => digits(entry.isbn || entry.item_isbn) === isbn);
-  if (!item) return { status: 'not_bought', price: null, title: null, message: body?.message || null, item: null };
+  if (!item)
+    return {
+      status: 'not_bought',
+      price: null,
+      title: null,
+      message: body?.message || null,
+      item: null,
+    };
   const price = Number(item.price);
   const title = [item.title, item.author].filter(Boolean).join(' — ') || null;
   if (item.exceeds_client_price_limit || !Number.isFinite(price) || price <= 0)
-    return { status: 'manual', price: null, title, message: item.comment || 'Wycena ręczna przez skup', item };
+    return {
+      status: 'manual',
+      price: null,
+      title,
+      message: item.comment || 'Wycena ręczna przez skup',
+      item,
+    };
   const quantity = Number(item.quantity) > 1 ? Number(item.quantity) : 1;
-  return { status: 'priced', price: Math.round((price / quantity) * 100) / 100, title, message: item.comment || null, item };
+  return {
+    status: 'priced',
+    price: Math.round((price / quantity) * 100) / 100,
+    title,
+    message: item.comment || null,
+    item,
+  };
 }
 
-export function createSkupksiazekClient({ fetch: fetchImpl = globalThis.fetch, minIntervalMs = 8_000, timeoutMs = 20_000 } = {}) {
+export function createSkupksiazekClient({
+  fetch: fetchImpl = globalThis.fetch,
+  minIntervalMs = 8_000,
+  timeoutMs = 20_000,
+} = {}) {
   const limiter = new SourceRateLimiter({ minIntervalMs });
   const jar = cookieJar();
   let csrf = null;
   let cartCode = '0';
 
   async function call(path, { method = 'GET', body } = {}) {
-    const headers = { 'User-Agent': USER_AGENT, Accept: method === 'GET' && path === '/' ? 'text/html' : 'application/json', 'Accept-Language': 'pl-PL,pl;q=0.9' };
+    const headers = {
+      'User-Agent': USER_AGENT,
+      Accept: method === 'GET' && path === '/' ? 'text/html' : 'application/json',
+      'Accept-Language': 'pl-PL,pl;q=0.9',
+    };
     const cookies = jar.header();
     if (cookies) headers.Cookie = cookies;
     if (method !== 'GET') {
@@ -58,7 +85,13 @@ export function createSkupksiazekClient({ fetch: fetchImpl = globalThis.fetch, m
       const xsrf = jar.get('XSRF-TOKEN');
       if (xsrf) headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrf);
     }
-    const response = await fetchImpl(SKUP_BASE + path, { method, headers, body: body ? JSON.stringify(body) : undefined, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+    const response = await fetchImpl(SKUP_BASE + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     jar.take(response.headers);
     return response;
   }
@@ -68,9 +101,16 @@ export function createSkupksiazekClient({ fetch: fetchImpl = globalThis.fetch, m
     cartCode = '0';
     await limiter.acquire();
     const response = await call('/');
-    if (!response.ok) throw Object.assign(new Error(`skupksiazek.pl: HTTP ${response.status}`), { code: 'HTTP_' + response.status });
-    csrf = (await response.text()).match(/<meta\s+name="csrf-token"\s+content="([^"]+)"/i)?.[1] || null;
-    if (!csrf) throw Object.assign(new Error('skupksiazek.pl: brak tokenu formularza na stronie'), { code: 'NO_CSRF' });
+    if (!response.ok)
+      throw Object.assign(new Error(`skupksiazek.pl: HTTP ${response.status}`), {
+        code: 'HTTP_' + response.status,
+      });
+    csrf =
+      (await response.text()).match(/<meta\s+name="csrf-token"\s+content="([^"]+)"/i)?.[1] || null;
+    if (!csrf)
+      throw Object.assign(new Error('skupksiazek.pl: brak tokenu formularza na stronie'), {
+        code: 'NO_CSRF',
+      });
   }
 
   async function readJson(response) {
@@ -84,31 +124,50 @@ export function createSkupksiazekClient({ fetch: fetchImpl = globalThis.fetch, m
 
   async function quote(rawIsbn) {
     const isbn = digits(rawIsbn);
-    if (isbn.length !== 13) throw Object.assign(new Error('Wycena wymaga ISBN-13'), { code: 'INVALID_ISBN' });
+    if (isbn.length !== 13)
+      throw Object.assign(new Error('Wycena wymaga ISBN-13'), { code: 'INVALID_ISBN' });
     for (let attempt = 0; attempt < 2; attempt += 1) {
       if (!csrf) await openSession();
       await limiter.acquire();
-      const response = await call('/cart/' + encodeURIComponent(cartCode), { method: 'POST', body: { isbn } });
+      const response = await call('/cart/' + encodeURIComponent(cartCode), {
+        method: 'POST',
+        body: { isbn },
+      });
       // 419: session/CSRF expired; 404: the cart we reused is gone. Start over once.
       if ((response.status === 419 || response.status === 404) && attempt === 0) {
         csrf = null;
         continue;
       }
       if (response.status === 429 || response.status >= 500)
-        throw Object.assign(new Error(`skupksiazek.pl: HTTP ${response.status}`), { code: 'HTTP_' + response.status, temporary: true });
+        throw Object.assign(new Error(`skupksiazek.pl: HTTP ${response.status}`), {
+          code: 'HTTP_' + response.status,
+          temporary: true,
+        });
       const body = await readJson(response);
       if (body?.cart?.code) cartCode = String(body.cart.code);
       if (!response.ok) {
         if (response.status >= 400 && response.status < 500 && body?.message)
-          return { status: 'not_bought', price: null, title: null, message: String(body.message).slice(0, 300) };
-        throw Object.assign(new Error(`skupksiazek.pl: HTTP ${response.status}`), { code: 'HTTP_' + response.status });
+          return {
+            status: 'not_bought',
+            price: null,
+            title: null,
+            message: String(body.message).slice(0, 300),
+          };
+        throw Object.assign(new Error(`skupksiazek.pl: HTTP ${response.status}`), {
+          code: 'HTTP_' + response.status,
+        });
       }
       const result = quoteFromCart(body, isbn);
       // Leave the cart as we found it. A failed removal does not invalidate the quote.
-      for (const item of (body.cart?.items || []).filter((entry) => digits(entry.isbn || entry.item_isbn) === isbn)) {
+      for (const item of (body.cart?.items || []).filter(
+        (entry) => digits(entry.isbn || entry.item_isbn) === isbn,
+      )) {
         try {
           await limiter.acquire();
-          const removed = await call(`/cart/${encodeURIComponent(cartCode)}/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+          const removed = await call(
+            `/cart/${encodeURIComponent(cartCode)}/${encodeURIComponent(item.id)}`,
+            { method: 'DELETE' },
+          );
           await removed.text();
         } catch {
           // Next quote reuses the same cart; the item simply stays there.

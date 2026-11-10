@@ -50,7 +50,9 @@ export class SqliteCatalogRepository extends CatalogRepository {
     backupBeforeMigrations(path);
     this.database = new DatabaseSync(path);
     this.database.function('bookflip_fold', { deterministic: true }, (value) =>
-      String(value ?? '').normalize('NFC').toLocaleLowerCase('pl'),
+      String(value ?? '')
+        .normalize('NFC')
+        .toLocaleLowerCase('pl'),
     );
     const timeout = Math.max(0, Math.min(60000, Number(busyTimeout) || 0));
     this.database.exec('PRAGMA foreign_keys=ON');
@@ -117,8 +119,12 @@ export class SqliteCatalogRepository extends CatalogRepository {
   /** @typedef {Record<string, any> & { created: boolean }} StoredRow A saved row (all its columns) and whether it was new. */
   /** @param {Record<string, any>} [input] @returns {StoredRow} */
   createEdition(input = {}) {
-    const merged=input.workId ? this.database.prepare('SELECT target_id FROM catalog_work_merges WHERE source_id=?').get(input.workId) : null;
-    if(merged) input={...input,workId:merged.target_id};
+    const merged = input.workId
+      ? this.database
+          .prepare('SELECT target_id FROM catalog_work_merges WHERE source_id=?')
+          .get(input.workId)
+      : null;
+    if (merged) input = { ...input, workId: merged.target_id };
     const at = iso(input.at || this.now()),
       legacyId = input.legacyId == null ? null : String(input.legacyId),
       existing = legacyId
@@ -531,7 +537,13 @@ export class SqliteCatalogRepository extends CatalogRepository {
     return Object.fromEntries(
       tables.map((table) => [
         table,
-        Number(this.database.prepare(`SELECT count(*) AS count FROM ${table}${table==='works' ? ' WHERE id NOT IN (SELECT source_id FROM catalog_work_merges)' : ''}`).get().count),
+        Number(
+          this.database
+            .prepare(
+              `SELECT count(*) AS count FROM ${table}${table === 'works' ? ' WHERE id NOT IN (SELECT source_id FROM catalog_work_merges)' : ''}`,
+            )
+            .get().count,
+        ),
       ]),
     );
   }

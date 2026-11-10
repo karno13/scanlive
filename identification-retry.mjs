@@ -48,11 +48,12 @@ export function retryIdentificationJobs(repository, mode, now = () => new Date()
   const bundleGuard = `NOT EXISTS (
     SELECT 1 FROM offer_sets s WHERE s.offer_id = identification_jobs.offer_id
   )`;
-  const condition = mode === 'unresolved'
-    ? "(status IN ('failed','review_required','retry_wait') OR (status='completed' AND json_valid(result_json) AND json_extract(result_json,'$.decision')='not_found'))"
-    : mode === 'not_found'
-    ? "status='completed' AND json_valid(result_json) AND json_extract(result_json,'$.decision')='not_found'"
-    : 'status = ?';
+  const condition =
+    mode === 'unresolved'
+      ? "(status IN ('failed','review_required','retry_wait') OR (status='completed' AND json_valid(result_json) AND json_extract(result_json,'$.decision')='not_found'))"
+      : mode === 'not_found'
+        ? "status='completed' AND json_valid(result_json) AND json_extract(result_json,'$.decision')='not_found'"
+        : 'status = ?';
   const statement = repository.database.prepare(`
     UPDATE identification_jobs
     SET status='queued',run_after=NULL,lease_token=NULL,lease_expires_at=NULL,

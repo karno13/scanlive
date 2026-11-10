@@ -34,19 +34,19 @@ function NOISE_NOW() {
   return noise;
 }
 const SALES_NOISE = [
-    'książka',
-    'ksiazka',
-    'książki',
-    'stan (?:bardzo )?dobry',
-    'bdb',
-    'unikat',
-    'unikatowa',
-    'okazja',
-    'nowa',
-    'nowy',
-    'black library',
-    'copernicus',
-    'chronicles',
+  'książka',
+  'ksiazka',
+  'książki',
+  'stan (?:bardzo )?dobry',
+  'bdb',
+  'unikat',
+  'unikatowa',
+  'okazja',
+  'nowa',
+  'nowy',
+  'black library',
+  'copernicus',
+  'chronicles',
 ];
 
 const clean = (text) =>
@@ -57,7 +57,10 @@ const clean = (text) =>
 
 /** "Abnett, Dan (1965- ) Tłumaczenie" or "Dan Abnett" → { display: "Dan Abnett", surname, first }. */
 function personName(raw) {
-  const text = String(raw ?? '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  const text = String(raw ?? '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!text) return null;
   let first, surname;
   if (text.includes(',')) {
@@ -100,7 +103,11 @@ function authorsInTitle(title, people) {
   const folded = ` ${fold(title)} `;
   const hit = (name) => folded.includes(` ${fold(name)} `);
   return people
-    .filter((person) => hit(person.surname) && (fold(person.surname).length >= 5 || (person.first && hit(person.first.split(' ')[0]))))
+    .filter(
+      (person) =>
+        hit(person.surname) &&
+        (fold(person.surname).length >= 5 || (person.first && hit(person.first.split(' ')[0]))),
+    )
     .map((person) => ({ person, at: folded.indexOf(` ${fold(person.surname)} `) }))
     .sort((a, b) => a.at - b.at)
     .map((item) => item.person)
@@ -112,9 +119,12 @@ function authorsInTitle(title, people) {
  * The first segment is the title in nearly every listing, so it is never taken for a name.
  */
 function nameSegment(title) {
-  for (const segment of String(title).split(/\s[-–—|]\s|,\s/).slice(1)) {
+  for (const segment of String(title)
+    .split(/\s[-–—|]\s|,\s/)
+    .slice(1)) {
     const text = clean(segment.replace(NOISE_NOW(), ' '));
-    if (/^(?:\p{Lu}[\p{Ll}'’-]+|\p{Lu}\.)(?:\s(?:\p{Lu}[\p{Ll}'’-]+|\p{Lu}\.)){1,2}$/u.test(text)) return text;
+    if (/^(?:\p{Lu}[\p{Ll}'’-]+|\p{Lu}\.)(?:\s(?:\p{Lu}[\p{Ll}'’-]+|\p{Lu}\.)){1,2}$/u.test(text))
+      return text;
   }
   return null;
 }
@@ -135,7 +145,9 @@ function sentenceCase(text) {
 
 /** Title of the book from a listing: no universe names, no author, no sales words. */
 export function titleFromListing(title, authors = []) {
-  let text = String(title ?? '').replace(/#/g, ' ').replace(NOISE_NOW(), ' ');
+  let text = String(title ?? '')
+    .replace(/#/g, ' ')
+    .replace(NOISE_NOW(), ' ');
   for (const author of authors) {
     const person = personName(author);
     if (person) text = removeName(text, person);
@@ -144,10 +156,16 @@ export function titleFromListing(title, authors = []) {
   // belongs to the series, not to the book's title.
   text = text
     .replace(/(?<![\p{L}\d])(?:\p{Lu}\.\s?){1,3}(?![\p{L}\d])/gu, ' ')
-    .replace(/(?<![\p{L}\d])(?:tom|t\.|cz\.|część|księga|ks\.)\s*(?:[ivxlc]+|\d{1,3})(?![\p{L}\d])/giu, ' ');
+    .replace(
+      /(?<![\p{L}\d])(?:tom|t\.|cz\.|część|księga|ks\.)\s*(?:[ivxlc]+|\d{1,3})(?![\p{L}\d])/giu,
+      ' ',
+    );
   // "Tytuł - Autor" leaves a dangling separator; keep the first meaningful segment when the
   // listing is "Tytuł | Seria | ..." and the rest is only noise.
-  const segments = text.split(/\s[-–—|]\s/).map(clean).filter((segment) => fold(segment).length >= 3);
+  const segments = text
+    .split(/\s[-–—|]\s/)
+    .map(clean)
+    .filter((segment) => fold(segment).length >= 3);
   return sentenceCase(clean((segments[0] ?? clean(text)).replace(/\s*[,;]\s*$/, '')));
 }
 
@@ -180,7 +198,8 @@ export function offerEditionDraft(repository, jobId) {
   const job = jobOffer(repository, jobId);
   const isbn = normalizeISBN(job.observed_isbn);
   const offers = isbn ? sameIsbnOffers(repository, isbn) : [];
-  if (!offers.some((offer) => offer.job_id === job.id)) offers.push({ ...job, job_id: job.id, matched_queries_json: '[]' });
+  if (!offers.some((offer) => offer.job_id === job.id))
+    offers.push({ ...job, job_id: job.id, matched_queries_json: '[]' });
   const people = knownPeople(repository);
   const authorVotes = new Map();
   const vote = (name, weight) => {
@@ -212,7 +231,9 @@ export function offerEditionDraft(repository, jobId) {
     .map((item) => item.name);
   // The title most listings agree on wins; then this offer's own; then the shorter one.
   const listings = offers.map((offer) => ` ${fold(offer.original_title)} `);
-  const titles = [...new Set(offers.map((offer) => titleFromListing(offer.original_title, authors)))]
+  const titles = [
+    ...new Set(offers.map((offer) => titleFromListing(offer.original_title, authors))),
+  ]
     .filter((title) => fold(title).length >= 3)
     .map((title) => ({
       title,
@@ -235,39 +256,65 @@ export function offerEditionDraft(repository, jobId) {
     title: record?.title || titles[0] || clean(job.original_title).slice(0, 200),
     authors: record?.authors?.length ? record.authors.slice(0, 2) : authors,
     ...(record
-      ? { record: { source: 'lubimyczytac.pl', url: record.url, publisher: record.publisher, publicationYear: record.publicationYear, cycle: record.cycle, pages: record.pages } }
+      ? {
+          record: {
+            source: 'lubimyczytac.pl',
+            url: record.url,
+            publisher: record.publisher,
+            publicationYear: record.publicationYear,
+            cycle: record.cycle,
+            pages: record.pages,
+          },
+        }
       : {}),
     universe: universeOf([job.original_title, ...queries].join(' ')),
-    siblings: offers.filter((offer) => offer.job_id !== job.id && offer.status === 'review_required').length,
+    siblings: offers.filter(
+      (offer) => offer.job_id !== job.id && offer.status === 'review_required',
+    ).length,
     listings: offers.slice(0, 8).map((offer) => offer.original_title),
   };
 }
 
 function validInput(input) {
   const title = clean(input?.title);
-  if (!title || title.length > 300) throw Object.assign(Error('INVALID_BOOK_TITLE'), { statusCode: 400 });
-  const authors = [].concat(input?.authors ?? [])
+  if (!title || title.length > 300)
+    throw Object.assign(Error('INVALID_BOOK_TITLE'), { statusCode: 400 });
+  const authors = []
+    .concat(input?.authors ?? [])
     .map((name) => clean(name))
     .filter(Boolean)
     .slice(0, 5);
-  if (authors.some((name) => name.length > 120)) throw Object.assign(Error('INVALID_AUTHOR'), { statusCode: 400 });
+  if (authors.some((name) => name.length > 120))
+    throw Object.assign(Error('INVALID_AUTHOR'), { statusCode: 400 });
   const isbn = normalizeISBN(input?.isbn);
   if (!isbn) throw Object.assign(Error('INVALID_ISBN'), { statusCode: 400 });
   const publisher = clean(input?.publisher).slice(0, 200) || null;
   const year = Number(input?.publicationYear);
-  return { title, authors, isbn, publisher, publicationYear: Number.isInteger(year) && year >= 1400 && year <= 2100 ? year : null };
+  return {
+    title,
+    authors,
+    isbn,
+    publisher,
+    publicationYear: Number.isInteger(year) && year >= 1400 && year <= 2100 ? year : null,
+  };
 }
 
 /**
  * Creates (or reuses) the edition with this ISBN and assigns the offer to it as a manual decision.
  * The other offers with the same ISBN follow automatically (see requeueReviewsWithKnownIsbn).
  */
-export function createEditionFromOffer(repository, jobId, input = {}, { now = () => new Date() } = {}) {
+export function createEditionFromOffer(
+  repository,
+  jobId,
+  input = {},
+  { now = () => new Date() } = {},
+) {
   const { title, authors, isbn, publisher, publicationYear } = validInput(input);
   // Publisher, year and cycle confirmed by a page with this exact ISBN (lubimyczytac.pl).
   const record = storedIsbnRecord(repository, isbn);
   const job = jobOffer(repository, jobId);
-  if (job.status !== 'review_required') throw Object.assign(Error('REVIEW_JOB_NOT_PENDING'), { statusCode: 409 });
+  if (job.status !== 'review_required')
+    throw Object.assign(Error('REVIEW_JOB_NOT_PENDING'), { statusCode: 409 });
   const at = now().toISOString();
   return repository.transaction(() => {
     let edition = repository.findEditionByISBN(isbn);
@@ -276,7 +323,14 @@ export function createEditionFromOffer(repository, jobId, input = {}, { now = ()
       // A reprint of a book already in the catalogue joins its work (same strict key as the resolver).
       const work =
         findWorkByKey(repository, title, authors) ??
-        repository.createWork({ id: randomUUID(), title, normalizedTitle: fold(title), authors, verificationStatus: 'unverified', at });
+        repository.createWork({
+          id: randomUUID(),
+          title,
+          normalizedTitle: fold(title),
+          authors,
+          verificationStatus: 'unverified',
+          at,
+        });
       edition = repository.createEdition({
         id: randomUUID(),
         workId: work.id,
@@ -287,7 +341,12 @@ export function createEditionFromOffer(repository, jobId, input = {}, { now = ()
         at,
       });
       if (record?.cycle?.name)
-        storeSeriesStatements(repository, edition.id, [{ name: record.cycle.name, volume: record.cycle.volume, kind: 'cycle' }], 'lubimyczytac');
+        storeSeriesStatements(
+          repository,
+          edition.id,
+          [{ name: record.cycle.name, volume: record.cycle.volume, kind: 'cycle' }],
+          'lubimyczytac',
+        );
       const keys = isbnKeys(isbn).length ? isbnKeys(isbn) : [isbn];
       for (const key of keys)
         repository.attachIdentifier(edition.id, key.length === 10 ? 'isbn10' : 'isbn13', key, {
@@ -296,19 +355,26 @@ export function createEditionFromOffer(repository, jobId, input = {}, { now = ()
           at,
         });
       repository.database
-        .prepare('INSERT OR IGNORE INTO offer_editions(edition_id,offer_id,isbn,created_at,checked_at) VALUES(?,?,?,?,?)')
+        .prepare(
+          'INSERT OR IGNORE INTO offer_editions(edition_id,offer_id,isbn,created_at,checked_at) VALUES(?,?,?,?,?)',
+        )
         .run(edition.id, job.offer_id, keys.find((key) => key.length === 13) ?? keys[0], at, at);
       created = true;
     }
-    const decision = decideIdentificationJob(repository, job.id, {
-      action: 'approved',
-      editionId: edition.id,
-      reason: created
-        ? record
-          ? 'Wydanie utworzone z ogłoszenia — ISBN nieznany BN, Open Library i e-ISBN; opis z lubimyczytac.pl (ten sam ISBN).'
-          : 'Wydanie utworzone z ogłoszenia — ISBN nieznany BN, Open Library i Google Books.'
-        : 'Przypisano do wydania z tym ISBN.',
-    }, { now });
+    const decision = decideIdentificationJob(
+      repository,
+      job.id,
+      {
+        action: 'approved',
+        editionId: edition.id,
+        reason: created
+          ? record
+            ? 'Wydanie utworzone z ogłoszenia — ISBN nieznany BN, Open Library i e-ISBN; opis z lubimyczytac.pl (ten sam ISBN).'
+            : 'Wydanie utworzone z ogłoszenia — ISBN nieznany BN, Open Library i Google Books.'
+          : 'Przypisano do wydania z tym ISBN.',
+      },
+      { now },
+    );
     return { editionId: edition.id, workId: edition.work_id, created, decision: decision.decision };
   });
 }
@@ -320,7 +386,12 @@ function primaryRecords(metadata) {
 }
 
 /** Gives an offer-made edition the bibliographic record that a source finally returned. */
-export function upgradeOfferEdition(repository, editionId, metadata, { now = () => new Date() } = {}) {
+export function upgradeOfferEdition(
+  repository,
+  editionId,
+  metadata,
+  { now = () => new Date() } = {},
+) {
   const edition = repository.database.prepare('SELECT * FROM editions WHERE id=?').get(editionId);
   if (!edition) return { upgraded: false, reason: 'edition_not_found' };
   const records = primaryRecords(metadata);
@@ -337,7 +408,9 @@ export function upgradeOfferEdition(repository, editionId, metadata, { now = () 
       .run(
         String(record.title || edition.title).slice(0, 500),
         normalizePublisher(record.publisher),
-        Number.isInteger(Number(record.publicationYear)) && record.publicationYear >= 1400 && record.publicationYear <= 2100
+        Number.isInteger(Number(record.publicationYear)) &&
+          record.publicationYear >= 1400 &&
+          record.publicationYear <= 2100
           ? Number(record.publicationYear)
           : null,
         record.language || null,
@@ -349,31 +422,56 @@ export function upgradeOfferEdition(repository, editionId, metadata, { now = () 
     // Only a work this listing created is rewritten; a known work keeps its operator-checked title.
     if (work?.verification_status === 'unverified')
       repository.database
-        .prepare("UPDATE works SET title=?, normalized_title=?, authors_json=?, verification_status='verified', updated_at=? WHERE id=?")
-        .run(String(record.title || work.title).slice(0, 500), fold(record.title || work.title), JSON.stringify(record.authors?.length ? record.authors : JSON.parse(work.authors_json || '[]')), at, work.id);
+        .prepare(
+          "UPDATE works SET title=?, normalized_title=?, authors_json=?, verification_status='verified', updated_at=? WHERE id=?",
+        )
+        .run(
+          String(record.title || work.title).slice(0, 500),
+          fold(record.title || work.title),
+          JSON.stringify(
+            record.authors?.length ? record.authors : JSON.parse(work.authors_json || '[]'),
+          ),
+          at,
+          work.id,
+        );
     repository.database
-      .prepare("UPDATE edition_identifiers SET verification_status='verified' WHERE edition_id=? AND scheme IN ('isbn10','isbn13')")
+      .prepare(
+        "UPDATE edition_identifiers SET verification_status='verified' WHERE edition_id=? AND scheme IN ('isbn10','isbn13')",
+      )
       .run(edition.id);
-    const scheme = record.source === 'open_library' ? 'open_library' : record.source === 'bn' ? 'bn' : null;
+    const scheme =
+      record.source === 'open_library' ? 'open_library' : record.source === 'bn' ? 'bn' : null;
     if (scheme && record.externalRecordId)
       try {
-        repository.attachIdentifier(edition.id, scheme, record.externalRecordId, { source: record.source, verificationStatus: 'verified', at });
+        repository.attachIdentifier(edition.id, scheme, record.externalRecordId, {
+          source: record.source,
+          verificationStatus: 'verified',
+          at,
+        });
       } catch {}
-    persistMetadataResults(repository, [metadata.bn, metadata.openLibrary, metadata.eIsbn, metadata.googleBooks].filter(Boolean), {
-      workId: edition.work_id,
-      editionId: edition.id,
-    });
+    persistMetadataResults(
+      repository,
+      [metadata.bn, metadata.openLibrary, metadata.eIsbn, metadata.googleBooks].filter(Boolean),
+      {
+        workId: edition.work_id,
+        editionId: edition.id,
+      },
+    );
     const external = repository.database
       .prepare('SELECT id FROM external_records WHERE provider=? AND external_id=?')
       .all(record.source, record.externalRecordId);
     for (const row of external)
       repository.database
-        .prepare('INSERT OR IGNORE INTO external_record_links(external_record_id,work_id,edition_id,linked_at) VALUES(?,?,?,?)')
+        .prepare(
+          'INSERT OR IGNORE INTO external_record_links(external_record_id,work_id,edition_id,linked_at) VALUES(?,?,?,?)',
+        )
         .run(row.id, edition.work_id, edition.id, at);
     enrichEdition(repository, edition.id, { now });
     if (record.source === 'e_isbn' && record.payload?.onix?.series?.length)
       storeSeriesStatements(repository, edition.id, record.payload.onix.series, 'e_isbn');
-    repository.database.prepare('UPDATE offer_editions SET upgraded_at=?, last_outcome=? WHERE edition_id=?').run(at, 'upgraded', edition.id);
+    repository.database
+      .prepare('UPDATE offer_editions SET upgraded_at=?, last_outcome=? WHERE edition_id=?')
+      .run(at, 'upgraded', edition.id);
   });
   return { upgraded: true, source: record.source };
 }
@@ -399,16 +497,22 @@ export async function recheckOfferEditions(catalog, { limit = 3, now = () => new
     }
     report.checked += 1;
     const temporary = !metadata || metadata.bn?.status === 'temporary_error';
-    const result = metadata ? upgradeOfferEdition(repository, row.edition_id, metadata, { now }) : { upgraded: false, reason: 'error' };
+    const result = metadata
+      ? upgradeOfferEdition(repository, row.edition_id, metadata, { now })
+      : { upgraded: false, reason: 'error' };
     if (result.upgraded) report.upgraded += 1;
     else if (temporary && !primaryRecords(metadata).length) report.errors += 1;
     else report.waiting += 1;
     if (!result.upgraded)
       repository.database
-        .prepare('UPDATE offer_editions SET checked_at=?, check_count=check_count+1, last_outcome=? WHERE edition_id=?')
+        .prepare(
+          'UPDATE offer_editions SET checked_at=?, check_count=check_count+1, last_outcome=? WHERE edition_id=?',
+        )
         .run(
           // A source outage is retried the next day, not in a week.
-          temporary ? new Date(now().getTime() - RECHECK_AFTER_MS + RETRY_SOON_MS).toISOString() : now().toISOString(),
+          temporary
+            ? new Date(now().getTime() - RECHECK_AFTER_MS + RETRY_SOON_MS).toISOString()
+            : now().toISOString(),
           String(result.reason || 'not_found').slice(0, 60),
           row.edition_id,
         );

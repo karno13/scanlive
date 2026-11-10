@@ -5,7 +5,8 @@ const pct = (part, total) => (total ? Math.round((part / total) * 1000) / 10 : 0
 
 export function catalogInsights(repository) {
   const db = repository.database;
-  const hasIsbn = "((o.observed_isbn IS NOT NULL AND o.observed_isbn<>'') OR m.offer_id IS NOT NULL)";
+  const hasIsbn =
+    "((o.observed_isbn IS NOT NULL AND o.observed_isbn<>'') OR m.offer_id IS NOT NULL)";
   const activeMatch = `LEFT JOIN (SELECT DISTINCT offer_id FROM offer_matches WHERE status='active') m ON m.offer_id=o.id`;
   const funnelRow = db
     .prepare(
@@ -25,7 +26,9 @@ export function catalogInsights(repository) {
   );
   const jobs = Object.fromEntries(
     db
-      .prepare("SELECT status, count(*) AS c FROM identification_jobs WHERE job_type='identify_edition' GROUP BY status")
+      .prepare(
+        "SELECT status, count(*) AS c FROM identification_jobs WHERE job_type='identify_edition' GROUP BY status",
+      )
       .all()
       .map((row) => [row.status, Number(row.c)]),
   );
@@ -78,7 +81,9 @@ export function catalogInsights(repository) {
     .get();
   const works = Number(
     db
-      .prepare('SELECT count(*) AS c FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id)')
+      .prepare(
+        'SELECT count(*) AS c FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id)',
+      )
       .get().c,
   );
   const editions = Number(editionRow.editions || 0);
@@ -130,7 +135,12 @@ export function catalogInsights(repository) {
     )
     .get();
   const outage = Number(waiting.n)
-    ? { source: 'BN', waiting: Number(waiting.n), reason: waiting.reason || null, nextRun: waiting.nextRun }
+    ? {
+        source: 'BN',
+        waiting: Number(waiting.n),
+        reason: waiting.reason || null,
+        nextRun: waiting.nextRun,
+      }
     : null;
   return { funnel, sources, completeness, series, outage, generatedAt: new Date().toISOString() };
 }

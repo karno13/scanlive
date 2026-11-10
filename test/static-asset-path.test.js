@@ -13,10 +13,18 @@ test('public assets include first-party browser modules without a manual route l
 
 test('public asset matching rejects arbitrary files, traversals and encoded paths', () => {
   for (const path of [
-    '/.env', '/package.json', '/local-app.mjs', '/secrets.json',
-    '/views/../.env', '/views/%2e%2e/.env',
-    '/views/subdir/secret.js', '/core/.private.js',
-    '/views/file.js/other', '/views/fake.js.map',
-    '/core/%2e%2e%2fapp.js', '/backup.zip',
-  ]) assert.equal(publicAssetPath(path), null, path);
+    '/.env',
+    '/package.json',
+    '/local-app.mjs',
+    '/secrets.json',
+    '/views/../.env',
+    '/views/%2e%2e/.env',
+    '/views/subdir/secret.js',
+    '/core/.private.js',
+    '/views/file.js/other',
+    '/views/fake.js.map',
+    '/core/%2e%2e%2fapp.js',
+    '/backup.zip',
+  ])
+    assert.equal(publicAssetPath(path), null, path);
 });

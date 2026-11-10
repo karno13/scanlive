@@ -18,7 +18,9 @@ export function marcFields(marc) {
           ind1: value.ind1 ?? ' ',
           ind2: value.ind2 ?? ' ',
           subfields: value.subfields.flatMap((entry) =>
-            entry && typeof entry === 'object' ? Object.entries(entry).map(([code, text]) => [code, String(text ?? '')]) : [],
+            entry && typeof entry === 'object'
+              ? Object.entries(entry).map(([code, text]) => [code, String(text ?? '')])
+              : [],
           ),
         });
       else out.push({ tag, value: String(value ?? ''), subfields: [] });
@@ -27,15 +29,22 @@ export function marcFields(marc) {
   return out;
 }
 
-const all = (field, code) => field.subfields.filter(([key]) => key === code).map(([, value]) => value);
+const all = (field, code) =>
+  field.subfields.filter(([key]) => key === code).map(([, value]) => value);
 const first = (field, code) => all(field, code)[0] ?? null;
 
 /** ISBD punctuation that closes a MARC subfield: "Zabójca krasnoludów /", "Copernicus Corporation,". */
 export function trimPunctuation(value) {
-  let text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  let text = String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   text = text.replace(/\s*[/:;=,]+$/, '').trim();
   // A final full stop is ISBD punctuation, except after an initial ("Werner, C. L.") or "t. 1".
-  if (/\.$/.test(text) && !/(?:^|[\s.])\p{L}\.$/u.test(text) && !/\b(?:t|ks|cz|nr|wyd|s)\.$/i.test(text))
+  if (
+    /\.$/.test(text) &&
+    !/(?:^|[\s.])\p{L}\.$/u.test(text) &&
+    !/\b(?:t|ks|cz|nr|wyd|s)\.$/i.test(text)
+  )
     text = text.slice(0, -1).trim();
   return text.replace(/^\[|\]$/g, '').trim();
 }
@@ -75,8 +84,13 @@ function contributors(fields) {
     if (field.tag === '700' && all(field, 't').length) continue;
     const sortName = trimPunctuation(first(field, 'a') ?? '');
     if (!sortName) continue;
-    const roles = all(field, 'e').flatMap((value) => value.split(/[,;]/)).map((value) => value.trim()).filter(Boolean);
-    const mapped = roles.length ? [...new Set(roles.map(roleOf))] : [field.tag === '100' ? 'author' : 'other'];
+    const roles = all(field, 'e')
+      .flatMap((value) => value.split(/[,;]/))
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const mapped = roles.length
+      ? [...new Set(roles.map(roleOf))]
+      : [field.tag === '100' ? 'author' : 'other'];
     for (const role of mapped) {
       const name = displayName(sortName);
       const key = `${personKey(name)}|${role}`;
@@ -100,7 +114,11 @@ export function seriesName(value, publisher = null) {
   text = text.replace(/\s*\([^)]*\)\s*$/, '');
   if (text.includes(' = ')) text = text.split(' = ').at(-1);
   const dash = text.match(/^(.*?)\s+-\s+(.+)$/);
-  if (dash && (/(?:corporation|media|wydawnictwo|s-ka|słów|slow)\b/i.test(dash[2]) || (publisher && fold(publisher).startsWith(fold(dash[2])))))
+  if (
+    dash &&
+    (/(?:corporation|media|wydawnictwo|s-ka|słów|slow)\b/i.test(dash[2]) ||
+      (publisher && fold(publisher).startsWith(fold(dash[2]))))
+  )
     text = dash[1];
   return trimPunctuation(text);
 }
@@ -182,14 +200,21 @@ function titleParts(fields) {
     fullTitle += fullTitle ? (code === 'b' ? ' : ' : '. ') + value : value;
     previous = raw;
   }
-  return { title: main.join('. ') || null, subtitle: subtitles.join(' ') || null, fullTitle: fullTitle || null };
+  return {
+    title: main.join('. ') || null,
+    subtitle: subtitles.join(' ') || null,
+    fullTitle: fullTitle || null,
+  };
 }
 
 function originalTitle(fields) {
   for (const field of fields.filter((entry) => entry.tag === '246')) {
     const label = all(field, 'i').join(' ');
     if (/oryg/i.test(label) && !/cykl/i.test(label)) {
-      const value = [first(field, 'a'), first(field, 'b')].map((part) => trimPunctuation(part ?? '')).filter(Boolean).join(' : ');
+      const value = [first(field, 'a'), first(field, 'b')]
+        .map((part) => trimPunctuation(part ?? ''))
+        .filter(Boolean)
+        .join(' : ');
       if (value) return value;
     }
   }
@@ -198,7 +223,9 @@ function originalTitle(fields) {
 }
 
 function publication(fields) {
-  const field = fields.find((entry) => entry.tag === '264' && entry.ind2 === '1') ?? fields.find((entry) => ['260', '264'].includes(entry.tag));
+  const field =
+    fields.find((entry) => entry.tag === '264' && entry.ind2 === '1') ??
+    fields.find((entry) => ['260', '264'].includes(entry.tag));
   if (!field) return { publisher: null, place: null, year: null };
   // The first $b is the publisher; later ones are co-publishers / collection partners.
   const publishers = all(field, 'b').map(trimPunctuation).filter(Boolean).slice(0, 1);
@@ -222,7 +249,9 @@ function physical(fields) {
   if (!field) return { pageCount: null, heightCm: null };
   const extent = all(field, 'a').join(' ');
   // "405, [3] strony", "165, [1] strona, [1] karta tablic": the paginated count is the first number.
-  const counted = /(?:\bs\.|\bs\b|stron|str\b)/i.test(extent) ? Number(extent.match(/\d{1,5}/)?.[0] ?? 0) : 0;
+  const counted = /(?:\bs\.|\bs\b|stron|str\b)/i.test(extent)
+    ? Number(extent.match(/\d{1,5}/)?.[0] ?? 0)
+    : 0;
   const pages = counted ? [counted] : [];
   const height = String(first(field, 'c') ?? '').match(/(\d{1,3})\s*cm/);
   const pageCount = pages[0] ?? null;
@@ -257,7 +286,10 @@ export function parseBnMarc(record) {
     subtitle,
     fullTitle,
     originalTitle: originalTitle(fields),
-    originalLanguage: typeof record.languageOfOriginal === 'string' && record.languageOfOriginal.trim() ? record.languageOfOriginal.trim() : null,
+    originalLanguage:
+      typeof record.languageOfOriginal === 'string' && record.languageOfOriginal.trim()
+        ? record.languageOfOriginal.trim()
+        : null,
     authors: people.filter((person) => person.role === 'author').map((person) => person.name),
     contributors: people,
     publisher,

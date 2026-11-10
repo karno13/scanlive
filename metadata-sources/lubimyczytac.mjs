@@ -32,14 +32,20 @@ export function parseLcSearch(html) {
 /** The schema.org Book of a book page, with the publisher from the page itself. */
 export function parseLcBook(html) {
   let book = null;
-  for (const match of String(html).matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/g)) {
+  for (const match of String(html).matchAll(
+    /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/g,
+  )) {
     try {
       const data = JSON.parse(match[1]);
-      for (const node of Array.isArray(data) ? data : [data]) if (node?.['@type'] === 'Book') book = node;
+      for (const node of Array.isArray(data) ? data : [data])
+        if (node?.['@type'] === 'Book') book = node;
     } catch {}
   }
   if (!book) return null;
-  const authors = [].concat(book.author ?? []).map((person) => decode(person?.name)).filter(Boolean);
+  const authors = []
+    .concat(book.author ?? [])
+    .map((person) => decode(person?.name))
+    .filter(Boolean);
   const publisher = decode(String(html).match(/Wydawnictwo:\s*<a[^>]*>([^<]+)<\/a>/)?.[1] ?? '');
   const year = Number(String(book.datePublished ?? '').slice(0, 4));
   const series = book.isPartOfSeries;
@@ -49,7 +55,12 @@ export function parseLcBook(html) {
     authors,
     publisher: publisher || null,
     publicationYear: year >= 1400 && year <= 2100 ? year : null,
-    cycle: series?.name ? { name: decode(series.name), volume: Number.isInteger(Number(series.position)) ? Number(series.position) : null } : null,
+    cycle: series?.name
+      ? {
+          name: decode(series.name),
+          volume: Number.isInteger(Number(series.position)) ? Number(series.position) : null,
+        }
+      : null,
     pages: Number(book.numberOfPages) || null,
     language: decode(book.inLanguage) || null,
     url: typeof book.url === 'string' && book.url.startsWith(HOST + '/ksiazka/') ? book.url : null,
@@ -60,14 +71,25 @@ export function parseLcBook(html) {
  * The lubimyczytac.pl record of `isbn`, searched by title (with the first author's surname first,
  * then the title alone). Null when no candidate page carries this exact ISBN.
  */
-export async function findLcRecord({ isbn, title, authors = [] }, { read = (url) => readSourceHtml(url, { source: 'lubimyczytac.pl' }) } = {}) {
+export async function findLcRecord(
+  { isbn, title, authors = [] },
+  { read = (url) => readSourceHtml(url, { source: 'lubimyczytac.pl' }) } = {},
+) {
   const wanted = normalizeISBN(isbn);
   if (!wanted || !String(title ?? '').trim()) return null;
-  const surname = String(authors[0] ?? '').trim().split(/\s+/).pop() ?? '';
-  const phrases = [...new Set([surname ? `${title} ${surname}` : null, String(title)].filter(Boolean))];
+  const surname =
+    String(authors[0] ?? '')
+      .trim()
+      .split(/\s+/)
+      .pop() ?? '';
+  const phrases = [
+    ...new Set([surname ? `${title} ${surname}` : null, String(title)].filter(Boolean)),
+  ];
   const seen = new Set();
   for (const phrase of phrases) {
-    const search = await read(`${HOST}/szukaj/ksiazki?phrase=${encodeURIComponent(phrase.slice(0, 120))}`);
+    const search = await read(
+      `${HOST}/szukaj/ksiazki?phrase=${encodeURIComponent(phrase.slice(0, 120))}`,
+    );
     for (const url of parseLcSearch(search).slice(0, MAX_CANDIDATES)) {
       if (seen.has(url)) continue;
       seen.add(url);

@@ -13,113 +13,241 @@ import { findTitleConflicts, resolveTitleConflict } from './title-consistency.mj
 import { getScanSchedule, saveScanSchedule, nextRunAt, nextQuickRunAt } from './scan-schedule.mjs';
 import { getPolishOnly, setPolishOnly } from './language-policy.mjs';
 import { listNames, mergeNames, removeNameAlias } from './name-aliases.mjs';
-function fail(code, statusCode = 400) { throw Object.assign(Error(code), { statusCode }); }
+function fail(code, statusCode = 400) {
+  throw Object.assign(Error(code), { statusCode });
+}
 export function amount(value) {
   if (value === null) return null;
-  if (!Number.isFinite(value) || value < 0 || value > 100000000 || Math.abs(value * 100 - Math.round(value * 100)) > 1e-6) fail('INVALID_AMOUNT');
+  if (
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > 100000000 ||
+    Math.abs(value * 100 - Math.round(value * 100)) > 1e-6
+  )
+    fail('INVALID_AMOUNT');
   return Math.round(value * 100) / 100;
 }
 export function getTradingDefaults(repo) {
-  const row = repo.database.prepare("SELECT value_json FROM app_preferences WHERE key='trading_defaults'").get();
+  const row = repo.database
+    .prepare("SELECT value_json FROM app_preferences WHERE key='trading_defaults'")
+    .get();
   return row ? JSON.parse(row.value_json) : { shipping: null, other: null };
 }
 export function saveTradingDefaults(repo, input) {
   const value = { shipping: amount(input?.shipping), other: amount(input?.other) };
-  repo.database.prepare("INSERT INTO app_preferences VALUES('trading_defaults',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at").run(JSON.stringify(value), new Date().toISOString());
+  repo.database
+    .prepare(
+      "INSERT INTO app_preferences VALUES('trading_defaults',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at",
+    )
+    .run(JSON.stringify(value), new Date().toISOString());
   return value;
 }
 export function getOfferScenario(repo, id) {
-  if (!repo.database.prepare('SELECT id FROM offers WHERE id=?').get(id)) fail('OFFER_NOT_FOUND', 404);
-  const row = repo.database.prepare('SELECT purchase,shipping,other,resale,actual_purchase AS actualPurchase,updated_at AS updatedAt FROM offer_scenarios WHERE offer_id=?').get(id);
-  return row || { purchase: null, shipping: null, other: null, resale: null, actualPurchase: null, updatedAt: null };
+  if (!repo.database.prepare('SELECT id FROM offers WHERE id=?').get(id))
+    fail('OFFER_NOT_FOUND', 404);
+  const row = repo.database
+    .prepare(
+      'SELECT purchase,shipping,other,resale,actual_purchase AS actualPurchase,updated_at AS updatedAt FROM offer_scenarios WHERE offer_id=?',
+    )
+    .get(id);
+  return (
+    row || {
+      purchase: null,
+      shipping: null,
+      other: null,
+      resale: null,
+      actualPurchase: null,
+      updatedAt: null,
+    }
+  );
 }
 export function saveOfferScenario(repo, id, input) {
   getOfferScenario(repo, id);
-  const values = ['purchase','shipping','other','resale','actualPurchase'].map(key => amount(input?.[key] ?? null));
-  repo.database.prepare(`INSERT INTO offer_scenarios(offer_id,purchase,shipping,other,resale,actual_purchase,updated_at) VALUES(?,?,?,?,?,?,?)
-    ON CONFLICT(offer_id) DO UPDATE SET purchase=excluded.purchase,shipping=excluded.shipping,other=excluded.other,resale=excluded.resale,actual_purchase=excluded.actual_purchase,updated_at=excluded.updated_at`).run(id,...values,new Date().toISOString());
-  return getOfferScenario(repo,id);
+  const values = ['purchase', 'shipping', 'other', 'resale', 'actualPurchase'].map((key) =>
+    amount(input?.[key] ?? null),
+  );
+  repo.database
+    .prepare(
+      `INSERT INTO offer_scenarios(offer_id,purchase,shipping,other,resale,actual_purchase,updated_at) VALUES(?,?,?,?,?,?,?)
+    ON CONFLICT(offer_id) DO UPDATE SET purchase=excluded.purchase,shipping=excluded.shipping,other=excluded.other,resale=excluded.resale,actual_purchase=excluded.actual_purchase,updated_at=excluded.updated_at`,
+    )
+    .run(id, ...values, new Date().toISOString());
+  return getOfferScenario(repo, id);
 }
 export function listScanRuns(repo) {
-  return repo.database.prepare('SELECT s.scanned_at,s.summary_json,EXISTS(SELECT 1 FROM scan_offer_results r WHERE r.scanned_at=s.scanned_at) AS indexed FROM scan_runs s ORDER BY s.scanned_at DESC LIMIT 50').all().map(row => {
-    const summary=JSON.parse(row.summary_json);
-    return {at:row.scanned_at,...summary,indexed:Boolean(row.indexed||summary.context)};
-  });
+  return repo.database
+    .prepare(
+      'SELECT s.scanned_at,s.summary_json,EXISTS(SELECT 1 FROM scan_offer_results r WHERE r.scanned_at=s.scanned_at) AS indexed FROM scan_runs s ORDER BY s.scanned_at DESC LIMIT 50',
+    )
+    .all()
+    .map((row) => {
+      const summary = JSON.parse(row.summary_json);
+      return { at: row.scanned_at, ...summary, indexed: Boolean(row.indexed || summary.context) };
+    });
 }
 export function recentReviewDecisions(repo) {
-  const decisions=repo.database.prepare(`SELECT d.id,d.action,d.reason,d.created_at AS createdAt,d.offer_id AS offerId,o.original_title AS title,
+  const decisions = repo.database
+    .prepare(
+      `SELECT d.id,d.action,d.reason,d.created_at AS createdAt,d.offer_id AS offerId,o.original_title AS title,
     d.edition_id AS editionId,r.id AS revisionId FROM review_decisions d JOIN offers o ON o.id=d.offer_id
-    LEFT JOIN review_revisions r ON r.decision_id=d.id ORDER BY d.created_at DESC,d.id DESC LIMIT 30`).all();
+    LEFT JOIN review_revisions r ON r.decision_id=d.id ORDER BY d.created_at DESC,d.id DESC LIMIT 30`,
+    )
+    .all();
   // Automatic relist links are decisions too (offer_relists, created_by 'relist_detection').
-  return [...decisions,...recentRelistDecisions(repo.database,30)]
-    .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))).slice(0,30);
+  return [...decisions, ...recentRelistDecisions(repo.database, 30)]
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .slice(0, 30);
 }
-export function reopenReviewDecision(repo,id) {
+export function reopenReviewDecision(repo, id) {
   return repo.transaction(() => {
-    const db=repo.database;
-    const decision=db.prepare('SELECT * FROM review_decisions WHERE id=?').get(id);
-    if (!decision) fail('DECISION_NOT_FOUND',404);
-    if (db.prepare('SELECT id FROM review_revisions WHERE decision_id=?').get(id)) fail('DECISION_ALREADY_REOPENED',409);
-    const latest=db.prepare('SELECT id FROM review_decisions WHERE offer_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1').get(decision.offer_id);
-    if (latest?.id!==id) fail('NEWER_DECISION_EXISTS',409);
-    const job=db.prepare('SELECT * FROM identification_jobs WHERE id=?').get(decision.job_id);
-    if (!job || job.status==='running') fail('IDENTIFICATION_IN_PROGRESS',409);
-    if (db.prepare('SELECT offer_id FROM offer_sets WHERE offer_id=?').get(decision.offer_id)) fail('OFFER_IS_SET',409);
-    const active=db.prepare("SELECT * FROM offer_matches WHERE offer_id=? AND status='active'").get(decision.offer_id);
-    if (active && active.edition_id!==decision.edition_id) fail('NEWER_ASSIGNMENT_EXISTS',409);
-    const now=new Date().toISOString();
-    if (active) db.prepare("UPDATE offer_matches SET status='superseded',valid_to=? WHERE id=?").run(now,active.id);
-    db.prepare('INSERT INTO review_revisions VALUES(?,?,?)').run(randomUUID(),id,now);
-    db.prepare("UPDATE identification_jobs SET status='review_required',result_json=?,lease_token=NULL,lease_expires_at=NULL,run_after=NULL,updated_at=? WHERE id=?").run(JSON.stringify({reason:['operator_correction']}),now,job.id);
-    return { jobId:job.id,offerId:decision.offer_id };
+    const db = repo.database;
+    const decision = db.prepare('SELECT * FROM review_decisions WHERE id=?').get(id);
+    if (!decision) fail('DECISION_NOT_FOUND', 404);
+    if (db.prepare('SELECT id FROM review_revisions WHERE decision_id=?').get(id))
+      fail('DECISION_ALREADY_REOPENED', 409);
+    const latest = db
+      .prepare(
+        'SELECT id FROM review_decisions WHERE offer_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1',
+      )
+      .get(decision.offer_id);
+    if (latest?.id !== id) fail('NEWER_DECISION_EXISTS', 409);
+    const job = db.prepare('SELECT * FROM identification_jobs WHERE id=?').get(decision.job_id);
+    if (!job || job.status === 'running') fail('IDENTIFICATION_IN_PROGRESS', 409);
+    if (db.prepare('SELECT offer_id FROM offer_sets WHERE offer_id=?').get(decision.offer_id))
+      fail('OFFER_IS_SET', 409);
+    const active = db
+      .prepare("SELECT * FROM offer_matches WHERE offer_id=? AND status='active'")
+      .get(decision.offer_id);
+    if (active && active.edition_id !== decision.edition_id) fail('NEWER_ASSIGNMENT_EXISTS', 409);
+    const now = new Date().toISOString();
+    if (active)
+      db.prepare("UPDATE offer_matches SET status='superseded',valid_to=? WHERE id=?").run(
+        now,
+        active.id,
+      );
+    db.prepare('INSERT INTO review_revisions VALUES(?,?,?)').run(randomUUID(), id, now);
+    db.prepare(
+      "UPDATE identification_jobs SET status='review_required',result_json=?,lease_token=NULL,lease_expires_at=NULL,run_after=NULL,updated_at=? WHERE id=?",
+    ).run(JSON.stringify({ reason: ['operator_correction'] }), now, job.id);
+    return { jobId: job.id, offerId: decision.offer_id };
   });
 }
-function text(value, limit, required=false) {
-  if (typeof value!=='string' || value.length>limit || (required&&!value.trim())) fail('INVALID_CATALOG_FIELDS');
+function text(value, limit, required = false) {
+  if (typeof value !== 'string' || value.length > limit || (required && !value.trim()))
+    fail('INVALID_CATALOG_FIELDS');
   return value.trim();
 }
-export function editCatalogWork(repo,id,input) {
-  const title=text(input?.title,500,true);
-  if (!Array.isArray(input?.authors) || input.authors.length>30) fail('INVALID_CATALOG_FIELDS');
-  const authors=input.authors.map(value=>text(value,200,true));
-  const result=repo.database.prepare('UPDATE works SET title=?,authors_json=?,normalized_title=?,verification_status=\'manual\',updated_at=? WHERE id=?').run(title,JSON.stringify(authors),title.normalize('NFC').toLocaleLowerCase('pl'),new Date().toISOString(),id);
-  if (!result.changes) fail('WORK_NOT_FOUND',404);
-  return {id,title,authors};
+export function editCatalogWork(repo, id, input) {
+  const title = text(input?.title, 500, true);
+  if (!Array.isArray(input?.authors) || input.authors.length > 30) fail('INVALID_CATALOG_FIELDS');
+  const authors = input.authors.map((value) => text(value, 200, true));
+  const result = repo.database
+    .prepare(
+      "UPDATE works SET title=?,authors_json=?,normalized_title=?,verification_status='manual',updated_at=? WHERE id=?",
+    )
+    .run(
+      title,
+      JSON.stringify(authors),
+      title.normalize('NFC').toLocaleLowerCase('pl'),
+      new Date().toISOString(),
+      id,
+    );
+  if (!result.changes) fail('WORK_NOT_FOUND', 404);
+  return { id, title, authors };
 }
-export function editCatalogEdition(repo,id,input) {
-  const title=text(input?.title,500,true), publisher=text(input?.publisher??'',300), language=text(input?.language??'',60), binding=text(input?.binding??'',100);
-  const year=input?.publicationYear;
-  if (year!==null && (!Number.isSafeInteger(year)||year<1400||year>2100)) fail('INVALID_CATALOG_FIELDS');
-  const result=repo.database.prepare("UPDATE editions SET title=?,publisher=?,language=?,binding=?,publication_year=?,verification_status='manual',updated_at=? WHERE id=?").run(title,publisher||null,language||null,binding||null,year,new Date().toISOString(),id);
-  if (!result.changes) fail('EDITION_NOT_FOUND',404);
-  return {id,title,publisher,language,binding,publicationYear:year};
+export function editCatalogEdition(repo, id, input) {
+  const title = text(input?.title, 500, true),
+    publisher = text(input?.publisher ?? '', 300),
+    language = text(input?.language ?? '', 60),
+    binding = text(input?.binding ?? '', 100);
+  const year = input?.publicationYear;
+  if (year !== null && (!Number.isSafeInteger(year) || year < 1400 || year > 2100))
+    fail('INVALID_CATALOG_FIELDS');
+  const result = repo.database
+    .prepare(
+      "UPDATE editions SET title=?,publisher=?,language=?,binding=?,publication_year=?,verification_status='manual',updated_at=? WHERE id=?",
+    )
+    .run(
+      title,
+      publisher || null,
+      language || null,
+      binding || null,
+      year,
+      new Date().toISOString(),
+      id,
+    );
+  if (!result.changes) fail('EDITION_NOT_FOUND', 404);
+  return { id, title, publisher, language, binding, publicationYear: year };
 }
-export function mergeCatalogWorks(repo,sourceId,targetId,confirm=false) {
-  if (sourceId===targetId) fail('SAME_WORK');
-  const db=repo.database;
-  const source=db.prepare('SELECT * FROM works WHERE id=?').get(sourceId),target=db.prepare('SELECT * FROM works WHERE id=?').get(targetId);
-  if (!source||!target) fail('WORK_NOT_FOUND',404);
-  if (db.prepare('SELECT 1 FROM catalog_work_merges WHERE source_id IN (?,?) OR target_id=?').get(sourceId,targetId,sourceId)) fail('WORK_ALREADY_MERGED',409);
+export function mergeCatalogWorks(repo, sourceId, targetId, confirm = false) {
+  if (sourceId === targetId) fail('SAME_WORK');
+  const db = repo.database;
+  const source = db.prepare('SELECT * FROM works WHERE id=?').get(sourceId),
+    target = db.prepare('SELECT * FROM works WHERE id=?').get(targetId);
+  if (!source || !target) fail('WORK_NOT_FOUND', 404);
+  if (
+    db
+      .prepare('SELECT 1 FROM catalog_work_merges WHERE source_id IN (?,?) OR target_id=?')
+      .get(sourceId, targetId, sourceId)
+  )
+    fail('WORK_ALREADY_MERGED', 409);
   // Preserve old compatibility IDs rather than silently moving their identity.
-  if (source.legacy_id && db.prepare('SELECT 1 FROM editions WHERE work_id=? AND legacy_id IS NULL').get(sourceId)) fail('LEGACY_IDENTITY_PROTECTED',409);
-  const editions=db.prepare('SELECT id,title FROM editions WHERE work_id=?').all(sourceId);
-  const summary={sourceId,targetId,sourceTitle:source.title,targetTitle:target.title,editions:editions.length};
+  if (
+    source.legacy_id &&
+    db.prepare('SELECT 1 FROM editions WHERE work_id=? AND legacy_id IS NULL').get(sourceId)
+  )
+    fail('LEGACY_IDENTITY_PROTECTED', 409);
+  const editions = db.prepare('SELECT id,title FROM editions WHERE work_id=?').all(sourceId);
+  const summary = {
+    sourceId,
+    targetId,
+    sourceTitle: source.title,
+    targetTitle: target.title,
+    editions: editions.length,
+  };
   if (!confirm) return summary;
-  return repo.transaction(()=>{
-    const oldSeries=db.prepare('SELECT * FROM work_series_annotations WHERE work_id=?').get(sourceId);
-    const newSeries=db.prepare('SELECT * FROM work_series_annotations WHERE work_id=?').get(targetId);
-    if(oldSeries&&newSeries&&(oldSeries.series!==newSeries.series||oldSeries.volume!==newSeries.volume)) fail('SERIES_CONFLICT',409);
-    if(oldSeries&&!newSeries) db.prepare('INSERT INTO work_series_annotations VALUES(?,?,?,?)').run(targetId,oldSeries.series,oldSeries.volume,new Date().toISOString());
+  return repo.transaction(() => {
+    const oldSeries = db
+      .prepare('SELECT * FROM work_series_annotations WHERE work_id=?')
+      .get(sourceId);
+    const newSeries = db
+      .prepare('SELECT * FROM work_series_annotations WHERE work_id=?')
+      .get(targetId);
+    if (
+      oldSeries &&
+      newSeries &&
+      (oldSeries.series !== newSeries.series || oldSeries.volume !== newSeries.volume)
+    )
+      fail('SERIES_CONFLICT', 409);
+    if (oldSeries && !newSeries)
+      db.prepare('INSERT INTO work_series_annotations VALUES(?,?,?,?)').run(
+        targetId,
+        oldSeries.series,
+        oldSeries.volume,
+        new Date().toISOString(),
+      );
     db.prepare('DELETE FROM work_series_annotations WHERE work_id=?').run(sourceId);
-    db.prepare('INSERT OR IGNORE INTO work_universe_overrides(work_id,universe,updated_at) SELECT ?,universe,updated_at FROM work_universe_overrides WHERE work_id=?').run(targetId,sourceId);
+    db.prepare(
+      'INSERT OR IGNORE INTO work_universe_overrides(work_id,universe,updated_at) SELECT ?,universe,updated_at FROM work_universe_overrides WHERE work_id=?',
+    ).run(targetId, sourceId);
     db.prepare('DELETE FROM work_universe_overrides WHERE work_id=?').run(sourceId);
-    db.prepare('UPDATE editions SET work_id=?,updated_at=? WHERE work_id=?').run(targetId,new Date().toISOString(),sourceId);
+    db.prepare('UPDATE editions SET work_id=?,updated_at=? WHERE work_id=?').run(
+      targetId,
+      new Date().toISOString(),
+      sourceId,
+    );
     // external_records are immutable (a trigger refuses updates). Work-level links are re-pointed
     // by adding links for the target; the originals stay as history.
-    db.prepare('INSERT OR IGNORE INTO external_record_links(external_record_id,work_id,edition_id,linked_at) SELECT external_record_id,?,NULL,? FROM external_record_links WHERE work_id=? AND edition_id IS NULL').run(targetId,new Date().toISOString(),sourceId);
+    db.prepare(
+      'INSERT OR IGNORE INTO external_record_links(external_record_id,work_id,edition_id,linked_at) SELECT external_record_id,?,NULL,? FROM external_record_links WHERE work_id=? AND edition_id IS NULL',
+    ).run(targetId, new Date().toISOString(), sourceId);
     // Keep historical external links and decisions intact. The alias resolves old links.
-    db.prepare('INSERT INTO catalog_work_merges VALUES(?,?,?)').run(sourceId,targetId,new Date().toISOString());
-    return {...summary,merged:true};
+    db.prepare('INSERT INTO catalog_work_merges VALUES(?,?,?)').run(
+      sourceId,
+      targetId,
+      new Date().toISOString(),
+    );
+    return { ...summary, merged: true };
   });
 }
 /** How well each search phrase performs: found offers, how many reached the catalogue, how many wait. */
@@ -163,17 +291,32 @@ export function scanQueryStats(repo, at = Date.now()) {
     )
     .all(cutoff, cutoff);
   const sep = String.fromCharCode(31);
-  const prices = groupedPriceStats(db, `SELECT o.id AS offer_id, q.query || char(31) || o.source AS grp FROM offers o ${queries}`, [], 'grp');
+  const prices = groupedPriceStats(
+    db,
+    `SELECT o.id AS offer_id, q.query || char(31) || o.source AS grp FROM offers o ${queries}`,
+    [],
+    'grp',
+  );
   // The same per saved scan profile (its phrases × its sources, each offer once): niches side by side.
   const profiles = listScanProfiles(repo).map((profile) => {
     const selected = `SELECT DISTINCT o.id AS offer_id, 'p' AS grp FROM offers o ${queries}
       WHERE lower(q.query) IN (SELECT lower(value) FROM json_each(?)) AND o.source IN (SELECT value FROM json_each(?))`;
     const params = [JSON.stringify(profile.queries || []), JSON.stringify(profile.sources || [])];
     const row = db
-      .prepare(`SELECT count(*) AS offers, ${marketColumns()} FROM offers o WHERE o.id IN (SELECT offer_id FROM (${selected}))`)
+      .prepare(
+        `SELECT count(*) AS offers, ${marketColumns()} FROM offers o WHERE o.id IN (SELECT offer_id FROM (${selected}))`,
+      )
       .get(cutoff, cutoff, ...params);
     const stats = groupedPriceStats(db, selected, params, 'grp').p;
-    return { name: profile.name, queries: profile.queries, sources: profile.sources, offers: Number(row.offers || 0), live: stats?.live ?? 0, liveMedian: stats?.median ?? null, ...marketFields(row, stats) };
+    return {
+      name: profile.name,
+      queries: profile.queries,
+      sources: profile.sources,
+      offers: Number(row.offers || 0),
+      live: stats?.live ?? 0,
+      liveMedian: stats?.median ?? null,
+      ...marketFields(row, stats),
+    };
   });
   return {
     soldWithinDays: SOLD_WITHIN_DAYS,
@@ -203,7 +346,12 @@ export function scanQueryFreshness(repo, days = 30, at = Date.now()) {
     .all(since);
   return {
     days,
-    items: rows.map((row) => ({ query: String(row.query), offers: Number(row.offers), fresh: Number(row.fresh || 0), lastNewAt: row.lastNewAt })),
+    items: rows.map((row) => ({
+      query: String(row.query),
+      offers: Number(row.offers),
+      fresh: Number(row.fresh || 0),
+      lastNewAt: row.lastNewAt,
+    })),
   };
 }
 export function listWorkDuplicates(repo) {
@@ -211,103 +359,203 @@ export function listWorkDuplicates(repo) {
 }
 /** Merges every source work of a group into its target; each merge keeps the existing safeguards. */
 export function mergeWorkGroup(repo, targetId, sourceIds) {
-  if (!Array.isArray(sourceIds) || !sourceIds.length || sourceIds.length > 50) fail('INVALID_CATALOG_FIELDS');
+  if (!Array.isArray(sourceIds) || !sourceIds.length || sourceIds.length > 50)
+    fail('INVALID_CATALOG_FIELDS');
   const group = findDuplicateWorkGroups(repo).find(
     (item) => item.targetId === targetId || item.works.some((work) => work.id === targetId),
   );
   // Only works that the strict key considers the same book may be merged through this shortcut.
   const allowed = new Set(group?.works.map((work) => work.id) ?? []);
-  if (!allowed.has(targetId) || sourceIds.some((id) => !allowed.has(id) || id === targetId)) fail('NOT_A_DUPLICATE_GROUP', 409);
+  if (!allowed.has(targetId) || sourceIds.some((id) => !allowed.has(id) || id === targetId))
+    fail('NOT_A_DUPLICATE_GROUP', 409);
   return repo.transaction(() => ({
     merged: sourceIds.map((id) => mergeCatalogWorks(repo, id, targetId, true)),
   }));
 }
 export async function dataOverview(repo) {
-  if(repo.path===':memory:') return { databasePath:':memory:',backups:[],lastBackupAt:null };
-  const folder=join(dirname(repo.path),'backups');
-  const files=await readdir(folder).catch(error=>{if(error.code==='ENOENT') return []; throw error;});
-  const backups=(await Promise.all(files.filter(name=>name.endsWith('.sqlite')).map(async name=>({name,at:(await stat(join(folder,name))).mtime.toISOString()})))).sort((a,b)=>b.at.localeCompare(a.at));
-  return { databasePath:repo.path,backupDirectory:folder,lastBackupAt:backups[0]?.at||null,backups:backups.slice(0,20) };
+  if (repo.path === ':memory:')
+    return { databasePath: ':memory:', backups: [], lastBackupAt: null };
+  const folder = join(dirname(repo.path), 'backups');
+  const files = await readdir(folder).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  const backups = (
+    await Promise.all(
+      files
+        .filter((name) => name.endsWith('.sqlite'))
+        .map(async (name) => ({ name, at: (await stat(join(folder, name))).mtime.toISOString() })),
+    )
+  ).sort((a, b) => b.at.localeCompare(a.at));
+  return {
+    databasePath: repo.path,
+    backupDirectory: folder,
+    lastBackupAt: backups[0]?.at || null,
+    backups: backups.slice(0, 20),
+  };
 }
 // The routes of this module, as a table (router.mjs). local-app.mjs forwards a request here when
 // this table knows its path, so a new route needs no change there.
 export const tradingRoutes = createRouter()
   .add('GET', '/api/trading-summary', ({ repo }) => {
-    const summary=repo.database.prepare(`SELECT count(*) AS watched,
+    const summary = repo.database
+      .prepare(
+        `SELECT count(*) AS watched,
       COALESCE(sum(CASE WHEN w.target_price IS NOT NULL AND o.currency='PLN' AND o.current_price<=round(w.target_price*100) THEN 1 ELSE 0 END),0) AS atTarget
-      FROM offer_workspace w JOIN offers o ON o.id=w.offer_id WHERE w.watched=1`).get();
-    return {...summary,review:repo.database.prepare("SELECT count(*) AS n FROM identification_jobs WHERE status='review_required'").get().n};
+      FROM offer_workspace w JOIN offers o ON o.id=w.offer_id WHERE w.watched=1`,
+      )
+      .get();
+    return {
+      ...summary,
+      review: repo.database
+        .prepare("SELECT count(*) AS n FROM identification_jobs WHERE status='review_required'")
+        .get().n,
+    };
   })
   .add('PUT', '/api/set-details/:id', ({ repo, input, params }) => {
-    const id=params.id;
-    if(typeof input?.confirmed!=='boolean') fail('INVALID_SET_DETAILS');
-    if(input.confirmed&&repo.database.prepare('SELECT 1 FROM offer_set_unknown_items WHERE offer_id=?').get(id)) fail('SET_HAS_UNKNOWN_ITEMS',409);
-    if(input.confirmed&&!repo.database.prepare('SELECT 1 FROM offer_set_editions WHERE offer_id=?').get(id)) fail('SET_HAS_NO_MEMBERS',409);
-    const result=repo.database.prepare('UPDATE offer_sets SET composition_confirmed=?,updated_at=? WHERE offer_id=?').run(Number(input.confirmed),new Date().toISOString(),id);
-    if(!result.changes) fail('SET_NOT_FOUND',404);
-    return {confirmed:input.confirmed};
+    const id = params.id;
+    if (typeof input?.confirmed !== 'boolean') fail('INVALID_SET_DETAILS');
+    if (
+      input.confirmed &&
+      repo.database.prepare('SELECT 1 FROM offer_set_unknown_items WHERE offer_id=?').get(id)
+    )
+      fail('SET_HAS_UNKNOWN_ITEMS', 409);
+    if (
+      input.confirmed &&
+      !repo.database.prepare('SELECT 1 FROM offer_set_editions WHERE offer_id=?').get(id)
+    )
+      fail('SET_HAS_NO_MEMBERS', 409);
+    const result = repo.database
+      .prepare('UPDATE offer_sets SET composition_confirmed=?,updated_at=? WHERE offer_id=?')
+      .run(Number(input.confirmed), new Date().toISOString(), id);
+    if (!result.changes) fail('SET_NOT_FOUND', 404);
+    return { confirmed: input.confirmed };
   })
-  .add('PUT', '/api/set-items/:offerId/:editionId', ({ repo, input, params }) => repo.transaction(()=>{
-    const {offerId,editionId}=params;
-    if(!Number.isSafeInteger(input?.quantity)||input.quantity<1||input.quantity>10000) fail('INVALID_QUANTITY');
-    const result=repo.database.prepare('UPDATE offer_set_editions SET quantity=?,resale_price=? WHERE offer_id=? AND edition_id=?').run(input.quantity,amount(input.resalePrice),offerId,editionId);
-    if(!result.changes) fail('SET_MEMBER_NOT_FOUND',404);
-    repo.database.prepare('UPDATE offer_sets SET composition_confirmed=0,updated_at=? WHERE offer_id=?').run(new Date().toISOString(),offerId);
-    return {saved:true};
-  }))
-  .add(['POST', 'DELETE'], '/api/set-unknown/:offerId/:itemId?', ({ repo, method, input, params }) => repo.transaction(()=>{
-    const offerId=params.offerId;
-    if(!repo.database.prepare('SELECT offer_id FROM offer_sets WHERE offer_id=?').get(offerId)) fail('SET_NOT_FOUND',404);
-    if(method==='POST') {
-      const title=text(input?.title,300,true),quantity=input?.quantity;
-      if(!Number.isSafeInteger(quantity)||quantity<1||quantity>10000) fail('INVALID_QUANTITY');
-      repo.database.prepare('INSERT INTO offer_set_unknown_items VALUES(?,?,?,?)').run(randomUUID(),offerId,title,quantity);
-    } else {
-      if(!params.itemId) fail('UNKNOWN_ITEM_REQUIRED');
-      repo.database.prepare('DELETE FROM offer_set_unknown_items WHERE offer_id=? AND id=?').run(offerId,params.itemId);
-    }
-    repo.database.prepare('UPDATE offer_sets SET composition_confirmed=0,updated_at=? WHERE offer_id=?').run(new Date().toISOString(),offerId);
-    return {saved:true};
-  }))
+  .add('PUT', '/api/set-items/:offerId/:editionId', ({ repo, input, params }) =>
+    repo.transaction(() => {
+      const { offerId, editionId } = params;
+      if (!Number.isSafeInteger(input?.quantity) || input.quantity < 1 || input.quantity > 10000)
+        fail('INVALID_QUANTITY');
+      const result = repo.database
+        .prepare(
+          'UPDATE offer_set_editions SET quantity=?,resale_price=? WHERE offer_id=? AND edition_id=?',
+        )
+        .run(input.quantity, amount(input.resalePrice), offerId, editionId);
+      if (!result.changes) fail('SET_MEMBER_NOT_FOUND', 404);
+      repo.database
+        .prepare('UPDATE offer_sets SET composition_confirmed=0,updated_at=? WHERE offer_id=?')
+        .run(new Date().toISOString(), offerId);
+      return { saved: true };
+    }),
+  )
+  .add(
+    ['POST', 'DELETE'],
+    '/api/set-unknown/:offerId/:itemId?',
+    ({ repo, method, input, params }) =>
+      repo.transaction(() => {
+        const offerId = params.offerId;
+        if (!repo.database.prepare('SELECT offer_id FROM offer_sets WHERE offer_id=?').get(offerId))
+          fail('SET_NOT_FOUND', 404);
+        if (method === 'POST') {
+          const title = text(input?.title, 300, true),
+            quantity = input?.quantity;
+          if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 10000)
+            fail('INVALID_QUANTITY');
+          repo.database
+            .prepare('INSERT INTO offer_set_unknown_items VALUES(?,?,?,?)')
+            .run(randomUUID(), offerId, title, quantity);
+        } else {
+          if (!params.itemId) fail('UNKNOWN_ITEM_REQUIRED');
+          repo.database
+            .prepare('DELETE FROM offer_set_unknown_items WHERE offer_id=? AND id=?')
+            .run(offerId, params.itemId);
+        }
+        repo.database
+          .prepare('UPDATE offer_sets SET composition_confirmed=0,updated_at=? WHERE offer_id=?')
+          .run(new Date().toISOString(), offerId);
+        return { saved: true };
+      }),
+  )
   .add('GET', '/api/trading-defaults', ({ repo }) => getTradingDefaults(repo))
-  .add('PUT', '/api/trading-defaults', ({ repo, input }) => saveTradingDefaults(repo,input))
-  .add('GET', '/api/scan-runs', ({ repo }) => ({items:listScanRuns(repo)}))
+  .add('PUT', '/api/trading-defaults', ({ repo, input }) => saveTradingDefaults(repo, input))
+  .add('GET', '/api/scan-runs', ({ repo }) => ({ items: listScanRuns(repo) }))
   // offers_seen: listings this source returned in its last checked scan, so a source whose
   // health row predates per-phrase success tracking is not shown as dead while it delivers offers.
-  .add('GET', '/api/source-health', ({ repo }) => ({items:repo.database.prepare('SELECT h.*,(SELECT count(*) FROM offers o WHERE o.source=h.source AND o.last_seen_at>=h.last_checked_at) AS offers_seen FROM source_health h ORDER BY h.source').all()}))
-  .add('GET', '/api/review-decisions', ({ repo }) => ({items:recentReviewDecisions(repo)}))
-  .add('POST', '/api/offer-relists/:offerId/undo', ({ repo, params }) => undoRelist(repo,params.offerId))
-  .add('POST', '/api/review-decisions/:id/reopen', ({ repo, params }) => reopenReviewDecision(repo,params.id))
-  .add('GET', '/api/offer-scenarios/:offerId', ({ repo, params }) => getOfferScenario(repo,params.offerId))
-  .add('PUT', '/api/offer-scenarios/:offerId', ({ repo, input, params }) => saveOfferScenario(repo,params.offerId,input))
-  .add('PUT', '/api/catalog/works/:id', ({ repo, input, params }) => editCatalogWork(repo,params.id,input))
-  .add('PUT', '/api/catalog/editions/:id', ({ repo, input, params }) => editCatalogEdition(repo,params.id,input))
+  .add('GET', '/api/source-health', ({ repo }) => ({
+    items: repo.database
+      .prepare(
+        'SELECT h.*,(SELECT count(*) FROM offers o WHERE o.source=h.source AND o.last_seen_at>=h.last_checked_at) AS offers_seen FROM source_health h ORDER BY h.source',
+      )
+      .all(),
+  }))
+  .add('GET', '/api/review-decisions', ({ repo }) => ({ items: recentReviewDecisions(repo) }))
+  .add('POST', '/api/offer-relists/:offerId/undo', ({ repo, params }) =>
+    undoRelist(repo, params.offerId),
+  )
+  .add('POST', '/api/review-decisions/:id/reopen', ({ repo, params }) =>
+    reopenReviewDecision(repo, params.id),
+  )
+  .add('GET', '/api/offer-scenarios/:offerId', ({ repo, params }) =>
+    getOfferScenario(repo, params.offerId),
+  )
+  .add('PUT', '/api/offer-scenarios/:offerId', ({ repo, input, params }) =>
+    saveOfferScenario(repo, params.offerId, input),
+  )
+  .add('PUT', '/api/catalog/works/:id', ({ repo, input, params }) =>
+    editCatalogWork(repo, params.id, input),
+  )
+  .add('PUT', '/api/catalog/editions/:id', ({ repo, input, params }) =>
+    editCatalogEdition(repo, params.id, input),
+  )
   .add('GET', '/api/scan-queries/stats', ({ repo }) => scanQueryStats(repo))
   .add('GET', '/api/scan-queries/freshness', ({ repo }) => scanQueryFreshness(repo))
   .add('GET', '/api/catalog/names', ({ repo }) => listNames(repo))
-  .add('POST', '/api/catalog/names/merge', ({ repo, input }) => mergeNames(repo,input))
-  .add('POST', '/api/catalog/names/unalias', ({ repo, input }) => removeNameAlias(repo,input))
+  .add('POST', '/api/catalog/names/merge', ({ repo, input }) => mergeNames(repo, input))
+  .add('POST', '/api/catalog/names/unalias', ({ repo, input }) => removeNameAlias(repo, input))
   .add('GET', '/api/catalog/universes', ({ repo }) => listUniverses(repo))
-  .add('PUT', '/api/catalog/universes', ({ repo, input }) => saveUniverse(repo,input))
-  .add('DELETE', '/api/catalog/universes/:name', ({ repo, params }) => deleteUniverse(repo,params.name))
-  .add('GET', '/api/scan-language', ({ repo }) => ({polishOnly:getPolishOnly(repo)}))
-  .add('PUT', '/api/scan-language', ({ repo, input }) => setPolishOnly(repo,input?.polishOnly))
-  .add('GET', '/api/scan-schedule', ({ repo }) => { const s=getScanSchedule(repo); return {...s,nextRunAt:nextRunAt(s),nextQuickRunAt:nextQuickRunAt(s)}; })
-  .add('PUT', '/api/scan-schedule', ({ repo, input }) => { const s=saveScanSchedule(repo,input); return {...s,nextRunAt:nextRunAt(s),nextQuickRunAt:nextQuickRunAt(s)}; })
+  .add('PUT', '/api/catalog/universes', ({ repo, input }) => saveUniverse(repo, input))
+  .add('DELETE', '/api/catalog/universes/:name', ({ repo, params }) =>
+    deleteUniverse(repo, params.name),
+  )
+  .add('GET', '/api/scan-language', ({ repo }) => ({ polishOnly: getPolishOnly(repo) }))
+  .add('PUT', '/api/scan-language', ({ repo, input }) => setPolishOnly(repo, input?.polishOnly))
+  .add('GET', '/api/scan-schedule', ({ repo }) => {
+    const s = getScanSchedule(repo);
+    return { ...s, nextRunAt: nextRunAt(s), nextQuickRunAt: nextQuickRunAt(s) };
+  })
+  .add('PUT', '/api/scan-schedule', ({ repo, input }) => {
+    const s = saveScanSchedule(repo, input);
+    return { ...s, nextRunAt: nextRunAt(s), nextQuickRunAt: nextQuickRunAt(s) };
+  })
   .add('GET', '/api/catalog/work-duplicates', ({ repo }) => listWorkDuplicates(repo))
-  .add('POST', '/api/catalog/work-duplicates/merge', ({ repo, input }) => mergeWorkGroup(repo,input?.targetId,input?.sourceIds))
-  .add('GET', '/api/catalog/title-conflicts', ({ repo }) => ({conflicts:findTitleConflicts(repo)}))
-  .add('POST', '/api/catalog/title-conflicts/resolve', ({ repo, input }) => resolveTitleConflict(repo,input))
-  .add('POST', '/api/catalog/merge-works', ({ repo, input }) => mergeCatalogWorks(repo,input?.sourceId,input?.targetId,input?.confirm===true))
+  .add('POST', '/api/catalog/work-duplicates/merge', ({ repo, input }) =>
+    mergeWorkGroup(repo, input?.targetId, input?.sourceIds),
+  )
+  .add('GET', '/api/catalog/title-conflicts', ({ repo }) => ({
+    conflicts: findTitleConflicts(repo),
+  }))
+  .add('POST', '/api/catalog/title-conflicts/resolve', ({ repo, input }) =>
+    resolveTitleConflict(repo, input),
+  )
+  .add('POST', '/api/catalog/merge-works', ({ repo, input }) =>
+    mergeCatalogWorks(repo, input?.sourceId, input?.targetId, input?.confirm === true),
+  )
   .add('GET', '/api/data/overview', ({ repo }) => dataOverview(repo))
   .add('POST', '/api/data/backup', async ({ repo }) => {
-    if(repo.path===':memory:') fail('BACKUP_REQUIRES_FILE',409);
-    const destination=join(dirname(repo.path),'backups','bookflip-manual-'+Date.now()+'-'+randomUUID()+'.sqlite');
-    return {path:await backupCatalog({source:repo.path,destination}),...await dataOverview(repo)};
+    if (repo.path === ':memory:') fail('BACKUP_REQUIRES_FILE', 409);
+    const destination = join(
+      dirname(repo.path),
+      'backups',
+      'bookflip-manual-' + Date.now() + '-' + randomUUID() + '.sqlite',
+    );
+    return {
+      path: await backupCatalog({ source: repo.path, destination }),
+      ...(await dataOverview(repo)),
+    };
   });
 
-export async function tradingRoute({repo,method,path,input}) {
-  const found=tradingRoutes.match(method,path);
-  if(!found?.handler) return undefined;
-  return found.handler({repo,method,input,params:found.params});
+export async function tradingRoute({ repo, method, path, input }) {
+  const found = tradingRoutes.match(method, path);
+  if (!found?.handler) return undefined;
+  return found.handler({ repo, method, input, params: found.params });
 }

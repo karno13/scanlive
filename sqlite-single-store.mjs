@@ -25,7 +25,14 @@ function bookFromProjection(catalog, bookId) {
     )
     .get(bookId);
   return row
-    ? { id: bookId, title: row.title, isbn: row.isbn ?? null, origin: row.verification_status === 'manual' ? 'manual' : 'detected', firstSeenAt: row.created_at, lastSeenAt: row.updated_at }
+    ? {
+        id: bookId,
+        title: row.title,
+        isbn: row.isbn ?? null,
+        origin: row.verification_status === 'manual' ? 'manual' : 'detected',
+        firstSeenAt: row.created_at,
+        lastSeenAt: row.updated_at,
+      }
     : null;
 }
 export function createSqliteBook(catalog, { title, isbn = null } = {}) {
@@ -36,7 +43,8 @@ export function createSqliteBook(catalog, { title, isbn = null } = {}) {
   if (rawIsbn && !cleanIsbn) bad('INVALID_BOOK_ISBN');
   const repo = catalog.repository,
     at = new Date().toISOString();
-  let bookId, editionId,
+  let bookId,
+    editionId,
     created = false;
   repo.transaction(() => {
     if (cleanIsbn) {
@@ -129,41 +137,67 @@ function prepareScanOffers(db, offers, state) {
     }
     if (!state.baseline.has(id)) {
       const row = read.get(id);
-      state.baseline.set(id, row ? { current_price: row.current_price, seen_count: Number(row.seen_count || 0) } : null);
+      state.baseline.set(
+        id,
+        row ? { current_price: row.current_price, seen_count: Number(row.seen_count || 0) } : null,
+      );
     }
     if (!state.queries.has(id)) state.queries.set(id, new Set());
     for (const query of offer.matchedQueries ?? []) state.queries.get(id).add(query);
-    return { ...offer, matchedQueries: [...state.queries.get(id)], seenCount: (state.baseline.get(id)?.seen_count ?? 0) + 1 };
+    return {
+      ...offer,
+      matchedQueries: [...state.queries.get(id)],
+      seenCount: (state.baseline.get(id)?.seen_count ?? 0) + 1,
+    };
   });
 }
 
 /** Saves the offers of one finished source+query while the scan continues. */
 export function persistSqliteScanBatch(catalog, { offers, scanAt, state }) {
   const db = catalog.repository.database;
-  const valid = offers.filter((offer) => offer?.source && offer?.url && Number.isSafeInteger(offer.price) && offer.price > 0);
+  const valid = offers.filter(
+    (offer) => offer?.source && offer?.url && Number.isSafeInteger(offer.price) && offer.price > 0,
+  );
   const prepared = prepareScanOffers(db, valid, state);
   const report = catalog.ingestOffers(prepared, String(scanAt));
   let newOffers = 0;
   for (const offer of prepared) {
     try {
-      if (state?.baseline.get(sourceOfferId(offer.source, offer.url, offerExternalId(offer))) === null) newOffers++;
+      if (
+        state?.baseline.get(sourceOfferId(offer.source, offer.url, offerExternalId(offer))) === null
+      )
+        newOffers++;
     } catch {}
   }
   return { saved: report.offers, newOffers };
 }
 
-export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], scanContext = null, scanState = null, rejected = null }) {
+export function persistSqliteScan(
+  catalog,
+  { offers, searchedAt, errors = [], scanContext = null, scanState = null, rejected = null },
+) {
   const at = String(searchedAt);
   const db = catalog.repository.database;
   // During the scan offers are already saved: compare with the state from before the scan.
   const previous = scanState
-    ? { get: (id) => (scanState.baseline.has(id) ? scanState.baseline.get(id) : db.prepare('SELECT current_price FROM offers WHERE id=?').get(id)) }
+    ? {
+        get: (id) =>
+          scanState.baseline.has(id)
+            ? scanState.baseline.get(id)
+            : db.prepare('SELECT current_price FROM offers WHERE id=?').get(id),
+      }
     : db.prepare('SELECT current_price FROM offers WHERE id=?');
-  const scanOffers = prepareScanOffers(db, offers.filter(
-    offer => offer?.source && offer?.url && Number.isSafeInteger(offer.price) && offer.price > 0,
-  ), scanState);
+  const scanOffers = prepareScanOffers(
+    db,
+    offers.filter(
+      (offer) =>
+        offer?.source && offer?.url && Number.isSafeInteger(offer.price) && offer.price > 0,
+    ),
+    scanState,
+  );
   const ids = [];
-  let newOffers = 0, priceChanges = 0;
+  let newOffers = 0,
+    priceChanges = 0;
   const seen = new Set();
   const outcomes = [];
   for (const offer of scanOffers) {
@@ -173,44 +207,77 @@ export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], sc
       seen.add(id);
       ids.push(id);
       const old = previous.get(id);
-      outcomes.push({ id, isNew: !old, changed: Boolean(old && old.current_price !== offer.price) });
+      outcomes.push({
+        id,
+        isNew: !old,
+        changed: Boolean(old && old.current_price !== offer.price),
+      });
       if (!old) newOffers++;
       else if (old.current_price !== offer.price) priceChanges++;
     } catch {}
   }
   // rejected: listings left out before saving, by reason ({language, language_unknown, topic, product}).
-  const lastScan = { at, found: offers.length, newOffers, priceChanges, errors,
+  const lastScan = {
+    at,
+    found: offers.length,
+    newOffers,
+    priceChanges,
+    errors,
     ...(rejected && Object.keys(rejected).length ? { rejected } : {}),
-    ...(scanContext ? {context:scanContext} : {}) };
+    ...(scanContext ? { context: scanContext } : {}),
+  };
   const ingest = catalog.repository.transaction(() => {
     const report = catalog.ingestOffers(scanOffers, at, { scanSummary: lastScan });
     const membership = db.prepare('INSERT OR REPLACE INTO scan_offer_results VALUES(?,?,?,?)');
-    for (const row of outcomes) if (db.prepare('SELECT id FROM offers WHERE id=?').get(row.id))
-      membership.run(at,row.id,Number(row.isNew),Number(row.changed));
+    for (const row of outcomes)
+      if (db.prepare('SELECT id FROM offers WHERE id=?').get(row.id))
+        membership.run(at, row.id, Number(row.isNew), Number(row.changed));
     // Offers absent from a complete scan of their phrase are most likely sold or withdrawn.
     // A quick scan of the newest listings sees one page: it never concludes an offer is gone.
-    if (scanContext && scanContext.mode !== 'newest') markUnseenOffers(db, scanContext.results || [], at);
+    if (scanContext && scanContext.mode !== 'newest')
+      markUnseenOffers(db, scanContext.results || [], at);
     // A listing that left the results while the same seller's copy appeared is a relist, not a sale.
     if (scanContext) detectRelists(catalog.repository, { now: () => new Date(at) });
     if (scanContext) {
       const grouped = new Map();
-      for(const result of scanContext.results || []) {
-        if(!grouped.has(result.source)) grouped.set(result.source,[]);
+      for (const result of scanContext.results || []) {
+        if (!grouped.has(result.source)) grouped.set(result.source, []);
         grouped.get(result.source).push(result);
       }
-      for (const [source,results] of grouped) {
+      for (const [source, results] of grouped) {
         // ok: every phrase answered; partial: some did (the source works, a few queries failed);
         // failed: nothing answered, so the source is effectively down for this scan.
-        const ok=results.every(result=>result.status==='ok');
-        const someOk=results.some(result=>result.status==='ok'||result.status==='partial');
+        const ok = results.every((result) => result.status === 'ok');
+        const someOk = results.some(
+          (result) => result.status === 'ok' || result.status === 'partial',
+        );
         // limited: nothing answered, but only because of HTTP 429 — the source works at a slower pace.
-        const limited=!someOk&&results.every(result=>result.status==='ok'||result.diagnostic?.code==='SOURCE_HTTP_429');
-        const code=[...new Set(results.filter(result=>result.status!=='ok').map(result=>result.diagnostic?.code||'SOURCE_REQUEST_FAILED'))].join(', ');
-        db.prepare(`INSERT INTO source_health(source,last_checked_at,last_success_at,last_error_at,last_error,status) VALUES(?,?,?,?,?,?)
+        const limited =
+          !someOk &&
+          results.every(
+            (result) => result.status === 'ok' || result.diagnostic?.code === 'SOURCE_HTTP_429',
+          );
+        const code = [
+          ...new Set(
+            results
+              .filter((result) => result.status !== 'ok')
+              .map((result) => result.diagnostic?.code || 'SOURCE_REQUEST_FAILED'),
+          ),
+        ].join(', ');
+        db.prepare(
+          `INSERT INTO source_health(source,last_checked_at,last_success_at,last_error_at,last_error,status) VALUES(?,?,?,?,?,?)
           ON CONFLICT(source) DO UPDATE SET last_checked_at=excluded.last_checked_at,
           last_success_at=COALESCE(excluded.last_success_at,source_health.last_success_at),
           last_error_at=COALESCE(excluded.last_error_at,source_health.last_error_at),
-          last_error=COALESCE(excluded.last_error,source_health.last_error),status=excluded.status`).run(source,at,someOk?at:null,ok?null:at,ok?null:code,ok?'ok':someOk?'partial':limited?'limited':'failed');
+          last_error=COALESCE(excluded.last_error,source_health.last_error),status=excluded.status`,
+        ).run(
+          source,
+          at,
+          someOk ? at : null,
+          ok ? null : at,
+          ok ? null : code,
+          ok ? 'ok' : someOk ? 'partial' : limited ? 'limited' : 'failed',
+        );
       }
     }
     return report;
@@ -219,22 +286,38 @@ export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], sc
   // The scanned offers as saved, read in one query. Price judgements are not made here any more:
   // statistics are computed in SQL where they are shown (price-stats.mjs).
   const rows = ids.length
-    ? db.prepare(`SELECT o.id, o.source, o.normalized_url AS url, o.original_title AS title, o.current_price AS price,
+    ? db
+        .prepare(
+          `SELECT o.id, o.source, o.normalized_url AS url, o.original_title AS title, o.current_price AS price,
          o.availability, o.first_seen_at AS firstSeenAt, o.last_seen_at AS lastSeenAt, o.observed_isbn AS isbn,
          o.language, o.seen_count AS seenCount, o.matched_queries_json,
          (SELECT COALESCE(e.legacy_id,w.legacy_id,'edition:' || e.id) FROM offer_matches m JOIN editions e ON e.id=m.edition_id
             JOIN works w ON w.id=e.work_id WHERE m.offer_id=o.id AND m.status='active' LIMIT 1) AS bookId
-       FROM offers o JOIN json_each(?) j ON j.value=o.id ORDER BY j.key`).all(JSON.stringify(ids))
+       FROM offers o JOIN json_each(?) j ON j.value=o.id ORDER BY j.key`,
+        )
+        .all(JSON.stringify(ids))
     : [];
   const analyzed = rows.map(({ matched_queries_json: queries, ...row }) => {
     let matchedQueries = [];
-    try { matchedQueries = JSON.parse(queries || '[]'); } catch {}
-    return { ...row, originalTitle: row.title, currentPrice: row.price, matchedQueries: Array.isArray(matchedQueries) ? matchedQueries : [] };
+    try {
+      matchedQueries = JSON.parse(queries || '[]');
+    } catch {}
+    return {
+      ...row,
+      originalTitle: row.title,
+      currentPrice: row.price,
+      matchedQueries: Array.isArray(matchedQueries) ? matchedQueries : [],
+    };
   });
   return {
-    ingest, offers:analyzed, lastScan,
-    summary:{newOffers,priceChanges},
-    history:{saved:db.prepare('SELECT count(*) AS total FROM offers').get().total,
-      new:newOffers,priceChanges},
+    ingest,
+    offers: analyzed,
+    lastScan,
+    summary: { newOffers, priceChanges },
+    history: {
+      saved: db.prepare('SELECT count(*) AS total FROM offers').get().total,
+      new: newOffers,
+      priceChanges,
+    },
   };
 }

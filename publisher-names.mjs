@@ -60,14 +60,22 @@ export function normalizePublisher(value) {
     .replace(/[\s,.;:]+$/, '');
   // Legal forms and BN's "Wydaw" abbreviation say nothing about which publisher it is.
   name = name
-    .replace(/,?\s+(?:sp\.?\s*z\s*o\.?\s*o\.?|s\.?\s*a\.?|sp\.?\s*j\.?|spółka z ograniczoną odpowiedzialnością)$/i, '')
+    .replace(
+      /,?\s+(?:sp\.?\s*z\s*o\.?\s*o\.?|s\.?\s*a\.?|sp\.?\s*j\.?|spółka z ograniczoną odpowiedzialnością)$/i,
+      '',
+    )
     .replace(/[.\s]+wydaw(?:nictwo|nictwa)?\.?$/i, '')
     .replace(/^wydawnictwo\s+/i, '')
     .trim();
   const key = fold(name);
   if (EMPTY.has(key)) return null;
   const known = ALIASES.get(key) ?? name;
-  return overrides.get(overrideKey(value)) ?? overrides.get(overrideKey(name)) ?? overrides.get(overrideKey(known)) ?? known;
+  return (
+    overrides.get(overrideKey(value)) ??
+    overrides.get(overrideKey(name)) ??
+    overrides.get(overrideKey(known)) ??
+    known
+  );
 }
 
 /**
@@ -78,7 +86,11 @@ export function normalizePublisher(value) {
 export const PUBLISHER_RULES_VERSION = 1;
 export function normalizeStoredPublishers(repository, { now = () => new Date() } = {}) {
   const db = repository.database;
-  const rows = db.prepare("SELECT id, publisher FROM editions WHERE publisher IS NOT NULL AND coalesce(verification_status,'')<>'manual'").all();
+  const rows = db
+    .prepare(
+      "SELECT id, publisher FROM editions WHERE publisher IS NOT NULL AND coalesce(verification_status,'')<>'manual'",
+    )
+    .all();
   const update = db.prepare('UPDATE editions SET publisher=?, updated_at=? WHERE id=?');
   const at = now().toISOString();
   let changed = 0;

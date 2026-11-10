@@ -1,7 +1,9 @@
 // Lightweight data for the app shell. Preserve the full /api/history endpoint for legacy callers.
 // Only labels for actively linked editions are needed for offer-list fallbacks.
 export function historyBookLabels(repository) {
-  const rows = repository.database.prepare(`
+  const rows = repository.database
+    .prepare(
+      `
     SELECT DISTINCT
       COALESCE(e.legacy_id,w.legacy_id,'edition:' || e.id) AS book_id,
       e.title AS title
@@ -10,7 +12,9 @@ export function historyBookLabels(repository) {
     JOIN works w ON w.id = e.work_id
     WHERE m.status = 'active'
     ORDER BY book_id
-  `).all();
+  `,
+    )
+    .all();
   const seen = new Set();
   const books = [];
   for (const row of rows) {

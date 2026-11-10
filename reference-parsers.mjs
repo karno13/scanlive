@@ -198,7 +198,9 @@ function parseVinted(html, b, checked) {
       true,
     );
     if (!o) continue;
-    if (/magyar|hungarian|rész|français|francais|deutsch|german|italiano|espa[nñ]ol/i.test(p.title)) {
+    if (
+      /magyar|hungarian|rész|français|francais|deutsch|german|italiano|espa[nñ]ol/i.test(p.title)
+    ) {
       b.reject?.('language');
       continue;
     }

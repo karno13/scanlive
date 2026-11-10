@@ -40,15 +40,34 @@ export function groupedPriceStats(database, offerSql, params = [], dimension = '
     )
     .all(...params);
   const totals = database
-    .prepare(`WITH selected AS (${offerSql}) SELECT ${key} AS k, count(*) AS n FROM selected s JOIN offers o ON o.id=s.offer_id GROUP BY k`)
+    .prepare(
+      `WITH selected AS (${offerSql}) SELECT ${key} AS k, count(*) AS n FROM selected s JOIN offers o ON o.id=s.offer_id GROUP BY k`,
+    )
     .all(...params);
   const out = {};
-  const empty = () => ({ offers: 0, live: 0, median: null, min: null, max: null, sold: 0, soldMedian: null, soldMin: null, soldMax: null });
+  const empty = () => ({
+    offers: 0,
+    live: 0,
+    median: null,
+    min: null,
+    max: null,
+    sold: 0,
+    soldMedian: null,
+    soldMin: null,
+    soldMax: null,
+  });
   for (const row of totals) (out[row.k] ||= empty()).offers = Number(row.n);
   for (const row of rows) {
     const entry = (out[row.k] ||= empty());
-    if (row.state === 'live') Object.assign(entry, { live: Number(row.n), median: row.median, min: row.lo, max: row.hi });
-    if (row.state === 'sold') Object.assign(entry, { sold: Number(row.n), soldMedian: row.median, soldMin: row.lo, soldMax: row.hi });
+    if (row.state === 'live')
+      Object.assign(entry, { live: Number(row.n), median: row.median, min: row.lo, max: row.hi });
+    if (row.state === 'sold')
+      Object.assign(entry, {
+        sold: Number(row.n),
+        soldMedian: row.median,
+        soldMin: row.lo,
+        soldMax: row.hi,
+      });
   }
   return out;
 }
@@ -61,5 +80,10 @@ export function vintedSoldStats(database, offerSql, params = []) {
     params,
     'all',
   ).all;
-  return { count: stats?.sold ?? 0, median: stats?.soldMedian ?? null, min: stats?.soldMin ?? null, max: stats?.soldMax ?? null };
+  return {
+    count: stats?.sold ?? 0,
+    median: stats?.soldMedian ?? null,
+    min: stats?.soldMin ?? null,
+    max: stats?.soldMax ?? null,
+  };
 }

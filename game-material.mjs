@@ -8,7 +8,8 @@ import { fold } from './title-proposals.mjs';
 
 const RULEBOOK =
   /(?:^|\s)(?:codex|battletome|rulebook|rule book|arcane journal|general s handbook|generals handbook|getting started|chapter approved|datacards?|index cards|campaign book|boarding actions|white dwarf|dawnbringers|crusade campaign|grand tournament|core rules)(?:\s|$)/;
-const FOREIGN = /(?:^|\s)(?:english|angielski|angielska|angielskim|po angielsku|wersja angielska|deutsch|german)(?:\s|$)|\((?:eng|en)\)|\[(?:eng|en)\]/;
+const FOREIGN =
+  /(?:^|\s)(?:english|angielski|angielska|angielskim|po angielsku|wersja angielska|deutsch|german)(?:\s|$)|\((?:eng|en)\)|\[(?:eng|en)\]/;
 
 /** 'game_rulebook', 'foreign_edition' or null. */
 export function notCatalogueMaterial(title) {

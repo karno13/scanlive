@@ -39,14 +39,20 @@ function recordId(record) {
  * One BN bibliographic record as a catalogue metadata record for `requestedISBN` (one of its ISBNs).
  * Returns { record } or { issue }. Shared by the ISBN lookup and catalogue seeding.
  */
-export function normalizeBnRecord(rawRecord, requestedISBN, { sourceUrl = null, fetchedAt = new Date().toISOString() } = {}) {
+export function normalizeBnRecord(
+  rawRecord,
+  requestedISBN,
+  { sourceUrl = null, fetchedAt = new Date().toISOString() } = {},
+) {
   const matched = matchingISBNs(recordIdentifiers(rawRecord), requestedISBN);
-  if (matched.length === 0) return { issue: { reason: 'isbn_mismatch', externalRecordId: recordId(rawRecord) } };
+  if (matched.length === 0)
+    return { issue: { reason: 'isbn_mismatch', externalRecordId: recordId(rawRecord) } };
   const externalRecordId = recordId(rawRecord);
   // MARC keeps title, people and publisher apart; the flattened fields are the fallback.
   const marc = parseBnMarc(rawRecord);
   const title = normalizedText(catalogTitle(marc) ?? rawRecord.title ?? rawRecord.name);
-  if (!externalRecordId || !title) return { issue: { reason: 'missing_required_fields', externalRecordId } };
+  if (!externalRecordId || !title)
+    return { issue: { reason: 'missing_required_fields', externalRecordId } };
   const isbn10 = matched.find((value) => value.length === 10) ?? null;
   const isbn13 = matched.find((value) => value.length === 13) ?? null;
   const record = buildNormalizedRecord({
@@ -58,7 +64,8 @@ export function normalizeBnRecord(rawRecord, requestedISBN, { sourceUrl = null, 
     title,
     authors: marc ? marc.authors : recordAuthors(rawRecord),
     publisher: marc?.publisher ?? singleValue(rawRecord.publisher ?? rawRecord.publishers),
-    publicationYear: rawRecord.publicationYear ?? rawRecord.publishYear ?? rawRecord.date ?? marc?.publicationYear,
+    publicationYear:
+      rawRecord.publicationYear ?? rawRecord.publishYear ?? rawRecord.date ?? marc?.publicationYear,
     language: recordLanguage(rawRecord),
     binding: marc?.binding ?? singleValue(rawRecord.binding ?? rawRecord.physicalFormat),
     materialType: singleValue(rawRecord.materialType ?? rawRecord.kind ?? rawRecord.type),
@@ -126,7 +133,10 @@ export function createBnAdapter({
       const records = [];
       const issues = [];
       for (const rawRecord of rawRecords) {
-        const normalized = normalizeBnRecord(rawRecord, requestedISBN, { sourceUrl: response.url ?? url.href, fetchedAt });
+        const normalized = normalizeBnRecord(rawRecord, requestedISBN, {
+          sourceUrl: response.url ?? url.href,
+          fetchedAt,
+        });
         if (normalized.issue) {
           issues.push(normalized.issue);
           continue;

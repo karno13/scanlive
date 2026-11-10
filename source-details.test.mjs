@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { DETAIL_SOURCES, parseProductDetail } from './source-details.mjs';
 
-const fixture = readFileSync(new URL('./fixtures/details/tezeusz-product.html', import.meta.url), 'utf8');
+const fixture = readFileSync(
+  new URL('./fixtures/details/tezeusz-product.html', import.meta.url),
+  'utf8',
+);
 const ld = (body) => `<script type="application/ld+json">${JSON.stringify(body)}</script>`;
 
 test('Tezeusz product page yields the ISBN and bibliographic facts from JSON-LD', () => {
@@ -62,5 +65,8 @@ test('Allegro Lokalnie: the ISBN comes from the seller parameter table, never fr
   assert.equal(detail.publisher, 'Insignis');
   assert.equal(detail.binding, 'miękka');
   assert.ok(DETAIL_SOURCES.has('Allegro Lokalnie'));
-  assert.equal(parseProductDetail(`<img alt="ISBN 9788380798779"><p>ISBN 9788380798779</p>`).isbn, null);
+  assert.equal(
+    parseProductDetail(`<img alt="ISBN 9788380798779"><p>ISBN 9788380798779</p>`).isbn,
+    null,
+  );
 });

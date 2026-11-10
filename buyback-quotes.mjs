@@ -23,13 +23,32 @@ function rowToQuote(row, now) {
 export const AUTO_INTERVAL_MS = 10 * 60_000;
 const AUTO_PAUSE_AFTER_FAILURE_MS = 2 * 3_600_000;
 
-export function createBuybackService(repository, client, { now = () => Date.now(), batchLimit = 500, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+export function createBuybackService(
+  repository,
+  client,
+  {
+    now = () => Date.now(),
+    batchLimit = 500,
+    setTimer = setTimeout,
+    clearTimer = clearTimeout,
+  } = {},
+) {
   const db = repository.database;
   const read = db.prepare('SELECT * FROM buyback_quotes WHERE source=? AND isbn13=?');
-  const write = db.prepare(`INSERT INTO buyback_quotes (source,isbn13,status,price_pln,title,message,checked_at) VALUES (?,?,?,?,?,?,?)
+  const write =
+    db.prepare(`INSERT INTO buyback_quotes (source,isbn13,status,price_pln,title,message,checked_at) VALUES (?,?,?,?,?,?,?)
     ON CONFLICT(source,isbn13) DO UPDATE SET status=excluded.status,price_pln=excluded.price_pln,title=excluded.title,message=excluded.message,checked_at=excluded.checked_at`);
   const inflight = new Map();
-  let batch = { state: 'idle', done: 0, total: 0, priced: 0, errors: 0, startedAt: null, finishedAt: null, lastError: null };
+  let batch = {
+    state: 'idle',
+    done: 0,
+    total: 0,
+    priced: 0,
+    errors: 0,
+    startedAt: null,
+    finishedAt: null,
+    lastError: null,
+  };
   let cancelled = false;
   let autoTimer = null;
   let autoPausedUntil = 0;
@@ -41,7 +60,9 @@ export function createBuybackService(repository, client, { now = () => Date.now(
 
   function many(isbns) {
     return Object.fromEntries(
-      [...new Set(isbns.map(digits).filter((isbn) => isbn.length === 13))].map((isbn) => [isbn, get(isbn)]).filter(([, quote]) => quote),
+      [...new Set(isbns.map(digits).filter((isbn) => isbn.length === 13))]
+        .map((isbn) => [isbn, get(isbn)])
+        .filter(([, quote]) => quote),
     );
   }
 
@@ -58,9 +79,22 @@ export function createBuybackService(repository, client, { now = () => Date.now(
       } catch (error) {
         // Keep a good older quote rather than overwrite it with a transient failure.
         if (cached && cached.status !== 'error') return { ...cached, refreshError: error.message };
-        quote = { status: 'error', price: null, title: null, message: String(error.message || error).slice(0, 300) };
+        quote = {
+          status: 'error',
+          price: null,
+          title: null,
+          message: String(error.message || error).slice(0, 300),
+        };
       }
-      write.run(SOURCE, isbn, quote.status, quote.price ?? null, quote.title ?? null, quote.message ?? null, new Date(now()).toISOString());
+      write.run(
+        SOURCE,
+        isbn,
+        quote.status,
+        quote.price ?? null,
+        quote.title ?? null,
+        quote.message ?? null,
+        new Date(now()).toISOString(),
+      );
       return get(isbn);
     })();
     inflight.set(isbn, work);
@@ -100,10 +134,19 @@ export function createBuybackService(repository, client, { now = () => Date.now(
       )
       .get(SOURCE);
     const total = db
-      .prepare(`SELECT round(coalesce(sum(price_pln),0),2) AS value FROM buyback_quotes q WHERE q.source=? AND q.status='priced'
-        AND EXISTS (SELECT 1 FROM edition_identifiers i WHERE i.scheme='isbn13' AND i.normalized_value=q.isbn13)`)
+      .prepare(
+        `SELECT round(coalesce(sum(price_pln),0),2) AS value FROM buyback_quotes q WHERE q.source=? AND q.status='priced'
+        AND EXISTS (SELECT 1 FROM edition_identifiers i WHERE i.scheme='isbn13' AND i.normalized_value=q.isbn13)`,
+      )
       .get(SOURCE).value;
-    return { isbns: Number(row.isbns), priced: Number(row.priced), manual: Number(row.manual), notBought: Number(row.notBought), pricedValue: Number(total), pending: pending().length };
+    return {
+      isbns: Number(row.isbns),
+      priced: Number(row.priced),
+      manual: Number(row.manual),
+      notBought: Number(row.notBought),
+      pricedValue: Number(total),
+      pending: pending().length,
+    };
   }
 
   function autoEnabled() {
@@ -111,7 +154,10 @@ export function createBuybackService(repository, client, { now = () => Date.now(
   }
 
   function setAuto(enabled) {
-    db.prepare('UPDATE buyback_settings SET auto=?, updated_at=? WHERE id=1').run(enabled ? 1 : 0, new Date(now()).toISOString());
+    db.prepare('UPDATE buyback_settings SET auto=?, updated_at=? WHERE id=1').run(
+      enabled ? 1 : 0,
+      new Date(now()).toISOString(),
+    );
     if (enabled) {
       autoPausedUntil = 0;
       scheduleAuto(1_000);
@@ -124,7 +170,13 @@ export function createBuybackService(repository, client, { now = () => Date.now(
   function autoTick() {
     autoTimer = null;
     try {
-      if (autoEnabled() && batch.state !== 'running' && now() >= autoPausedUntil && pending().length) start({ auto: true });
+      if (
+        autoEnabled() &&
+        batch.state !== 'running' &&
+        now() >= autoPausedUntil &&
+        pending().length
+      )
+        start({ auto: true });
     } catch {
       // Database closed or busy: try again on the next tick.
     }
@@ -148,19 +200,37 @@ export function createBuybackService(repository, client, { now = () => Date.now(
   }
 
   function status() {
-    return { ...batch, auto: autoEnabled(), autoPausedUntil: autoPausedUntil > now() ? new Date(autoPausedUntil).toISOString() : null, summary: summary() };
+    return {
+      ...batch,
+      auto: autoEnabled(),
+      autoPausedUntil: autoPausedUntil > now() ? new Date(autoPausedUntil).toISOString() : null,
+      summary: summary(),
+    };
   }
 
   function start({ auto = false } = {}) {
     if (batch.state === 'running') return status();
     const queue = pending();
     cancelled = false;
-    batch = { state: 'running', done: 0, total: queue.length, priced: 0, errors: 0, startedAt: new Date(now()).toISOString(), finishedAt: null, lastError: null, auto };
+    batch = {
+      state: 'running',
+      done: 0,
+      total: queue.length,
+      priced: 0,
+      errors: 0,
+      startedAt: new Date(now()).toISOString(),
+      finishedAt: null,
+      lastError: null,
+      auto,
+    };
     running = (async () => {
       let consecutiveErrors = 0;
       for (const isbn of queue) {
         if (cancelled) break;
-        const quote = await check(isbn, { force: true }).catch((error) => ({ status: 'error', message: error.message }));
+        const quote = await check(isbn, { force: true }).catch((error) => ({
+          status: 'error',
+          message: error.message,
+        }));
         batch.done += 1;
         if (quote.status === 'priced') batch.priced += 1;
         if (quote.status === 'error' || quote.refreshError) {
@@ -186,5 +256,18 @@ export function createBuybackService(repository, client, { now = () => Date.now(
     return status();
   }
 
-  return { get, many, check, pending, summary, status, start, cancel, setAuto, startAuto, stopAuto, idle: () => running };
+  return {
+    get,
+    many,
+    check,
+    pending,
+    summary,
+    status,
+    start,
+    cancel,
+    setAuto,
+    startAuto,
+    stopAuto,
+    idle: () => running,
+  };
 }

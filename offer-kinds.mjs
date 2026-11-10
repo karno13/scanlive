@@ -23,7 +23,8 @@ const RULES = [
 export function offerKind({ source, sellerName = null } = {}) {
   const seller = String(sellerName ?? '').toLowerCase();
   for (const rule of RULES)
-    if (rule.sources.includes(source) && (!rule.seller || seller.includes(rule.seller))) return rule.kind;
+    if (rule.sources.includes(source) && (!rule.seller || seller.includes(rule.seller)))
+      return rule.kind;
   return 'private';
 }
 
@@ -32,7 +33,9 @@ const quote = (text) => `'${String(text).replace(/'/g, "''")}'`;
 export function offerKindSql(alias = 'o') {
   const cases = RULES.map((rule) => {
     const source = `${alias}.source IN (${rule.sources.map(quote).join(',')})`;
-    const seller = rule.seller ? ` AND lower(coalesce(${alias}.seller_name,'')) LIKE ${quote('%' + rule.seller + '%')}` : '';
+    const seller = rule.seller
+      ? ` AND lower(coalesce(${alias}.seller_name,'')) LIKE ${quote('%' + rule.seller + '%')}`
+      : '';
     return `WHEN ${source}${seller} THEN ${quote(rule.kind)}`;
   });
   return `(CASE ${cases.join(' ')} ELSE 'private' END)`;

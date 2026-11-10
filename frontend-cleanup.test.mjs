@@ -10,9 +10,15 @@ test('workspace dependencies match their declarations', async () => {
     const source = await readFile(new URL('./app/views/' + name + '.js', import.meta.url), 'utf8');
     const capitalized = name[0].toUpperCase() + name.slice(1);
     const declaration = source.match(/export function \w+\(\{([^}]+)\}\)/);
-    const initializer = shell.match(new RegExp('const ' + name + 'View = create' + capitalized + 'View\\(\\{([^}]+)\\}\\);'));
+    const initializer = shell.match(
+      new RegExp('const ' + name + 'View = create' + capitalized + 'View\\(\\{([^}]+)\\}\\);'),
+    );
     assert.ok(declaration && initializer, name);
-    const params = text => text.split(',').map(x => x.trim()).filter(Boolean);
+    const params = (text) =>
+      text
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
     assert.deepEqual(params(initializer[1]), params(declaration[1]), name);
   }
 });

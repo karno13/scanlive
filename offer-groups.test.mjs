@@ -8,12 +8,36 @@ test('offers grouped by edition: count, price range, sources; filters apply; una
   try {
     const at = '2026-11-08T10:00:00Z';
     const work = repository.createWork({ title: 'Fourth Wing', authors: ['Rebecca Yarros'] });
-    const edition = repository.createEdition({ workId: work.id, title: 'Fourth Wing', publisher: 'Filia', publicationYear: 2023 });
+    const edition = repository.createEdition({
+      workId: work.id,
+      title: 'Fourth Wing',
+      publisher: 'Filia',
+      publicationYear: 2023,
+    });
     const other = repository.createWork({ title: 'Iron Flame', authors: ['Rebecca Yarros'] });
-    const ironEdition = repository.createEdition({ workId: other.id, title: 'Iron Flame', publisher: 'Filia', publicationYear: 2024 });
+    const ironEdition = repository.createEdition({
+      workId: other.id,
+      title: 'Iron Flame',
+      publisher: 'Filia',
+      publicationYear: 2024,
+    });
     const offer = (n, source, price, editionId) => {
-      const row = repository.upsertOffer({ source, normalizedUrl: `https://www.vinted.pl/items/${n}-x`, originalTitle: 'Fourth wing ' + n, currentPrice: price, at });
-      if (editionId) repository.assignOfferToEdition(row.id, editionId, { id: 'm' + n, method: 'structured_isbn', status: 'active', reason: 'isbn', createdBy: 'system', at });
+      const row = repository.upsertOffer({
+        source,
+        normalizedUrl: `https://www.vinted.pl/items/${n}-x`,
+        originalTitle: 'Fourth wing ' + n,
+        currentPrice: price,
+        at,
+      });
+      if (editionId)
+        repository.assignOfferToEdition(row.id, editionId, {
+          id: 'm' + n,
+          method: 'structured_isbn',
+          status: 'active',
+          reason: 'isbn',
+          createdBy: 'system',
+          at,
+        });
       return row;
     };
     offer(1, 'Vinted', 5000, edition.id);
@@ -26,8 +50,22 @@ test('offers grouped by edition: count, price range, sources; filters apply; una
     assert.equal(groups.unassigned, 1);
     const fourth = groups.items[0];
     assert.deepEqual(
-      { title: fourth.workTitle, offers: fourth.offers, min: fourth.minPrice, max: fourth.maxPrice, sources: fourth.sources, publisher: fourth.publisher },
-      { title: 'Fourth Wing', offers: 3, min: 3000, max: 10052, sources: ['Vinted'], publisher: 'Filia' },
+      {
+        title: fourth.workTitle,
+        offers: fourth.offers,
+        min: fourth.minPrice,
+        max: fourth.maxPrice,
+        sources: fourth.sources,
+        publisher: fourth.publisher,
+      },
+      {
+        title: 'Fourth Wing',
+        offers: 3,
+        min: 3000,
+        max: 10052,
+        sources: ['Vinted'],
+        publisher: 'Filia',
+      },
     );
     assert.equal(listCatalogOfferGroups(repository, { maxPrice: '40' }).total, 1);
     assert.equal(listCatalogOffers(repository, { edition: edition.id }).total, 3);

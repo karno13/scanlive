@@ -26,29 +26,45 @@ function defaultWait(milliseconds) {
 
 // A bounded process-local cache for shared Open Library work/author resources.
 // ISBN result caching stays in SQLite. Errors never survive a completed request.
-export function createResourceRequester(request, {now=Date.now,ttlMs=3_600_000,maxEntries=1000}={}) {
-  if(typeof request!=='function')throw new TypeError('request must be a function');
-  if(!Number.isFinite(ttlMs)||ttlMs<0||!Number.isSafeInteger(maxEntries)||maxEntries<1)
+export function createResourceRequester(
+  request,
+  { now = Date.now, ttlMs = 3_600_000, maxEntries = 1000 } = {},
+) {
+  if (typeof request !== 'function') throw new TypeError('request must be a function');
+  if (!Number.isFinite(ttlMs) || ttlMs < 0 || !Number.isSafeInteger(maxEntries) || maxEntries < 1)
     throw new RangeError('Invalid resource cache limits');
-  const cache=new Map(),pending=new Map();
+  const cache = new Map(),
+    pending = new Map();
   return async function resourceRequest(url) {
-    const cached=cache.get(url);
-    if(cached && cached.expiresAt>now()) {
-      cache.delete(url);cache.set(url,cached);
+    const cached = cache.get(url);
+    if (cached && cached.expiresAt > now()) {
+      cache.delete(url);
+      cache.set(url, cached);
       return cached.result;
     }
-    if(cached)cache.delete(url);
-    if(pending.has(url))return pending.get(url);
-    const work=Promise.resolve().then(()=>request(url)).then(result=>{
-      if(result.status==='found' && result.payload && typeof result.payload==='object' &&
-          !Array.isArray(result.payload) && /^https:\/\/openlibrary\.org\/(works|authors)\/[^/]+\.json$/.test(url)) {
-        cache.set(url,{result,expiresAt:now()+ttlMs});
-        while(cache.size>maxEntries)cache.delete(cache.keys().next().value);
-      }
-      return result;
-    });
-    pending.set(url,work);
-    try{return await work;}finally{if(pending.get(url)===work)pending.delete(url);}
+    if (cached) cache.delete(url);
+    if (pending.has(url)) return pending.get(url);
+    const work = Promise.resolve()
+      .then(() => request(url))
+      .then((result) => {
+        if (
+          result.status === 'found' &&
+          result.payload &&
+          typeof result.payload === 'object' &&
+          !Array.isArray(result.payload) &&
+          /^https:\/\/openlibrary\.org\/(works|authors)\/[^/]+\.json$/.test(url)
+        ) {
+          cache.set(url, { result, expiresAt: now() + ttlMs });
+          while (cache.size > maxEntries) cache.delete(cache.keys().next().value);
+        }
+        return result;
+      });
+    pending.set(url, work);
+    try {
+      return await work;
+    } finally {
+      if (pending.get(url) === work) pending.delete(url);
+    }
   };
 }
 
@@ -83,7 +99,11 @@ function temporaryNetworkError(error) {
 function errorDetails(error) {
   // The cause code tells an outage (ECONNRESET) from a broken server (CERT_HAS_EXPIRED).
   const code = error?.cause?.code || error?.code;
-  return { name: error?.name ?? 'Error', message: error?.message ?? String(error), ...(code ? { code: String(code) } : {}) };
+  return {
+    name: error?.name ?? 'Error',
+    message: error?.message ?? String(error),
+    ...(code ? { code: String(code) } : {}),
+  };
 }
 
 export function createJsonRequester({

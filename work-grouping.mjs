@@ -2,8 +2,12 @@
 // this every ISBN (every reprint, every publisher) became its own work. The key is deliberately
 // strict - same main title AND same first author - because a wrong merge is worse than a missed one.
 import { fold } from './title-proposals.mjs';
-import { brandOnlyPattern, universePrefix, universeSuffix, universesVersion } from './universes.mjs';
-
+import {
+  brandOnlyPattern,
+  universePrefix,
+  universeSuffix,
+  universesVersion,
+} from './universes.mjs';
 
 /** "Para w ruch / Raising steam, Discworld series ; t. 40" -> "Para w ruch" */
 export function mainTitle(title) {
@@ -21,7 +25,10 @@ export function mainTitle(title) {
 
 /** Surname of the first author: BN "Pratchett, Terry (1948-2015) ..." or "Terry Pratchett". */
 export function firstSurname(authors) {
-  const first = [].concat(authors ?? []).map(String).find((value) => value.trim());
+  const first = []
+    .concat(authors ?? [])
+    .map(String)
+    .find((value) => value.trim());
   if (!first) return '';
   const text = first.replace(/\([^)]*\)/g, ' ').trim();
   const surname = text.includes(',') ? text.split(',')[0] : text.split(/\s+/).at(-1);
@@ -56,7 +63,6 @@ function liveWorks(repository) {
     )
     .all();
 }
-
 
 /** Second key: the original title ("Light fantastic") names one work across translations and publishers. */
 export function originalKey(originalTitle, authors) {
@@ -100,7 +106,9 @@ const KEYS_STAMP = 'work_keys_version';
 export function refreshWorkKeys(repository) {
   const db = repository.database;
   const wanted = JSON.stringify(`${KEYS_VERSION}:${universesVersion()}`);
-  const stamp = db.prepare('SELECT value_json FROM app_preferences WHERE key=?').get(KEYS_STAMP)?.value_json;
+  const stamp = db
+    .prepare('SELECT value_json FROM app_preferences WHERE key=?')
+    .get(KEYS_STAMP)?.value_json;
   return repository.transaction(() => {
     if (stamp !== wanted) {
       db.prepare('INSERT OR IGNORE INTO work_keys_dirty(work_id) SELECT id FROM works').run();
@@ -108,10 +116,15 @@ export function refreshWorkKeys(repository) {
         'INSERT INTO app_preferences(key,value_json,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at',
       ).run(KEYS_STAMP, wanted, new Date().toISOString());
     }
-    const dirty = db.prepare('SELECT work_id FROM work_keys_dirty').all().map((row) => row.work_id);
+    const dirty = db
+      .prepare('SELECT work_id FROM work_keys_dirty')
+      .all()
+      .map((row) => row.work_id);
     if (!dirty.length) return 0;
     const work = db.prepare('SELECT id, title, authors_json FROM works WHERE id=?');
-    const originals = db.prepare('SELECT DISTINCT original_title FROM editions WHERE work_id=? AND original_title IS NOT NULL');
+    const originals = db.prepare(
+      'SELECT DISTINCT original_title FROM editions WHERE work_id=? AND original_title IS NOT NULL',
+    );
     const clear = db.prepare('DELETE FROM work_keys WHERE work_id=?');
     const add = db.prepare('INSERT OR IGNORE INTO work_keys(work_id,key) VALUES(?,?)');
     const done = db.prepare('DELETE FROM work_keys_dirty WHERE work_id=?');
@@ -120,7 +133,10 @@ export function refreshWorkKeys(repository) {
       const row = work.get(id);
       if (row) {
         const authors = parseAuthors(row.authors_json);
-        const keys = [workKey(row.title, authors), ...originals.all(id).map((edition) => originalKey(edition.original_title, authors))];
+        const keys = [
+          workKey(row.title, authors),
+          ...originals.all(id).map((edition) => originalKey(edition.original_title, authors)),
+        ];
         for (const key of new Set(keys.filter(Boolean))) add.run(id, key);
       }
       done.run(id);
@@ -131,7 +147,9 @@ export function refreshWorkKeys(repository) {
 
 /** An existing work that is the same book as (title, authors[, original title]), or null. */
 export function findWorkByKey(repository, title, authors, originalTitle = null) {
-  const wanted = [...new Set([workKey(title, authors), originalKey(originalTitle, authors)].filter(Boolean))];
+  const wanted = [
+    ...new Set([workKey(title, authors), originalKey(originalTitle, authors)].filter(Boolean)),
+  ];
   if (!wanted.length) return null;
   refreshWorkKeys(repository);
   const matches = repository.database
@@ -175,7 +193,10 @@ export function findDuplicateWorkGroups(repository) {
   for (const work of works)
     if (workKeys.get(work.id).length) {
       const title = fold(mainTitle(work.title));
-      byTitle.set(title, byTitle.has(title) && byTitle.get(title) !== root(work.id) ? null : root(work.id));
+      byTitle.set(
+        title,
+        byTitle.has(title) && byTitle.get(title) !== root(work.id) ? null : root(work.id),
+      );
     }
   for (const work of works) {
     if (workKeys.get(work.id).length) continue;

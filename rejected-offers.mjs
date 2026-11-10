@@ -66,7 +66,8 @@ export function createRejectionIndex(repository) {
     find(offer) {
       const title = rejectionTitleKey(offer.original_title ?? offer.originalTitle);
       const isbn = isbnKey(offer.observed_isbn ?? offer.observedIsbn);
-      const hit = (title && byTitle.get(offer.source + '|' + title)) || (isbn && byIsbn.get(isbn)) || null;
+      const hit =
+        (title && byTitle.get(offer.source + '|' + title)) || (isbn && byIsbn.get(isbn)) || null;
       return hit && hit.id !== offer.id ? hit : null;
     },
   };
@@ -80,9 +81,17 @@ export function rejectAsRepeat(repository, offerId, original, at) {
     .get(offerId);
   if (!job || job.status === 'completed' || job.status === 'running') return false;
   // A manual assignment or a set always wins over an automatic rejection.
-  if (db.prepare("SELECT 1 FROM offer_matches WHERE offer_id=? AND status='active' AND method IN ('manual','legacy_manual')").get(offerId)) return false;
+  if (
+    db
+      .prepare(
+        "SELECT 1 FROM offer_matches WHERE offer_id=? AND status='active' AND method IN ('manual','legacy_manual')",
+      )
+      .get(offerId)
+  )
+    return false;
   if (db.prepare('SELECT 1 FROM offer_sets WHERE offer_id=?').get(offerId)) return false;
-  const reason = 'Jak wcześniej odrzucona oferta: ' + String(original.original_title || '').slice(0, 160);
+  const reason =
+    'Jak wcześniej odrzucona oferta: ' + String(original.original_title || '').slice(0, 160);
   db.prepare(
     `INSERT INTO review_decisions(id,job_id,offer_id,edition_id,action,reason,created_by,created_at)
      VALUES(?,?,?,NULL,'excluded',?,?,?)`,
@@ -90,7 +99,17 @@ export function rejectAsRepeat(repository, offerId, original, at) {
   db.prepare(
     `UPDATE identification_jobs SET status='completed', run_after=NULL, lease_token=NULL, lease_expires_at=NULL,
        last_error=NULL, result_json=?, updated_at=? WHERE id=?`,
-  ).run(JSON.stringify({ manualDecision: 'excluded', automatic: true, sameAs: original.id, reason, decidedAt: at }), at, job.id);
+  ).run(
+    JSON.stringify({
+      manualDecision: 'excluded',
+      automatic: true,
+      sameAs: original.id,
+      reason,
+      decidedAt: at,
+    }),
+    at,
+    job.id,
+  );
   return true;
 }
 
@@ -98,7 +117,10 @@ export function rejectAsRepeat(repository, offerId, original, at) {
  * Open jobs (queued or waiting for review) that repeat a rejected offer are rejected. Run after
  * each scan save and once at start; cheap: one pass over rejected offers and open jobs.
  */
-export function rejectRepeatsOfRejectedOffers(repository, { now = () => new Date(), offerIds = null } = {}) {
+export function rejectRepeatsOfRejectedOffers(
+  repository,
+  { now = () => new Date(), offerIds = null } = {},
+) {
   const index = createRejectionIndex(repository);
   if (!index.size) return { rejected: 0 };
   const db = repository.database;
@@ -148,7 +170,14 @@ export function undoUnconfirmedRepeatRejections(repository, { now = () => new Da
       if (original && original.id === row.same_as) continue;
       db.prepare(
         `INSERT INTO review_decisions(id,job_id,offer_id,edition_id,action,reason,created_by,created_at) VALUES(?,?,?,NULL,'requeued',?,?,?)`,
-      ).run(`auto_reject_undo_${row.job_id}_${at}`, row.job_id, row.id, 'Cofnięto automatyczne odrzucenie: poprawiona reguła powtórek go nie potwierdza.', AUTO_REJECT_AUTHOR, at);
+      ).run(
+        `auto_reject_undo_${row.job_id}_${at}`,
+        row.job_id,
+        row.id,
+        'Cofnięto automatyczne odrzucenie: poprawiona reguła powtórek go nie potwierdza.',
+        AUTO_REJECT_AUTHOR,
+        at,
+      );
       db.prepare(
         `UPDATE identification_jobs SET status='queued', run_after=NULL, lease_token=NULL, lease_expires_at=NULL,
            last_error=NULL, result_json=NULL, attempt_count=0, updated_at=? WHERE id=?`,

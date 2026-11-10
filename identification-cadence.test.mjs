@@ -11,8 +11,16 @@ test('local identification starts every five seconds by default', async () => {
 test('frequent ticks do not overlap identification batches', async () => {
   let started = 0;
   let finish;
-  const hold = new Promise((resolve) => { finish = resolve; });
-  const scheduler = createIdentificationScheduler({ runBatch: async () => { started++; await hold; } , intervalMs: 5_000 });
+  const hold = new Promise((resolve) => {
+    finish = resolve;
+  });
+  const scheduler = createIdentificationScheduler({
+    runBatch: async () => {
+      started++;
+      await hold;
+    },
+    intervalMs: 5_000,
+  });
   const first = scheduler.tick();
   await Promise.resolve();
   const second = scheduler.tick();

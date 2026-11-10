@@ -19,7 +19,10 @@ test('accepts only marketplace CDN images over https', () => {
     safeImageUrl('https://images1.vinted.net/t/abc/310x430/x.webp?s=1'),
     'https://images1.vinted.net/t/abc/310x430/x.webp?s=1',
   );
-  assert.equal(safeImageUrl({ url: 'https://a.allegroimg.com/original/1/2' }), 'https://a.allegroimg.com/original/1/2');
+  assert.equal(
+    safeImageUrl({ url: 'https://a.allegroimg.com/original/1/2' }),
+    'https://a.allegroimg.com/original/1/2',
+  );
   assert.equal(safeImageUrl(['https://dedalus.pl/img/a.jpg']), 'https://dedalus.pl/img/a.jpg');
   assert.equal(safeImageUrl('//ecsmedia.pl/cir/p/a.webp'), 'https://ecsmedia.pl/cir/p/a.webp');
   assert.equal(safeImageUrl('https://evil.example/a.jpg'), null);
@@ -27,7 +30,10 @@ test('accepts only marketplace CDN images over https', () => {
   assert.equal(safeImageUrl('/b/mp/img/svg/no_picture.svg'), null);
   assert.equal(safeImageUrl('https://tezeusz.pl/img/empty-photo.svg'), null);
   assert.equal(safeImageUrl(42), null);
-  assert.equal(proxiedImage('https://ecsmedia.pl/a.webp'), '/api/image?u=https%3A%2F%2Fecsmedia.pl%2Fa.webp');
+  assert.equal(
+    proxiedImage('https://ecsmedia.pl/a.webp'),
+    '/api/image?u=https%3A%2F%2Fecsmedia.pl%2Fa.webp',
+  );
 });
 
 test('reads og:image or JSON-LD image from a detail page', () => {
@@ -39,16 +45,26 @@ test('reads og:image or JSON-LD image from a detail page', () => {
     imageFromDetailHtml('<script>{"image": ["https://dedalus.pl/img/b.jpg"]}</script>'),
     'https://dedalus.pl/img/b.jpg',
   );
-  assert.equal(imageFromDetailHtml('<meta property="og:image" content="https://x.example/a.jpg">'), null);
   assert.equal(
-    imageFromDetailHtml('<meta property="og:image" content=https://a.allegroimg.com/original/1e9edf/e29f>'),
+    imageFromDetailHtml('<meta property="og:image" content="https://x.example/a.jpg">'),
+    null,
+  );
+  assert.equal(
+    imageFromDetailHtml(
+      '<meta property="og:image" content=https://a.allegroimg.com/original/1e9edf/e29f>',
+    ),
     'https://a.allegroimg.com/original/1e9edf/e29f',
   );
 });
 
 test('Tezeusz card image skips the onerror placeholder', () => {
   const html = `<a class='tezeusz-product-card js-ga' href='mafin-i-urgi-1'><img loading="lazy" src="https://static6.tezeusz.pl/a.jpeg" onerror="this.src='/img/empty-photo.svg'" alt="Mafin i Urgi"><div class="tezeusz-product-card-price">29,99 zł</div></a>`;
-  const rows = parseMarketplace(html, { source: 'Tezeusz.pl', host: 'tezeusz.pl', mode: 'watchlist', title: 'Mafin' });
+  const rows = parseMarketplace(html, {
+    source: 'Tezeusz.pl',
+    host: 'tezeusz.pl',
+    mode: 'watchlist',
+    title: 'Mafin',
+  });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].image, 'https://static6.tezeusz.pl/a.jpeg');
 });
@@ -67,9 +83,15 @@ test('image proxy caches the body and rejects non-images', async () => {
     assert.equal(first.type, 'image/webp');
     assert.deepEqual([...second.body], [1, 2, 3]);
     assert.equal(calls, 1);
-    await assert.rejects(fetchCachedImage('https://evil.example/a.jpg', { cacheDirectory: dir, fetcher }), /NOT_ALLOWED/);
+    await assert.rejects(
+      fetchCachedImage('https://evil.example/a.jpg', { cacheDirectory: dir, fetcher }),
+      /NOT_ALLOWED/,
+    );
     const html = async () => new Response('<html>', { headers: { 'content-type': 'text/html' } });
-    await assert.rejects(fetchCachedImage('https://ecsmedia.pl/b.webp', { cacheDirectory: dir, fetcher: html }), /NOT_FOUND/);
+    await assert.rejects(
+      fetchCachedImage('https://ecsmedia.pl/b.webp', { cacheDirectory: dir, fetcher: html }),
+      /NOT_FOUND/,
+    );
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -86,16 +108,32 @@ test('stores scanned image and backfills a missing one from the listing page onc
       imageUrl: 'https://images1.vinted.net/t/a/1.webp',
     });
     assert.equal(stored.image_url, 'https://images1.vinted.net/t/a/1.webp');
-    const again = repository.upsertOffer({ id: stored.id, source: 'Vinted', normalizedUrl: 'https://www.vinted.pl/items/1', currentPrice: 900 });
+    const again = repository.upsertOffer({
+      id: stored.id,
+      source: 'Vinted',
+      normalizedUrl: 'https://www.vinted.pl/items/1',
+      currentPrice: 900,
+    });
     assert.equal(again.image_url, 'https://images1.vinted.net/t/a/1.webp');
-    const bare = repository.upsertOffer({ source: 'OLX', normalizedUrl: 'https://www.olx.pl/d/oferta/x', originalTitle: 'x', currentPrice: 500 });
+    const bare = repository.upsertOffer({
+      source: 'OLX',
+      normalizedUrl: 'https://www.olx.pl/d/oferta/x',
+      originalTitle: 'x',
+      currentPrice: 500,
+    });
     let reads = 0;
     const readHtml = async () => {
       reads += 1;
       return '<meta property="og:image" content="https://ireland.apollo.olxcdn.com/v1/files/a/image">';
     };
-    assert.equal(await offerImageUrl(repository, bare.id, { readHtml }), 'https://ireland.apollo.olxcdn.com/v1/files/a/image');
-    assert.equal(await offerImageUrl(repository, bare.id, { readHtml }), 'https://ireland.apollo.olxcdn.com/v1/files/a/image');
+    assert.equal(
+      await offerImageUrl(repository, bare.id, { readHtml }),
+      'https://ireland.apollo.olxcdn.com/v1/files/a/image',
+    );
+    assert.equal(
+      await offerImageUrl(repository, bare.id, { readHtml }),
+      'https://ireland.apollo.olxcdn.com/v1/files/a/image',
+    );
     assert.equal(reads, 1);
   } finally {
     repository.close?.();
@@ -106,9 +144,19 @@ test('background backfill fills photos and gives up on a blocked source', async 
   const repository = new SqliteCatalogRepository(':memory:');
   try {
     for (let i = 0; i < 3; i++)
-      repository.upsertOffer({ source: 'Vinted', normalizedUrl: `https://www.vinted.pl/items/${i}`, originalTitle: 'v' + i, currentPrice: 100 });
+      repository.upsertOffer({
+        source: 'Vinted',
+        normalizedUrl: `https://www.vinted.pl/items/${i}`,
+        originalTitle: 'v' + i,
+        currentPrice: 100,
+      });
     for (let i = 0; i < 6; i++)
-      repository.upsertOffer({ source: 'OLX', normalizedUrl: `https://www.olx.pl/d/oferta/${i}`, originalTitle: 'o' + i, currentPrice: 100 });
+      repository.upsertOffer({
+        source: 'OLX',
+        normalizedUrl: `https://www.olx.pl/d/oferta/${i}`,
+        originalTitle: 'o' + i,
+        currentPrice: 100,
+      });
     const reads = { Vinted: 0, OLX: 0 };
     const backfill = createImageBackfill(repository, {
       readHtml: async (url, source) => {
@@ -118,7 +166,8 @@ test('background backfill fills photos and gives up on a blocked source', async 
       },
     });
     assert.equal(backfill.start().state, 'running');
-    while (backfill.status().state === 'running') await new Promise((resolve) => setTimeout(resolve, 5));
+    while (backfill.status().state === 'running')
+      await new Promise((resolve) => setTimeout(resolve, 5));
     const status = backfill.status();
     assert.equal(status.filled, 3);
     assert.equal(reads.OLX, 3);
@@ -133,7 +182,12 @@ test('backfill waits on HTTP 429 and retries the same offer instead of skipping 
   const repository = new SqliteCatalogRepository(':memory:');
   try {
     for (let i = 0; i < 4; i++)
-      repository.upsertOffer({ source: 'OLX', normalizedUrl: `https://www.olx.pl/d/oferta/${i}`, originalTitle: 'o' + i, currentPrice: 100 });
+      repository.upsertOffer({
+        source: 'OLX',
+        normalizedUrl: `https://www.olx.pl/d/oferta/${i}`,
+        originalTitle: 'o' + i,
+        currentPrice: 100,
+      });
     let calls = 0;
     const backfill = createImageBackfill(repository, {
       throttleWaitMs: 1,
@@ -144,7 +198,8 @@ test('backfill waits on HTTP 429 and retries the same offer instead of skipping 
       },
     });
     backfill.start();
-    while (backfill.status().state === 'running') await new Promise((resolve) => setTimeout(resolve, 5));
+    while (backfill.status().state === 'running')
+      await new Promise((resolve) => setTimeout(resolve, 5));
     // Three waits are allowed per streak; the fourth 429 counts as a failure, then reads succeed.
     const status = backfill.status();
     assert.equal(status.filled, 3);

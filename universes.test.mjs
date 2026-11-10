@@ -5,18 +5,31 @@ import { createProductionCatalog } from './catalog-production.mjs';
 import { universeOf } from './catalog-series.mjs';
 import { seriesKind } from './bn-marc.mjs';
 import { matchesTopic } from './search-policy.mjs';
-import { DEFAULT_UNIVERSES, currentUniverses, deleteUniverse, listUniverses, saveUniverse, setUniverses } from './universes.mjs';
+import {
+  DEFAULT_UNIVERSES,
+  currentUniverses,
+  deleteUniverse,
+  listUniverses,
+  saveUniverse,
+  setUniverses,
+} from './universes.mjs';
 import { mainTitle } from './work-grouping.mjs';
 
 function catalog() {
-  return createProductionCatalog({ databasePath: ':memory:', fetcher: async () => assert.fail('no network') });
+  return createProductionCatalog({
+    databasePath: ':memory:',
+    fetcher: async () => assert.fail('no network'),
+  });
 }
 
 test('the table starts with the universes the code used until now', () => {
   const store = catalog();
   try {
     const stored = listUniverses(store.repository).items;
-    assert.deepEqual(stored, DEFAULT_UNIVERSES.map((u) => ({ ...u, names: u.names.filter((name) => name !== u.name) })));
+    assert.deepEqual(
+      stored,
+      DEFAULT_UNIVERSES.map((u) => ({ ...u, names: u.names.filter((name) => name !== u.name) })),
+    );
   } finally {
     store.close();
     setUniverses(DEFAULT_UNIVERSES);
@@ -27,22 +40,43 @@ test('a universe added in the catalogue strips branding, files the series view a
   const store = catalog();
   try {
     assert.equal(mainTitle('Wiedźmin: Ostatnie życzenie'), 'Wiedźmin: Ostatnie życzenie');
-    saveUniverse(store.repository, { name: 'Wiedźmin', names: ['The Witcher'], lines: [], markers: ['Geralt'] });
+    saveUniverse(store.repository, {
+      name: 'Wiedźmin',
+      names: ['The Witcher'],
+      lines: [],
+      markers: ['Geralt'],
+    });
     assert.equal(mainTitle('Wiedźmin: Ostatnie życzenie'), 'Ostatnie życzenie');
     assert.equal(mainTitle('Krew elfów (THE WITCHER)'), 'Krew elfów');
     assert.equal(universeOf('Geralt z Rivii — opowiadania'), 'Wiedźmin');
     assert.equal(seriesKind('The Witcher'), 'universe');
-    assert.equal(matchesTopic({ mode: 'discovery', category: 'Wiedźmin', searchQuery: 'Wiedźmin' }, 'The Witcher Sword of destiny'), true);
+    assert.equal(
+      matchesTopic(
+        { mode: 'discovery', category: 'Wiedźmin', searchQuery: 'Wiedźmin' },
+        'The Witcher Sword of destiny',
+      ),
+      true,
+    );
 
     // One spelling belongs to one universe.
-    assert.throws(() => saveUniverse(store.repository, { name: 'Wiedźmin', names: ['Discworld'] }), /UNIVERSE_NAME_TAKEN/);
+    assert.throws(
+      () => saveUniverse(store.repository, { name: 'Wiedźmin', names: ['Discworld'] }),
+      /UNIVERSE_NAME_TAKEN/,
+    );
     // Renamed in place; removed again.
-    saveUniverse(store.repository, { previousName: 'Wiedźmin', name: 'Saga o wiedźminie', names: ['Wiedźmin', 'The Witcher'] });
+    saveUniverse(store.repository, {
+      previousName: 'Wiedźmin',
+      name: 'Saga o wiedźminie',
+      names: ['Wiedźmin', 'The Witcher'],
+    });
     assert.ok(currentUniverses().some((u) => u.name === 'Saga o wiedźminie'));
     assert.ok(!currentUniverses().some((u) => u.name === 'Wiedźmin'));
     deleteUniverse(store.repository, 'Saga o wiedźminie');
     assert.equal(mainTitle('Wiedźmin: Ostatnie życzenie'), 'Wiedźmin: Ostatnie życzenie');
-    assert.throws(() => deleteUniverse(store.repository, 'Saga o wiedźminie'), /UNIVERSE_NOT_FOUND/);
+    assert.throws(
+      () => deleteUniverse(store.repository, 'Saga o wiedźminie'),
+      /UNIVERSE_NOT_FOUND/,
+    );
   } finally {
     store.close();
     setUniverses(DEFAULT_UNIVERSES);

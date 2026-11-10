@@ -54,7 +54,10 @@ function upsertPerson(db, person, at) {
 }
 
 function replaceContributors(db, editionId, people, source, at) {
-  db.prepare('DELETE FROM edition_contributors WHERE edition_id=? AND source=?').run(editionId, source);
+  db.prepare('DELETE FROM edition_contributors WHERE edition_id=? AND source=?').run(
+    editionId,
+    source,
+  );
   const insert = db.prepare(
     'INSERT OR IGNORE INTO edition_contributors(edition_id,person_id,role,position,source) VALUES(?,?,?,?,?)',
   );
@@ -71,7 +74,15 @@ function replaceSeries(db, editionId, series, source) {
   );
   for (const entry of series)
     if (entry.normalizedName)
-      insert.run(editionId, entry.name, entry.normalizedName, entry.kind, entry.volume ?? null, entry.position ?? 0, source);
+      insert.run(
+        editionId,
+        entry.name,
+        entry.normalizedName,
+        entry.kind,
+        entry.volume ?? null,
+        entry.position ?? 0,
+        source,
+      );
 }
 
 /**
@@ -80,7 +91,10 @@ function replaceSeries(db, editionId, series, source) {
  */
 export function enrichEdition(repository, editionId, { now = () => new Date() } = {}) {
   const db = repository?.database;
-  if (!db?.prepare || !db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='edition_series'").get())
+  if (
+    !db?.prepare ||
+    !db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='edition_series'").get()
+  )
     return { editionId, updated: false, reason: 'schema_missing' };
   const edition = db.prepare('SELECT * FROM editions WHERE id=?').get(editionId);
   if (!edition) return { editionId, updated: false, reason: 'edition_not_found' };
@@ -90,7 +104,9 @@ export function enrichEdition(repository, editionId, { now = () => new Date() } 
   const work = db.prepare('SELECT * FROM works WHERE id=?').get(edition.work_id);
   if (!details) {
     // Open Library and older records: the work's author list is all we know.
-    const hasPeople = db.prepare('SELECT 1 FROM edition_contributors WHERE edition_id=? LIMIT 1').get(editionId);
+    const hasPeople = db
+      .prepare('SELECT 1 FROM edition_contributors WHERE edition_id=? LIMIT 1')
+      .get(editionId);
     if (!hasPeople && work) {
       const people = parseAuthors(work.authors_json).map((name) => ({ name, role: 'author' }));
       replaceContributors(db, editionId, people, 'work_authors', at);
@@ -137,7 +153,9 @@ export function enrichEdition(repository, editionId, { now = () => new Date() } 
       editionId,
     );
   }
-  db.prepare("DELETE FROM edition_contributors WHERE edition_id=? AND source='work_authors'").run(editionId);
+  db.prepare("DELETE FROM edition_contributors WHERE edition_id=? AND source='work_authors'").run(
+    editionId,
+  );
   replaceContributors(db, editionId, details.contributors, 'bn', at);
   replaceSeries(db, editionId, details.series, 'bn');
 
@@ -148,7 +166,9 @@ export function enrichEdition(repository, editionId, { now = () => new Date() } 
       .get(work.id);
     if (firstEdition?.id === editionId) {
       const authors = details.authors.length ? details.authors : parseAuthors(work.authors_json);
-      db.prepare('UPDATE works SET title=?, normalized_title=?, authors_json=?, updated_at=? WHERE id=?').run(
+      db.prepare(
+        'UPDATE works SET title=?, normalized_title=?, authors_json=?, updated_at=? WHERE id=?',
+      ).run(
         title,
         title.normalize('NFC').toLocaleLowerCase('pl'),
         JSON.stringify(authors),
@@ -162,13 +182,19 @@ export function enrichEdition(repository, editionId, { now = () => new Date() } 
 }
 
 /** Upgrades every edition once (per upgrade version); safe to run again. */
-export function upgradeCatalogBibliography(repository, { now = () => new Date(), force = false } = {}) {
+export function upgradeCatalogBibliography(
+  repository,
+  { now = () => new Date(), force = false } = {},
+) {
   const db = repository.database;
   if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='edition_series'").get())
     return { skipped: true, reason: 'schema_missing' };
   if (!force && db.prepare('SELECT 1 FROM app_preferences WHERE key=?').get(UPGRADE_KEY))
     return { skipped: true, reason: 'already_done' };
-  const ids = db.prepare('SELECT id FROM editions ORDER BY created_at, id').all().map((row) => row.id);
+  const ids = db
+    .prepare('SELECT id FROM editions ORDER BY created_at, id')
+    .all()
+    .map((row) => row.id);
   let updated = 0;
   let works = 0;
   repository.transaction(() => {
@@ -180,7 +206,11 @@ export function upgradeCatalogBibliography(repository, { now = () => new Date(),
     db.prepare(
       `INSERT INTO app_preferences(key,value_json,updated_at) VALUES(?,?,?)
        ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at`,
-    ).run(UPGRADE_KEY, JSON.stringify({ editions: ids.length, updated, works }), now().toISOString());
+    ).run(
+      UPGRADE_KEY,
+      JSON.stringify({ editions: ids.length, updated, works }),
+      now().toISOString(),
+    );
   });
   return { skipped: false, editions: ids.length, updated, works };
 }
@@ -199,7 +229,9 @@ export function editionContributors(repository, editionId) {
 /** Series statements of an edition: [{name, kind, volume}]. */
 export function editionSeries(repository, editionId) {
   return repository.database
-    .prepare('SELECT name, kind, volume FROM edition_series WHERE edition_id=? ORDER BY position, name')
+    .prepare(
+      'SELECT name, kind, volume FROM edition_series WHERE edition_id=? ORDER BY position, name',
+    )
     .all(editionId)
     .map((row) => ({ ...row }));
 }
@@ -244,6 +276,11 @@ export function personWorks(repository, personId) {
     .all(personId);
   return {
     person: { ...person },
-    editions: rows.map((row) => ({ ...row, roles: String(row.roles || '').split(',').filter(Boolean) })),
+    editions: rows.map((row) => ({
+      ...row,
+      roles: String(row.roles || '')
+        .split(',')
+        .filter(Boolean),
+    })),
   };
 }

@@ -8,11 +8,21 @@ const isbn = '9780306406157';
 function record(source, title, year) {
   const payload = { id: source + '-1' };
   return {
-    source, externalRecordId: source + '-1', workExternalId: null,
-    isbn13: isbn, isbn10: null, title, authors: ['Author'],
-    publisher: null, publicationYear: year, language: null, binding: null,
-    materialType: 'book', sourceUrl: 'https://example.test',
-    fetchedAt: '2026-11-01T00:00:00Z', payload,
+    source,
+    externalRecordId: source + '-1',
+    workExternalId: null,
+    isbn13: isbn,
+    isbn10: null,
+    title,
+    authors: ['Author'],
+    publisher: null,
+    publicationYear: year,
+    language: null,
+    binding: null,
+    materialType: 'book',
+    sourceUrl: 'https://example.test',
+    fetchedAt: '2026-11-01T00:00:00Z',
+    payload,
     payloadHash: payloadHash(payload),
   };
 }
@@ -22,12 +32,18 @@ test('trusted BN ISBN creates edition despite translation and year disagreement'
     const bn = record('bn', 'Era Mroku: antologia opowiadań', 2019);
     const ol = record('open_library', 'Era Mroku', 2011);
     const offer = repo.upsertOffer({
-      source: 'test', normalizedUrl: 'https://example.test/offer',
-      originalTitle: 'Era Mroku Herezja Horusa', observedIsbn: isbn,
+      source: 'test',
+      normalizedUrl: 'https://example.test/offer',
+      originalTitle: 'Era Mroku Herezja Horusa',
+      observedIsbn: isbn,
     });
     repo.putMetadataEvidence({
-      id: 'structured-isbn-evidence', offerId: offer.id, fieldName: 'isbn',
-      value: isbn, classification: 'structured', sourceType: 'scanner:test',
+      id: 'structured-isbn-evidence',
+      offerId: offer.id,
+      fieldName: 'isbn',
+      value: isbn,
+      classification: 'structured',
+      sourceType: 'scanner:test',
       observedAt: new Date('2026-11-01T00:00:00Z'),
     });
     const result = await new CatalogResolver({
@@ -35,23 +51,30 @@ test('trusted BN ISBN creates edition despite translation and year disagreement'
       lookupMetadata: async () => ({
         bn: { status: 'found', records: [bn] },
         openLibrary: { status: 'found', records: [ol] },
-        comparison: { status: 'conflict', conflicts: [
-          { type: 'field_conflict', field: 'title' },
-          { type: 'field_conflict', field: 'publicationYear' },
-        ] },
+        comparison: {
+          status: 'conflict',
+          conflicts: [
+            { type: 'field_conflict', field: 'title' },
+            { type: 'field_conflict', field: 'publicationYear' },
+          ],
+        },
       }),
     }).resolve({ offerId: offer.id });
     assert.equal(result.decision, 'created_work_and_edition');
     assert.equal(repo.findEditionByISBN(isbn)?.publication_year, 2019);
-  } finally { repo.close(); }
+  } finally {
+    repo.close();
+  }
 });
 test('ISBN whose record shares no word with the listing is held for review', async () => {
   const repo = new SqliteCatalogRepository(':memory:');
   try {
     const bn = record('bn', 'Completely Different Title', 2019);
     const offer = repo.upsertOffer({
-      source: 'test', normalizedUrl: 'https://example.test/other',
-      originalTitle: 'Era Mroku', observedIsbn: isbn,
+      source: 'test',
+      normalizedUrl: 'https://example.test/other',
+      originalTitle: 'Era Mroku',
+      observedIsbn: isbn,
     });
     const result = await new CatalogResolver({
       repository: repo,
@@ -64,5 +87,7 @@ test('ISBN whose record shares no word with the listing is held for review', asy
     assert.equal(result.decision, 'review_required');
     assert.deepEqual(result.reason, ['isbn_title_mismatch']);
     assert.equal(repo.counts().works, 0);
-  } finally { repo.close(); }
+  } finally {
+    repo.close();
+  }
 });

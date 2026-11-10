@@ -4,13 +4,52 @@ import { brandWords } from './universes.mjs';
 // (the same work exists in many editions, translations and ISBNs).
 
 const STOP = new Set([
-  'w', 'i', 'z', 'na', 'do', 'od', 'po', 'za', 'ze', 'o', 'a', 'the', 'of', 'and', 'oraz', 'dla', 'czyli',
+  'w',
+  'i',
+  'z',
+  'na',
+  'do',
+  'od',
+  'po',
+  'za',
+  'ze',
+  'o',
+  'a',
+  'the',
+  'of',
+  'and',
+  'oraz',
+  'dla',
+  'czyli',
 ]);
 // Words sellers add that are not part of the bibliographic title.
 const SELLER_NOISE = new Set([
-  'ksiazka', 'ksiazki', 'ksiazek', 'nowa', 'nowe', 'nowy', 'uzywana', 'uzywane', 'stan', 'bdb', 'idealny',
-  'okazja', 'wysylka', 'gratis', 'polecam', 'wydanie', 'wyd', 'pierwsze', 'polskie', 'twarda', 'miekka',
-  'oprawa', 'okladka', 'unikat', 'rzadkosc', 'kolekcjonerskie',
+  'ksiazka',
+  'ksiazki',
+  'ksiazek',
+  'nowa',
+  'nowe',
+  'nowy',
+  'uzywana',
+  'uzywane',
+  'stan',
+  'bdb',
+  'idealny',
+  'okazja',
+  'wysylka',
+  'gratis',
+  'polecam',
+  'wydanie',
+  'wyd',
+  'pierwsze',
+  'polskie',
+  'twarda',
+  'miekka',
+  'oprawa',
+  'okladka',
+  'unikat',
+  'rzadkosc',
+  'kolekcjonerskie',
 ]);
 // Universe / brand names that appear on the cover but rarely in the catalogued title.
 // Universe / brand words, from the universes table.
@@ -63,7 +102,12 @@ export function searchVariants(offerTitle, { max = 4 } = {}) {
   const out = [];
   const add = (phrase) => {
     const text = phrase.replace(/\s+/g, ' ').trim();
-    if (fold(text).length >= 4 && titleTokens(text).length && !out.some((x) => fold(x) === fold(text))) out.push(text);
+    if (
+      fold(text).length >= 4 &&
+      titleTokens(text).length &&
+      !out.some((x) => fold(x) === fold(text))
+    )
+      out.push(text);
   };
   const words = cleaned.split(/\s+/).filter(Boolean);
   const withoutBrand = (list) => list.filter((word) => !BRAND.has(fold(word)));
@@ -71,7 +115,10 @@ export function searchVariants(offerTitle, { max = 4 } = {}) {
   add(cleaned);
   // Sellers append the author ("... Warcraft Christie Golden"); catalogue titles do not contain it.
   if (words.length >= 5) add(words.slice(0, -2).join(' '));
-  const pieces = cleaned.split(/\s[-–—|]\s|\s*[|:.]\s+/).map((piece) => piece.trim()).filter(Boolean);
+  const pieces = cleaned
+    .split(/\s[-–—|]\s|\s*[|:.]\s+/)
+    .map((piece) => piece.trim())
+    .filter(Boolean);
   if (pieces.length > 1)
     for (const piece of pieces) {
       const own = withoutBrand(piece.split(/\s+/));
@@ -104,13 +151,16 @@ const DERIVATIVE =
 /** The companion-product word of `offerTitle` that `candidateTitle` lacks, or null. */
 export function derivativeMarker(offerTitle, candidateTitle = '') {
   const candidate = ` ${fold(candidateTitle)} `;
-  for (const match of ` ${fold(offerTitle)} `.matchAll(DERIVATIVE)) if (!candidate.includes(` ${match[1]}`)) return match[1];
+  for (const match of ` ${fold(offerTitle)} `.matchAll(DERIVATIVE))
+    if (!candidate.includes(` ${match[1]}`)) return match[1];
   return null;
 }
 
 /** Author name words of a candidate (first and last names, folded), as written in listings. */
 export function authorTokens(candidate) {
-  return titleTokens(candidate.authorText ?? (candidate.authors ?? []).join(' ')).filter((word) => word.length > 3);
+  return titleTokens(candidate.authorText ?? (candidate.authors ?? []).join(' ')).filter(
+    (word) => word.length > 3,
+  );
 }
 
 /**
@@ -129,15 +179,18 @@ export function scoreCandidate(offerTitle, candidate, { knownAuthors = null } = 
   let score = 0.75 * candidateCoverage + 0.25 * Math.min(1, offerCoverage * 1.6);
   const wanted = extractVolume(offerTitle);
   const found = candidateVolume(candidate);
-  if (wanted != null && found != null) score = wanted === found ? Math.min(1, score + 0.08) : score * 0.4;
+  if (wanted != null && found != null)
+    score = wanted === found ? Math.min(1, score + 0.08) : score * 0.4;
   // The author written in the listing is a strong confirmation.
   const authorWords = titleTokens(candidate.authorText ?? (candidate.authors ?? []).join(' '));
   const surnames = authorWords.slice(0, 2);
   const ownAuthor = authorWords.some((word) => word.length > 3 && offer.has(word));
-  if (surnames.some((word) => word.length > 3 && offer.has(word))) score = Math.min(1, score + 0.07);
+  if (surnames.some((word) => word.length > 3 && offer.has(word)))
+    score = Math.min(1, score + 0.07);
   if (!ownAuthor && knownAuthors) {
     const own = new Set([...authorWords, ...main]);
-    if ([...offer].some((word) => word.length > 3 && knownAuthors.has(word) && !own.has(word))) score *= 0.55;
+    if ([...offer].some((word) => word.length > 3 && knownAuthors.has(word) && !own.has(word)))
+      score *= 0.55;
   }
   // A one-word title found inside a long listing ("Smoki" in a twelve-word title) is weak evidence
   // on its own: below the proposal threshold unless the author confirms it.
@@ -151,24 +204,35 @@ export function rankCandidates(offerTitle, candidates, { limit = 6 } = {}) {
   // The other candidates' authors tell which author a listing names.
   const knownAuthors = new Set(candidates.flatMap(authorTokens));
   const ranked = candidates
-    .map((candidate) => ({ ...candidate, score: scoreCandidate(offerTitle, candidate, { knownAuthors }) }))
+    .map((candidate) => ({
+      ...candidate,
+      score: scoreCandidate(offerTitle, candidate, { knownAuthors }),
+    }))
     .filter((candidate) => candidate.score >= 0.35)
-    .sort((a, b) => b.score - a.score || String(b.publicationYear).localeCompare(String(a.publicationYear)));
+    .sort(
+      (a, b) =>
+        b.score - a.score || String(b.publicationYear).localeCompare(String(a.publicationYear)),
+    );
   const best = ranked[0];
   let confidence = 'none';
   if (best) {
     // Rivals with a different title make a proposal ambiguous; other editions of the same book do not.
     const rival = ranked.find(
       (candidate) =>
-        fold(String(candidate.title).split(' / ')[0]) !== fold(String(best.title).split(' / ')[0]) &&
-        candidate.score > best.score - 0.15,
+        fold(String(candidate.title).split(' / ')[0]) !==
+          fold(String(best.title).split(' / ')[0]) && candidate.score > best.score - 0.15,
     );
     confidence = best.score >= 0.85 && !rival ? 'high' : best.score >= 0.6 ? 'medium' : 'low';
   }
   return { candidates: ranked.slice(0, limit), confidence };
 }
 
-export function saveProposal(repository, job, { queries, candidates, confidence }, now = () => new Date()) {
+export function saveProposal(
+  repository,
+  job,
+  { queries, candidates, confidence },
+  now = () => new Date(),
+) {
   const best = candidates[0] ?? null;
   repository.database
     .prepare(
@@ -191,7 +255,9 @@ export function saveProposal(repository, job, { queries, candidates, confidence 
 }
 
 export function loadProposal(repository, jobId) {
-  const row = repository.database.prepare('SELECT * FROM title_proposals WHERE job_id=?').get(jobId);
+  const row = repository.database
+    .prepare('SELECT * FROM title_proposals WHERE job_id=?')
+    .get(jobId);
   return row
     ? {
         jobId,
@@ -204,7 +270,11 @@ export function loadProposal(repository, jobId) {
 }
 
 /** Looks the offer's title up in the national catalogue and stores ranked proposals. */
-export async function computeProposal(catalog, job, { now = () => new Date(), maxQueries = 3 } = {}) {
+export async function computeProposal(
+  catalog,
+  job,
+  { now = () => new Date(), maxQueries = 3 } = {},
+) {
   const queries = searchVariants(job.original_title, { max: maxQueries });
   const pool = new Map();
   const unavailable = new Set();
@@ -217,13 +287,15 @@ export async function computeProposal(catalog, job, { now = () => new Date(), ma
       throw error;
     }
     for (const source of result.unavailable ?? []) unavailable.add(source);
-    for (const candidate of result.candidates ?? []) if (!pool.has(candidate.isbn)) pool.set(candidate.isbn, candidate);
+    for (const candidate of result.candidates ?? [])
+      if (!pool.has(candidate.isbn)) pool.set(candidate.isbn, candidate);
     // A confident hit on the first phrase needs no further requests.
     if (rankCandidates(job.original_title, [...pool.values()]).confidence === 'high') break;
   }
   const ranked = rankCandidates(job.original_title, [...pool.values()]);
   // Do not cache an empty answer that is only the result of a source outage.
-  if (!ranked.candidates.length && unavailable.size) return { ...ranked, queries, unavailable: [...unavailable], stored: false };
+  if (!ranked.candidates.length && unavailable.size)
+    return { ...ranked, queries, unavailable: [...unavailable], stored: false };
   saveProposal(catalog.repository, job, { queries, ...ranked }, now);
   return { ...ranked, queries, unavailable: [...unavailable], stored: true };
 }
@@ -284,10 +356,18 @@ export function rescoreStoredProposals(repository) {
       continue;
     }
     if (!Array.isArray(stored) || !stored.length) continue;
-    const { candidates, confidence } = rankCandidates(row.original_title, stored, { limit: stored.length });
+    const { candidates, confidence } = rankCandidates(row.original_title, stored, {
+      limit: stored.length,
+    });
     const best = candidates[0] ?? null;
     if (confidence === row.confidence && (best?.score ?? null) === row.best_score) continue;
-    update.run(JSON.stringify(candidates), best?.isbn ?? null, best?.score ?? null, confidence, row.job_id);
+    update.run(
+      JSON.stringify(candidates),
+      best?.isbn ?? null,
+      best?.score ?? null,
+      confidence,
+      row.job_id,
+    );
     changed += 1;
   }
   return changed;

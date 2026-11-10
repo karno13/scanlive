@@ -20,8 +20,15 @@ function offer(repo, n, queries, at, availability = 'unconfirmed') {
   });
 }
 const status = (repo, n) =>
-  repo.database.prepare('SELECT availability FROM offers WHERE normalized_url=?').get(`https://www.vinted.pl/items/${n}`).availability;
-const complete = { source: 'Vinted', query: 'Warcraft', status: 'ok', pagination: { state: 'end' } };
+  repo.database
+    .prepare('SELECT availability FROM offers WHERE normalized_url=?')
+    .get(`https://www.vinted.pl/items/${n}`).availability;
+const complete = {
+  source: 'Vinted',
+  query: 'Warcraft',
+  status: 'ok',
+  pagination: { state: 'end' },
+};
 
 test('only a finished, successful scan counts as evidence that an offer is gone', () => {
   assert.equal(completeResults([complete]).length, 1);
@@ -37,13 +44,19 @@ test('offers missing from a complete scan of their phrase are marked, seen ones 
   offer(repo, 3, ['Warhammer'], T1);
   offer(repo, 2, ['Warcraft'], T2); // still listed in the latest scan
   assert.equal(markUnseenOffers(repo.database, [complete], T2), 1);
-  assert.deepEqual([status(repo, 1), status(repo, 2), status(repo, 3)], ['not_seen', 'unconfirmed', 'unconfirmed']);
+  assert.deepEqual(
+    [status(repo, 1), status(repo, 2), status(repo, 3)],
+    ['not_seen', 'unconfirmed', 'unconfirmed'],
+  );
 });
 
 test('an incomplete scan never marks anything, and a re-seen offer returns to unconfirmed', () => {
   const repo = new SqliteCatalogRepository(':memory:');
   offer(repo, 1, ['Warcraft'], T1);
-  assert.equal(markUnseenOffers(repo.database, [{ ...complete, pagination: { state: 'unknown' } }], T2), 0);
+  assert.equal(
+    markUnseenOffers(repo.database, [{ ...complete, pagination: { state: 'unknown' } }], T2),
+    0,
+  );
   assert.equal(markUnseenOffers(repo.database, [complete], T2), 1);
   assert.equal(status(repo, 1), 'not_seen');
   offer(repo, 1, ['Warcraft'], '2026-11-06T10:00:00.000Z'); // listed again

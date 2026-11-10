@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readSeries, writeSeries, seriesSummary } from '../app/views/series.js';
 function storage() {
   const map = new Map();
-  return { getItem: key => map.get(key) ?? null, setItem: (key,value) => map.set(key,value) };
+  return { getItem: (key) => map.get(key) ?? null, setItem: (key, value) => map.set(key, value) };
 }
 test('series notes roundtrip', () => {
   const local = storage();
@@ -18,10 +18,10 @@ test('series gap detection never invents missing titles', () => {
     b: { series: 'Warcraft', volume: 3 },
     c: { series: 'Other', volume: 1 },
   });
-  assert.deepEqual(result.find(group => group.name === 'Warcraft').missing, [2]);
-  assert.deepEqual(result.find(group => group.name === 'Other').missing, []);
+  assert.deepEqual(result.find((group) => group.name === 'Warcraft').missing, [2]);
+  assert.deepEqual(result.find((group) => group.name === 'Other').missing, []);
 });
 test('invalid stored data is ignored', () => {
   assert.deepEqual(readSeries({ getItem: () => '{bad' }), {});
-  assert.equal(seriesSummary([{id:'a'}], {a:{series:'abc',volume:-1}}).length, 0);
+  assert.equal(seriesSummary([{ id: 'a' }], { a: { series: 'abc', volume: -1 } }).length, 0);
 });

@@ -7,7 +7,14 @@ import { createProductionCatalog } from './catalog-production.mjs';
 test('scan center displays catalog-wide ISBN counts and review reasons', async () => {
   const html = await readFile(new URL('./app/index.html', import.meta.url), 'utf8');
   const ui = await readFile(new URL('./app/views/scan-insights.js', import.meta.url), 'utf8');
-  for (const id of ['scanIsbnMatched', 'scanIsbnCreated', 'scanIsbnReview', 'scanIsbnNotFound', 'scanIsbnReasons', 'scanIsbnFailures'])
+  for (const id of [
+    'scanIsbnMatched',
+    'scanIsbnCreated',
+    'scanIsbnReview',
+    'scanIsbnNotFound',
+    'scanIsbnReasons',
+    'scanIsbnFailures',
+  ])
     assert.match(html, new RegExp('id="' + id + '"'));
   const app = await readFile(new URL('./app/app.js', import.meta.url), 'utf8');
   assert.match(app, /scanInsights.refreshIsbn\(state.catalog\)/);

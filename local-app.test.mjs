@@ -229,6 +229,14 @@ test('a source that blocks automated requests is not asked again for the other p
   );
   assert.deepEqual(asked, ['Mort'], 'only the first phrase reaches the blocked source');
   assert.equal(result.results.length, 3);
-  assert.ok(result.results.every((row) => row.status === 'unavailable' && row.diagnostic.code === 'SOURCE_HTTP_403'));
-  assert.equal(events.filter((type) => type === 'source-done').length, 3, 'progress still counts every phrase');
+  assert.ok(
+    result.results.every(
+      (row) => row.status === 'unavailable' && row.diagnostic.code === 'SOURCE_HTTP_403',
+    ),
+  );
+  assert.equal(
+    events.filter((type) => type === 'source-done').length,
+    3,
+    'progress still counts every phrase',
+  );
 });

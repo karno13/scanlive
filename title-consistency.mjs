@@ -7,7 +7,6 @@ import { universeSynonyms } from './universes.mjs';
 
 // The same universe written two ways on covers and in BN records.
 
-
 const stem = (token) => token.slice(0, 5);
 
 function stems(text) {
@@ -16,7 +15,11 @@ function stems(text) {
   const words = ` ${folded} `;
   for (const group of universeSynonyms())
     if (group.some((name) => name && words.includes(` ${name} `))) folded += ' ' + group.join(' ');
-  return new Set(titleTokens(folded).filter((token) => !/^\d{1,3}$/.test(token)).map(stem));
+  return new Set(
+    titleTokens(folded)
+      .filter((token) => !/^\d{1,3}$/.test(token))
+      .map(stem),
+  );
 }
 
 function authorText(authors) {
@@ -39,7 +42,9 @@ function authorText(authors) {
 export function titleConflict(offerTitle, record = {}) {
   const offer = stems(offerTitle);
   if (!offer.size) return false;
-  const known = stems([record.title, record.workTitle, authorText(record.authors)].filter(Boolean).join(' '));
+  const known = stems(
+    [record.title, record.workTitle, authorText(record.authors)].filter(Boolean).join(' '),
+  );
   if (!known.size) return false;
   for (const token of offer) if (known.has(token)) return false;
   return true;
@@ -60,7 +65,11 @@ export function findTitleConflicts(repository) {
     .all();
   return rows
     .filter((row) =>
-      titleConflict(row.original_title, { title: row.edition_title, workTitle: row.work_title, authors: row.authors_json }),
+      titleConflict(row.original_title, {
+        title: row.edition_title,
+        workTitle: row.work_title,
+        authors: row.authors_json,
+      }),
     )
     .map((row) => ({
       offerId: row.offer_id,
@@ -103,7 +112,9 @@ export function resolveTitleConflict(repository, input = {}, { now = () => new D
       return { offerId, action, editionId: active.edition_id };
     }
     repository.database
-      .prepare("UPDATE offer_matches SET status='superseded', valid_to=? WHERE offer_id=? AND status='active'")
+      .prepare(
+        "UPDATE offer_matches SET status='superseded', valid_to=? WHERE offer_id=? AND status='active'",
+      )
       .run(at, offerId);
     const result = JSON.stringify({
       decision: 'review_required',
@@ -112,7 +123,9 @@ export function resolveTitleConflict(repository, input = {}, { now = () => new D
       withdrawnAt: at,
     });
     const job = repository.database
-      .prepare("SELECT id FROM identification_jobs WHERE offer_id=? AND job_type='identify_edition'")
+      .prepare(
+        "SELECT id FROM identification_jobs WHERE offer_id=? AND job_type='identify_edition'",
+      )
       .get(offerId);
     if (job)
       repository.database

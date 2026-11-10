@@ -20,28 +20,26 @@ export function availableCatalogMigrations(directory = migrationsDirectory) {
     });
 }
 
-
 /**
  * SQLite cannot ALTER a CHECK constraint. Rebuild the decision table once to
  * admit excluded offers, preserving rows, indexes and triggers from the current
  * schema. This runs inside migration 103 and is idempotent.
  */
 function allowExcludedReviewDecisions(database) {
-  const table = database.prepare(
-    "SELECT sql FROM sqlite_master WHERE type='table' AND name='review_decisions'",
-  ).get();
+  const table = database
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='review_decisions'")
+    .get();
   if (!table) return;
-  const expanded = table.sql.replace(
-    /('not_book'\s*,\s*)('requeued')/,
-    "$1'excluded',$2",
-  );
+  const expanded = table.sql.replace(/('not_book'\s*,\s*)('requeued')/, "$1'excluded',$2");
   if (expanded === table.sql) {
     if (!table.sql.includes("'excluded'")) throw Error('REVIEW_DECISIONS_SCHEMA_UNRECOGNIZED');
     return;
   }
-  const objects = database.prepare(
-    "SELECT sql FROM sqlite_master WHERE type IN ('index','trigger') AND tbl_name='review_decisions' AND sql IS NOT NULL ORDER BY type",
-  ).all();
+  const objects = database
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type IN ('index','trigger') AND tbl_name='review_decisions' AND sql IS NOT NULL ORDER BY type",
+    )
+    .all();
   const createTemp = expanded.replace(
     /^(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?)(?:"review_decisions"|`review_decisions`|review_decisions)/i,
     '$1review_decisions_upgrade',
@@ -52,7 +50,6 @@ function allowExcludedReviewDecisions(database) {
   database.exec('DROP TABLE review_decisions');
   database.exec('ALTER TABLE review_decisions_upgrade RENAME TO review_decisions');
   for (const object of objects) database.exec(object.sql);
-
 }
 
 export function applyCatalogMigrations(

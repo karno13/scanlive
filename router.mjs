@@ -25,7 +25,8 @@ export function createRouter() {
   const router = {
     /** @param {string|string[]} methods @param {string} pattern @param {Function} handler */
     add(methods, pattern, handler) {
-      const list = methods === '*' ? null : [].concat(methods).map((method) => method.toUpperCase());
+      const list =
+        methods === '*' ? null : [].concat(methods).map((method) => method.toUpperCase());
       routes.push({ methods: list, pattern, handler, ...compile(pattern) });
       return router;
     },

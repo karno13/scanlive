@@ -24,25 +24,33 @@ export function validateBookflipRequest(request, access = null) {
   const local = localHosts.has(host);
   // Serve injects this identity header and strips client-supplied copies.
   // Funnel does not provide it; reject Funnel even if exposed accidentally.
-  const viaServe = Boolean(access && host === access.host &&
+  const viaServe = Boolean(
+    access &&
+    host === access.host &&
     isLoopback(request.socket.remoteAddress) &&
-    String(request.headers['tailscale-user-login'] || '').toLowerCase() === access.user);
-  if (!local && !viaServe) return { status:403, error:'INVALID_HOST' };
+    String(request.headers['tailscale-user-login'] || '').toLowerCase() === access.user,
+  );
+  if (!local && !viaServe) return { status: 403, error: 'INVALID_HOST' };
   const origin = request.headers.origin;
   if (origin) {
     let parsed;
-    try { parsed = new URL(origin); }
-    catch { return { status:403, error:'INVALID_ORIGIN' }; }
-    const localOrigin = local && parsed.protocol === 'http:' && localHosts.has(parsed.host.toLowerCase());
+    try {
+      parsed = new URL(origin);
+    } catch {
+      return { status: 403, error: 'INVALID_ORIGIN' };
+    }
+    const localOrigin =
+      local && parsed.protocol === 'http:' && localHosts.has(parsed.host.toLowerCase());
     const remoteOrigin = viaServe && parsed.origin === `https://${access.host}`;
-    if (!localOrigin && !remoteOrigin)
-      return { status:403, error:'INVALID_ORIGIN' };
+    if (!localOrigin && !remoteOrigin) return { status: 403, error: 'INVALID_ORIGIN' };
   }
-  if (['POST','PUT','PATCH','DELETE'].includes(request.method)) {
-    if (!origin) return { status:403, error:'ORIGIN_REQUIRED' };
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
+    if (!origin) return { status: 403, error: 'ORIGIN_REQUIRED' };
     const type = String(request.headers['content-type'] || '')
-      .split(';',1)[0].trim().toLowerCase();
-    if (type !== 'application/json') return { status:415, error:'JSON_REQUIRED' };
+      .split(';', 1)[0]
+      .trim()
+      .toLowerCase();
+    if (type !== 'application/json') return { status: 415, error: 'JSON_REQUIRED' };
   }
   return null;
 }

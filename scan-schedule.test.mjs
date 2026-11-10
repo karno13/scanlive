@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { putScanProfile } from './scan-profiles-api.mjs';
-import { createScanScheduler, getScanSchedule, nextRunAt, saveScanSchedule } from './scan-schedule.mjs';
+import {
+  createScanScheduler,
+  getScanSchedule,
+  nextRunAt,
+  saveScanSchedule,
+} from './scan-schedule.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 
 function setup() {
@@ -13,9 +18,18 @@ function setup() {
 test('the schedule is off by default and validates interval and profile', () => {
   const repo = setup();
   assert.equal(getScanSchedule(repo).enabled, false);
-  assert.throws(() => saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 0 }), /INVALID_SCHEDULE_INTERVAL/);
-  assert.throws(() => saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 999 }), /INVALID_SCHEDULE_INTERVAL/);
-  assert.throws(() => saveScanSchedule(repo, { enabled: true, profile: 'Nie ma', everyHours: 24 }), /SCHEDULE_PROFILE_NOT_FOUND/);
+  assert.throws(
+    () => saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 0 }),
+    /INVALID_SCHEDULE_INTERVAL/,
+  );
+  assert.throws(
+    () => saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 999 }),
+    /INVALID_SCHEDULE_INTERVAL/,
+  );
+  assert.throws(
+    () => saveScanSchedule(repo, { enabled: true, profile: 'Nie ma', everyHours: 24 }),
+    /SCHEDULE_PROFILE_NOT_FOUND/,
+  );
   const saved = saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 12 });
   assert.deepEqual([saved.enabled, saved.profile, saved.everyHours], [true, 'Fantasy', 12]);
 });
@@ -51,7 +65,11 @@ test('a due scan runs the saved profile once and records the attempt', async () 
 test('a manual scan in progress (409) is retried later without recording a run', async () => {
   const repo = setup();
   saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 1 });
-  const scheduler = createScanScheduler({ getRepository: () => repo, runScan: async () => 409, now: () => Date.now() });
+  const scheduler = createScanScheduler({
+    getRepository: () => repo,
+    runScan: async () => 409,
+    now: () => Date.now(),
+  });
   assert.deepEqual(await scheduler.tick(), { skipped: 'scan-running' });
   assert.equal(getScanSchedule(repo).lastRunAt, null);
 });
@@ -80,7 +98,11 @@ test('an enabled schedule whose profile was deleted records "profile-missing" an
   saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 1 });
   repo.database.prepare("DELETE FROM scan_profiles WHERE name='Fantasy'").run();
   let scans = 0;
-  const scheduler = createScanScheduler({ getRepository: () => repo, runScan: async () => (scans++, 200), now: () => Date.now() });
+  const scheduler = createScanScheduler({
+    getRepository: () => repo,
+    runScan: async () => (scans++, 200),
+    now: () => Date.now(),
+  });
   assert.equal((await scheduler.tick()).result, 'profile-missing');
   assert.equal(scans, 0);
 });
@@ -89,17 +111,39 @@ test('scheduled scans leave out sources that failed less than a day ago and repo
   const repo = setup();
   saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 6 });
   const db = repo.database;
-  db.prepare("UPDATE scan_profiles SET sources_json=? WHERE name='Fantasy'").run(JSON.stringify(['Vinted', 'Allegro', 'OLX']));
+  db.prepare("UPDATE scan_profiles SET sources_json=? WHERE name='Fantasy'").run(
+    JSON.stringify(['Vinted', 'Allegro', 'OLX']),
+  );
   const clock = Date.parse('2026-11-07T12:00:00Z');
-  const insert = db.prepare('INSERT INTO source_health(source,last_checked_at,last_success_at,last_error_at,last_error,status) VALUES(?,?,?,?,?,?)');
-  insert.run('Allegro', '2026-11-07T08:00:00.000Z', null, '2026-11-07T08:00:00.000Z', 'SOURCE_CAPTCHA', 'failed');
-  insert.run('OLX', '2026-11-05T08:00:00.000Z', null, '2026-11-05T08:00:00.000Z', 'SOURCE_HTTP_403', 'failed');
+  const insert = db.prepare(
+    'INSERT INTO source_health(source,last_checked_at,last_success_at,last_error_at,last_error,status) VALUES(?,?,?,?,?,?)',
+  );
+  insert.run(
+    'Allegro',
+    '2026-11-07T08:00:00.000Z',
+    null,
+    '2026-11-07T08:00:00.000Z',
+    'SOURCE_CAPTCHA',
+    'failed',
+  );
+  insert.run(
+    'OLX',
+    '2026-11-05T08:00:00.000Z',
+    null,
+    '2026-11-05T08:00:00.000Z',
+    'SOURCE_HTTP_403',
+    'failed',
+  );
   const calls = [];
   const scheduler = createScanScheduler({
     getRepository: () => repo,
     runScan: async (input) => {
       calls.push(input);
-      db.prepare('INSERT INTO scan_runs(scanned_at,summary_json,created_at) VALUES(?,?,?)').run('2026-11-07T12:00:01.000Z', JSON.stringify({ errors: [{ source: 'OLX', query: 'Warcraft', code: 'SOURCE_HTTP_403' }] }), '2026-11-07T12:00:01.000Z');
+      db.prepare('INSERT INTO scan_runs(scanned_at,summary_json,created_at) VALUES(?,?,?)').run(
+        '2026-11-07T12:00:01.000Z',
+        JSON.stringify({ errors: [{ source: 'OLX', query: 'Warcraft', code: 'SOURCE_HTTP_403' }] }),
+        '2026-11-07T12:00:01.000Z',
+      );
       return 200;
     },
     now: () => clock,
@@ -107,7 +151,12 @@ test('scheduled scans leave out sources that failed less than a day ago and repo
   const outcome = await scheduler.tick();
   // Allegro failed 4 h ago: paused. OLX failed 2 days ago: tried again.
   assert.deepEqual(calls[0].sources, ['Vinted', 'OLX']);
-  assert.deepEqual(outcome, { ran: true, result: 'partial', skipped: ['Allegro'], problems: ['OLX'] });
+  assert.deepEqual(outcome, {
+    ran: true,
+    result: 'partial',
+    skipped: ['Allegro'],
+    problems: ['OLX'],
+  });
   assert.deepEqual(getScanSchedule(repo).lastSkipped, ['Allegro']);
   assert.deepEqual(getScanSchedule(repo).lastProblems, ['OLX']);
 });

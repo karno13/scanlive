@@ -9,7 +9,11 @@ import { IdentificationWorker } from './identification-worker.mjs';
 function setup(now) {
   const repository = new SqliteCatalogRepository(':memory:');
   const add = (id, attempts, createdAt) => {
-    const offer = repository.upsertOffer({ source: 'test', normalizedUrl: `https://example.test/${id}`, originalTitle: id });
+    const offer = repository.upsertOffer({
+      source: 'test',
+      normalizedUrl: `https://example.test/${id}`,
+      originalTitle: id,
+    });
     repository.database
       .prepare(
         "INSERT INTO identification_jobs(id,offer_id,job_type,status,attempt_count,created_at,updated_at) VALUES(?,?,'identify_edition','queued',?,?,?)",
@@ -26,11 +30,23 @@ function setup(now) {
     retryDelayMs: 5 * 60_000,
     resolver: { resolve: async ({ offerId }) => results.shift()?.(offerId) },
   });
-  return { repository, worker, results, setClock: (value) => { clock = value; } };
+  return {
+    repository,
+    worker,
+    results,
+    setClock: (value) => {
+      clock = value;
+    },
+  };
 }
 
-const down = () => ({ decision: 'retry_pending', reason: ['metadata_source_temporary_error'], evidence: { bnStatus: 'temporary_error' } });
-const job = (repository, id) => repository.database.prepare('SELECT * FROM identification_jobs WHERE id=?').get(id);
+const down = () => ({
+  decision: 'retry_pending',
+  reason: ['metadata_source_temporary_error'],
+  evidence: { bnStatus: 'temporary_error' },
+});
+const job = (repository, id) =>
+  repository.database.prepare('SELECT * FROM identification_jobs WHERE id=?').get(id);
 
 test('fresh jobs are claimed before a long retry backlog', async () => {
   const { repository, worker, results } = setup(new Date('2026-01-03T00:00:00Z'));
@@ -67,11 +83,21 @@ test('an answer from BN wakes up the jobs waiting out its outage', async () => {
     // A new offer arrives later and BN answers for it.
     const later = new Date(now.getTime() + 2 * 60_000);
     setClock(later);
-    const offer = repository.upsertOffer({ source: 'test', normalizedUrl: 'https://example.test/new', originalTitle: 'new' });
+    const offer = repository.upsertOffer({
+      source: 'test',
+      normalizedUrl: 'https://example.test/new',
+      originalTitle: 'new',
+    });
     repository.database
-      .prepare("INSERT INTO identification_jobs(id,offer_id,job_type,status,created_at,updated_at) VALUES('new',?,'identify_edition','queued',?,?)")
+      .prepare(
+        "INSERT INTO identification_jobs(id,offer_id,job_type,status,created_at,updated_at) VALUES('new',?,'identify_edition','queued',?,?)",
+      )
       .run(offer.id, later.toISOString(), later.toISOString());
-    results.push(() => ({ decision: 'review_required', reason: ['no_isbn_evidence'], evidence: { bnStatus: 'not_found' } }));
+    results.push(() => ({
+      decision: 'review_required',
+      reason: ['no_isbn_evidence'],
+      evidence: { bnStatus: 'not_found' },
+    }));
     await worker.processNext();
     assert.equal(job(repository, 'fresh').run_after, later.toISOString());
     assert.equal(job(repository, 'old-retry').run_after, later.toISOString());

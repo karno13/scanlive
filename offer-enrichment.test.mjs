@@ -4,7 +4,10 @@ import test from 'node:test';
 import { enrichOffers, pendingEnrichment } from './offer-enrichment.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 
-const page = readFileSync(new URL('./fixtures/details/tezeusz-product.html', import.meta.url), 'utf8');
+const page = readFileSync(
+  new URL('./fixtures/details/tezeusz-product.html', import.meta.url),
+  'utf8',
+);
 
 function setup() {
   const repo = new SqliteCatalogRepository(':memory:');
@@ -31,13 +34,19 @@ test('an ISBN found on the detail page is stored as structured evidence and re-q
   assert.equal(report.isbnFound, 1);
   assert.equal(report.requeued, 1);
   assert.equal(
-    repo.database.prepare('SELECT observed_isbn FROM offers WHERE id=?').get(offer.id).observed_isbn,
+    repo.database.prepare('SELECT observed_isbn FROM offers WHERE id=?').get(offer.id)
+      .observed_isbn,
     '9788388916014',
   );
   const evidence = repo.database
-    .prepare("SELECT classification,source_type FROM metadata_evidence WHERE offer_id=? AND field_name='isbn'")
+    .prepare(
+      "SELECT classification,source_type FROM metadata_evidence WHERE offer_id=? AND field_name='isbn'",
+    )
     .get(offer.id);
-  assert.deepEqual({ ...evidence }, { classification: 'structured', source_type: 'detail:Tezeusz.pl' });
+  assert.deepEqual(
+    { ...evidence },
+    { classification: 'structured', source_type: 'detail:Tezeusz.pl' },
+  );
   assert.equal(status(repo, offer.id), 'queued');
   const row = repo.database
     .prepare('SELECT outcome,facts_json FROM offer_enrichment WHERE offer_id=?')
@@ -99,7 +108,8 @@ test('a block stops the run, and failed offers wait before a bounded number of r
   now = new Date(now.getTime() + 2 * 3600_000);
   assert.equal(pendingEnrichment(repo, { now: clock }).length, 0, 'gives up after three attempts');
   assert.equal(
-    repo.database.prepare('SELECT attempts FROM offer_enrichment WHERE offer_id=?').get(first).attempts,
+    repo.database.prepare('SELECT attempts FROM offer_enrichment WHERE offer_id=?').get(first)
+      .attempts,
     3,
   );
 });

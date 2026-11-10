@@ -5,11 +5,19 @@ import { lookupISBN } from './metadata-lookup.mjs';
 test('metadata lookups expose independent provider timings and cache origin', async () => {
   const result = await lookupISBN('9780306406157', {
     bnAdapter: { source: 'bn', lookup: async () => ({ status: 'not_found', records: [] }) },
-    openLibraryAdapter: { source: 'open_library', lookup: async () => ({ status: 'not_found', records: [] }) },
+    openLibraryAdapter: {
+      source: 'open_library',
+      lookup: async () => ({ status: 'not_found', records: [] }),
+    },
     cache: {
-      get: (source) => source === 'bn'
-        ? { result: { status: 'not_found', records: [] }, fetchedAt: '2026-01-01', expiresAt: '2027-01-01' }
-        : null,
+      get: (source) =>
+        source === 'bn'
+          ? {
+              result: { status: 'not_found', records: [] },
+              fetchedAt: '2026-01-01',
+              expiresAt: '2027-01-01',
+            }
+          : null,
       set: () => true,
     },
   });

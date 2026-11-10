@@ -209,7 +209,10 @@ function externalWork(repository, record) {
 /** BN first; Open Library when BN does not know the ISBN or is unreachable and OL has it. */
 function primarySource(result) {
   // After BN: Open Library, then the national ISBN registry (e-ISBN), then Google Books.
-  const fallback = [result.openLibrary, result.eIsbn, result.googleBooks].find((entry) => entry?.status === 'found') ?? null;
+  const fallback =
+    [result.openLibrary, result.eIsbn, result.googleBooks].find(
+      (entry) => entry?.status === 'found',
+    ) ?? null;
   if (result.bn?.status === 'not_found') return fallback ?? result.openLibrary;
   if (result.bn?.status === 'temporary_error' && fallback) return fallback;
   return result.bn;
@@ -217,7 +220,7 @@ function primarySource(result) {
 
 function mergeRecords(result, chosen = null) {
   const source = primarySource(result);
-  const records = source?.status === 'found' ? source.records ?? [] : [];
+  const records = source?.status === 'found' ? (source.records ?? []) : [];
   if (chosen) return { record: chosen, records: [chosen] };
   return records.length === 1 ? { record: records[0], records } : null;
 }
@@ -231,23 +234,33 @@ function mergeRecords(result, chosen = null) {
  * - exactly one record agrees with the listing title — that one.
  */
 export function chooseAmongRecords(records, offerTitle, { recordId = null } = {}) {
-  if (recordId) return records.find((record) => String(record.externalRecordId) === String(recordId)) ?? null;
+  if (recordId)
+    return records.find((record) => String(record.externalRecordId) === String(recordId)) ?? null;
   const titles = new Set(records.map((record) => text(mainTitle(record.title))));
   if (titles.size === 1 && !titles.has(''))
-    return [...records].sort((a, b) => (Number(a.publicationYear) || 9999) - (Number(b.publicationYear) || 9999))[0];
+    return [...records].sort(
+      (a, b) => (Number(a.publicationYear) || 9999) - (Number(b.publicationYear) || 9999),
+    )[0];
   if (!offerTitle) return null;
-  const agreeing = records.filter((record) => !titleConflict(offerTitle, { title: record.title, authors: record.authors }) &&
-    text(offerTitle).includes(text(mainTitle(record.title))));
+  const agreeing = records.filter(
+    (record) =>
+      !titleConflict(offerTitle, { title: record.title, authors: record.authors }) &&
+      text(offerTitle).includes(text(mainTitle(record.title))),
+  );
   return agreeing.length === 1 ? agreeing[0] : null;
 }
 
 /** An ISBN typed or chosen by the operator in review is their assertion: no title check. */
 function operatorEvidence(evidence) {
-  return (evidence?.observations ?? []).some((row) => String(row.source ?? '').startsWith('review:'));
+  return (evidence?.observations ?? []).some((row) =>
+    String(row.source ?? '').startsWith('review:'),
+  );
 }
 
 function allRecords(metadata) {
-  return [metadata?.bn, metadata?.openLibrary, metadata?.eIsbn, metadata?.googleBooks].flatMap((entry) => (entry?.status === 'found' ? entry.records ?? [] : []));
+  return [metadata?.bn, metadata?.openLibrary, metadata?.eIsbn, metadata?.googleBooks].flatMap(
+    (entry) => (entry?.status === 'found' ? (entry.records ?? []) : []),
+  );
 }
 
 function offerTitleOf(offer) {
@@ -306,14 +319,23 @@ export class CatalogResolver {
     return extractOfferISBN(candidate);
   }
 
-  async resolve({ offerId = null, offer = null, evidence = null, dryRun = false, recordId = null } = {}) {
+  async resolve({
+    offerId = null,
+    offer = null,
+    evidence = null,
+    dryRun = false,
+    recordId = null,
+  } = {}) {
     const storedOffer = offerId
       ? this.repository.database.prepare('SELECT * FROM offers WHERE id=?').get(offerId)
       : null;
     const currentOffer = { ...(storedOffer ?? {}), ...(offer ?? {}) };
-    if (offerId && this.repository.database.prepare(
-      'SELECT offer_id FROM offer_sets WHERE offer_id=?',
-    ).get(offerId))
+    if (
+      offerId &&
+      this.repository.database
+        .prepare('SELECT offer_id FROM offer_sets WHERE offer_id=?')
+        .get(offerId)
+    )
       return decision('review_required', ['offer_is_set'], null);
     const isbnEvidence = canonicalEvidence(evidence) ?? this.evidenceForOffer(currentOffer);
     const proof = { isbn: isbnEvidence, metadataRecords: [] };
@@ -322,10 +344,14 @@ export class CatalogResolver {
     // Game rulebooks and foreign editions never enter the catalogue automatically; an ISBN the
     // operator typed or chose still does.
     // The offer's own language (Vinted detail, Empik category) counts as much as its title.
-    const foreignLanguage = currentOffer.language && !/^(?:pl|pol|polish|polski|język polski)$/i.test(String(currentOffer.language).trim());
-    const material = offerId && !manualProtected && !operatorEvidence(isbnEvidence)
-      ? notCatalogueMaterial(offerTitleOf(currentOffer)) ?? (foreignLanguage ? 'foreign_edition' : null)
-      : null;
+    const foreignLanguage =
+      currentOffer.language &&
+      !/^(?:pl|pol|polish|polski|język polski)$/i.test(String(currentOffer.language).trim());
+    const material =
+      offerId && !manualProtected && !operatorEvidence(isbnEvidence)
+        ? (notCatalogueMaterial(offerTitleOf(currentOffer)) ??
+          (foreignLanguage ? 'foreign_edition' : null))
+        : null;
     if (material) return decision('review_required', [material], proof);
 
     if (isbnEvidence.status === 'missing')
@@ -359,7 +385,12 @@ export class CatalogResolver {
 
     const isbn = normalizeISBN(isbnEvidence.isbn ?? isbnEvidence.candidateIsbn);
     // Several books in one listing, one ISBN shown: the operator decides (usually "mark as set").
-    if (offerId && !manualProtected && !operatorEvidence(isbnEvidence) && this.#looksLikeBundle(offerTitleOf(currentOffer)))
+    if (
+      offerId &&
+      !manualProtected &&
+      !operatorEvidence(isbnEvidence) &&
+      this.#looksLikeBundle(offerTitleOf(currentOffer))
+    )
       return decision('review_required', ['possible_bundle'], proof, {}, { candidate: { isbn } });
     const existing = this.repository.findEditionByISBN(isbn);
     if (manualProtected && existing && manual.edition_id !== existing.id)
@@ -378,7 +409,12 @@ export class CatalogResolver {
       return this.#matchExisting(existing, currentOffer, offerId, isbnEvidence, proof, dryRun);
 
     const metadata = await this.lookupMetadata(isbn);
-    proof.metadataRecords = [metadata.bn, metadata.openLibrary, metadata.eIsbn, metadata.googleBooks]
+    proof.metadataRecords = [
+      metadata.bn,
+      metadata.openLibrary,
+      metadata.eIsbn,
+      metadata.googleBooks,
+    ]
       .flatMap((entry) => entry?.records ?? [])
       .map((record) => ({
         source: record.source,
@@ -388,7 +424,10 @@ export class CatalogResolver {
       }));
     proof.bnStatus = metadata.bn?.status ?? null;
     if (metadata.bn?.status === 'temporary_error')
-      proof.bnError = metadata.bn.error?.code || metadata.bn.error?.message || (metadata.bn.httpStatus ? `HTTP ${metadata.bn.httpStatus}` : null);
+      proof.bnError =
+        metadata.bn.error?.code ||
+        metadata.bn.error?.message ||
+        (metadata.bn.httpStatus ? `HTTP ${metadata.bn.httpStatus}` : null);
     const source = primarySource(metadata);
     if (source?.status === 'temporary_error')
       return decision('retry_pending', ['metadata_source_temporary_error'], proof);
@@ -404,17 +443,28 @@ export class CatalogResolver {
         return this.#matchExisting(linked, currentOffer, offerId, isbnEvidence, proof, dryRun);
       chosen = chooseAmongRecords(source.records, offerTitleOf(currentOffer), { recordId });
       if (!chosen)
-        return decision('review_required', ['multiple_metadata_records'], proof, {}, {
-          records: source.records.map((record) => ({
-            id: record.externalRecordId, source: record.source, title: record.title,
-            authors: record.authors, publisher: record.publisher, publicationYear: record.publicationYear,
-          })),
-        });
+        return decision(
+          'review_required',
+          ['multiple_metadata_records'],
+          proof,
+          {},
+          {
+            records: source.records.map((record) => ({
+              id: record.externalRecordId,
+              source: record.source,
+              title: record.title,
+              authors: record.authors,
+              publisher: record.publisher,
+              publicationYear: record.publicationYear,
+            })),
+          },
+        );
     }
     const selected = chosen ? mergeRecords(metadata, chosen) : mergeRecords(metadata);
-    const isbnMatches = (record) => [record.isbn10, record.isbn13]
-      .flatMap((value) => value ? isbnKeys(value) : [])
-      .some((key) => isbnKeys(isbn).includes(key));
+    const isbnMatches = (record) =>
+      [record.isbn10, record.isbn13]
+        .flatMap((value) => (value ? isbnKeys(value) : []))
+        .some((key) => isbnKeys(isbn).includes(key));
     if (!isbnMatches(selected.record))
       return decision('review_required', ['metadata_isbn_mismatch'], proof);
     const context = { matches: ['isbn'], conflicts: [], sufficient: true };
@@ -465,13 +515,25 @@ export class CatalogResolver {
         { context, dryRun },
       );
     // The operator removed this edition from this offer: never put it back automatically.
-    if (offerId && !operatorEvidence(isbnEvidence) && operatorRejectedEditions(this.repository, offerId).has(edition.id))
-      return decision('review_required', ['operator_rejected_edition'], proof, { workId: edition.work_id });
+    if (
+      offerId &&
+      !operatorEvidence(isbnEvidence) &&
+      operatorRejectedEditions(this.repository, offerId).has(edition.id)
+    )
+      return decision('review_required', ['operator_rejected_edition'], proof, {
+        workId: edition.work_id,
+      });
     if (offerId && !operatorEvidence(isbnEvidence)) {
       const work = this.repository.database
         .prepare('SELECT title, authors_json FROM works WHERE id=?')
         .get(edition.work_id);
-      if (titleConflict(offerTitleOf(offer), { title: edition.title, workTitle: work?.title, authors: work?.authors_json }))
+      if (
+        titleConflict(offerTitleOf(offer), {
+          title: edition.title,
+          workTitle: work?.title,
+          authors: work?.authors_json,
+        })
+      )
         return decision('review_required', ['isbn_title_mismatch'], proof, {
           workId: edition.work_id,
           editionId: edition.id,
@@ -524,13 +586,21 @@ export class CatalogResolver {
       !operatorEvidence(isbnEvidence) &&
       titleConflict(offerTitleOf(currentOffer), {
         // Any source agreeing with the listing is enough (BN and Open Library may word it differently).
-        title: allRecords(metadata).map((record) => record.title).join(' '),
+        title: allRecords(metadata)
+          .map((record) => record.title)
+          .join(' '),
         authors: allRecords(metadata).flatMap((record) => record.authors ?? []),
       })
     )
-      return decision('review_required', ['isbn_title_mismatch'], proof, {}, {
-        candidate: { title: selected.record.title, authors: selected.record.authors, isbn },
-      });
+      return decision(
+        'review_required',
+        ['isbn_title_mismatch'],
+        proof,
+        {},
+        {
+          candidate: { title: selected.record.title, authors: selected.record.authors, isbn },
+        },
+      );
     const existingWork = externalWork(
       this.repository,
       selected.records.find((record) => record.workExternalId),
@@ -539,7 +609,12 @@ export class CatalogResolver {
     // the existing work instead of creating a new one.
     const sameBook = existingWork
       ? null
-      : findWorkByKey(this.repository, selected.record.title, selected.record.authors, selected.record.originalTitle);
+      : findWorkByKey(
+          this.repository,
+          selected.record.title,
+          selected.record.authors,
+          selected.record.originalTitle,
+        );
     const reuseWork = existingWork ?? sameBook;
     const workId =
       reuseWork?.id ?? stableId('resolver_work', selected.record.workExternalId ?? isbn);
@@ -556,21 +631,25 @@ export class CatalogResolver {
     if (dryRun)
       return decision(
         type,
-        [
-          workReason ?? 'no_external_work_match',
-          'metadata_and_offer_context_match',
-        ],
+        [workReason ?? 'no_external_work_match', 'metadata_and_offer_context_match'],
         proof,
         {
           workId,
           editionId,
           offerMatchId: offerId ? stableId('resolver_match', offerId, editionId) : null,
         },
-        { context, dryRun: true, candidate: {
-          title: selected.record.title, authors: selected.record.authors,
-          publisher: selected.record.publisher, publicationYear: selected.record.publicationYear,
-          language: selected.record.language, isbn,
-        } },
+        {
+          context,
+          dryRun: true,
+          candidate: {
+            title: selected.record.title,
+            authors: selected.record.authors,
+            publisher: selected.record.publisher,
+            publicationYear: selected.record.publicationYear,
+            language: selected.record.language,
+            isbn,
+          },
+        },
       );
 
     return this.repository.transaction(() => {
@@ -614,10 +693,14 @@ export class CatalogResolver {
             at: this.now(),
           });
       }
-      persistMetadataResults(this.repository, [metadata.bn, metadata.openLibrary, metadata.eIsbn, metadata.googleBooks].filter(Boolean), {
-        workId: work.id,
-        editionId: edition.id,
-      });
+      persistMetadataResults(
+        this.repository,
+        [metadata.bn, metadata.openLibrary, metadata.eIsbn, metadata.googleBooks].filter(Boolean),
+        {
+          workId: work.id,
+          editionId: edition.id,
+        },
+      );
       const externalRows = this.repository.database
         .prepare(
           `SELECT id,record_type FROM external_records WHERE (provider,external_id) IN (${selected.records.map(() => '(?,?)').join(',')})`,
@@ -647,7 +730,12 @@ export class CatalogResolver {
       enrichEdition(this.repository, edition.id, { now: this.now });
       // The publisher's own series statement from the national ISBN registry.
       if (selected.record.source === 'e_isbn' && selected.record.payload?.onix?.series?.length)
-        storeSeriesStatements(this.repository, edition.id, selected.record.payload.onix.series, 'e_isbn');
+        storeSeriesStatements(
+          this.repository,
+          edition.id,
+          selected.record.payload.onix.series,
+          'e_isbn',
+        );
       const matchId = offerId ? stableId('resolver_match', offerId, edition.id) : null;
       if (offerId)
         this.repository.assignOfferToEdition(offerId, edition.id, {
@@ -660,10 +748,7 @@ export class CatalogResolver {
         });
       return decision(
         type,
-        [
-          workReason ?? 'new_external_work',
-          'metadata_and_offer_context_match',
-        ],
+        [workReason ?? 'new_external_work', 'metadata_and_offer_context_match'],
         proof,
         { workId: work.id, editionId: edition.id, offerMatchId: matchId },
         { context, dryRun: false },

@@ -4,7 +4,9 @@ import { scanCancelled, awaitScan } from '../scan-cancellation.mjs';
 test('aborted operations stop without awaiting an unfinished source request', async () => {
   const controller = new AbortController();
   let finish;
-  const work = new Promise(resolve => { finish = resolve; });
+  const work = new Promise((resolve) => {
+    finish = resolve;
+  });
   const task = awaitScan(work, controller.signal);
   controller.abort();
   await assert.rejects(task, /SCAN_CANCELLED/);
@@ -14,5 +16,5 @@ test('aborted operations stop without awaiting an unfinished source request', as
 });
 test('successful source work keeps its original result', async () => {
   const controller = new AbortController();
-  assert.equal(await awaitScan(Promise.resolve(42), controller.signal),42);
+  assert.equal(await awaitScan(Promise.resolve(42), controller.signal), 42);
 });

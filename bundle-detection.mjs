@@ -18,7 +18,12 @@ export function looksLikeBundle(title) {
   if (/\p{L}\s*\+\s*\p{L}/u.test(raw)) return true;
   // fold() turns "–" and "-" into spaces; keep the dash visible for ranges ("tomy 1–4").
   const text = fold(raw.replace(/[–—-]/g, ' - ')).replace(/\s+/g, ' ');
-  const dashed = raw.toLowerCase().replace(/ł/g, 'l').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[–—]/g, '-');
+  const dashed = raw
+    .toLowerCase()
+    .replace(/ł/g, 'l')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[–—]/g, '-');
   return PATTERNS.some((pattern) => pattern.test(text) || pattern.test(dashed));
 }
 
@@ -32,17 +37,39 @@ export function looksLikeBundle(title) {
 export function createCatalogBundleDetector(repository) {
   const db = repository.database;
   const rows = db
-    .prepare('SELECT id, title, authors_json FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id=w.id)')
+    .prepare(
+      'SELECT id, title, authors_json FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id=w.id)',
+    )
     .all();
-  const parse = (text) => { try { return JSON.parse(text || '[]'); } catch { return []; } };
-  const authorWords = new Set(rows.flatMap((row) => titleTokens(parse(row.authors_json).join(' '))));
+  const parse = (text) => {
+    try {
+      return JSON.parse(text || '[]');
+    } catch {
+      return [];
+    }
+  };
+  const authorWords = new Set(
+    rows.flatMap((row) => titleTokens(parse(row.authors_json).join(' '))),
+  );
   const cycles = new Map();
-  for (const row of db.prepare("SELECT e.work_id, s.name FROM edition_series s JOIN editions e ON e.id=s.edition_id WHERE s.kind='cycle'").all()) {
+  for (const row of db
+    .prepare(
+      "SELECT e.work_id, s.name FROM edition_series s JOIN editions e ON e.id=s.edition_id WHERE s.kind='cycle'",
+    )
+    .all()) {
     if (!cycles.has(row.work_id)) cycles.set(row.work_id, []);
     cycles.get(row.work_id).push(' ' + titleTokens(row.name, { dropBrand: true }).join(' ') + ' ');
   }
   const works = rows
-    .map((row) => ({ id: row.id, own: titleTokens(String(row.title).split(' / ')[0].split(/\s*:\s*/)[0], { dropBrand: true }) }))
+    .map((row) => ({
+      id: row.id,
+      own: titleTokens(
+        String(row.title)
+          .split(' / ')[0]
+          .split(/\s*:\s*/)[0],
+        { dropBrand: true },
+      ),
+    }))
     .filter((work) => work.own.length >= 2 && !work.own.every((word) => authorWords.has(word)));
   const index = new Map();
   for (const work of works) {
@@ -51,12 +78,32 @@ export function createCatalogBundleDetector(repository) {
   }
   return (title) => {
     // "Gdyby jednak | Autorka Fourth Wing", "w stylu Fourth Wing": another book named as a reference.
-    if (/\b(?:autork|autor[a ]|autorstwa|w stylu|dla fan|fani )/i.test(fold(title) + ' ')) return [];
+    if (/\b(?:autork|autor[a ]|autorstwa|w stylu|dla fan|fani )/i.test(fold(title) + ' '))
+      return [];
     const words = new Set(titleTokens(title, { dropBrand: true }));
-    let hits = [...words].flatMap((word) => index.get(word) || []).filter((work) => work.own.every((word) => words.has(word)));
+    let hits = [...words]
+      .flatMap((word) => index.get(word) || [])
+      .filter((work) => work.own.every((word) => words.has(word)));
     // "Wrota Baldura II: Cienie Amnu" also contains "Wrota Baldura": keep the longer title only.
-    hits = hits.filter((hit) => !hits.some((other) => other !== hit && other.own.length > hit.own.length && hit.own.every((word) => other.own.includes(word))));
-    hits = hits.filter((hit) => !hits.some((other) => other !== hit && (cycles.get(other.id) || []).some((cycle) => cycle.includes(' ' + hit.own.join(' ') + ' '))));
+    hits = hits.filter(
+      (hit) =>
+        !hits.some(
+          (other) =>
+            other !== hit &&
+            other.own.length > hit.own.length &&
+            hit.own.every((word) => other.own.includes(word)),
+        ),
+    );
+    hits = hits.filter(
+      (hit) =>
+        !hits.some(
+          (other) =>
+            other !== hit &&
+            (cycles.get(other.id) || []).some((cycle) =>
+              cycle.includes(' ' + hit.own.join(' ') + ' '),
+            ),
+        ),
+    );
     const byTitle = new Map(hits.map((hit) => [hit.own.join(' '), hit.id]));
     return byTitle.size >= 2 ? [...byTitle.values()] : [];
   };
@@ -69,10 +116,15 @@ export function createCatalogBundleDetector(repository) {
  */
 export function reviewAutomaticBundleMatches(repository, { now = () => new Date() } = {}) {
   const v1 = requeueAutomaticMatches(repository, 'bundle_review_v1', () => looksLikeBundle, now);
-  const v2 = requeueAutomaticMatches(repository, 'bundle_review_v2', () => {
-    const detect = createCatalogBundleDetector(repository);
-    return (title) => detect(title).length >= 2;
-  }, now);
+  const v2 = requeueAutomaticMatches(
+    repository,
+    'bundle_review_v2',
+    () => {
+      const detect = createCatalogBundleDetector(repository);
+      return (title) => detect(title).length >= 2;
+    },
+    now,
+  );
   return { skipped: v1.skipped && v2.skipped, requeued: (v1.requeued || 0) + (v2.requeued || 0) };
 }
 
@@ -91,7 +143,9 @@ function requeueAutomaticMatches(repository, key, makeTest, now) {
     .filter((row) => test(row.original_title));
   repository.transaction(() => {
     for (const row of rows) {
-      db.prepare("UPDATE offer_matches SET status='superseded', valid_to=? WHERE id=? AND status='active'").run(at, row.id);
+      db.prepare(
+        "UPDATE offer_matches SET status='superseded', valid_to=? WHERE id=? AND status='active'",
+      ).run(at, row.id);
       db.prepare(
         `UPDATE identification_jobs SET status='queued', run_after=NULL, lease_token=NULL, lease_expires_at=NULL,
            last_error=NULL, result_json=NULL, attempt_count=0, updated_at=? WHERE offer_id=? AND status<>'running'`,

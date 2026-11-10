@@ -18,7 +18,10 @@ import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import { findDuplicateWorkGroups, findWorkByKey } from './work-grouping.mjs';
 
 // An edition created before migration 112: glued BN title and authors, payload kept.
-function legacyEdition(repository, { id = 'e1', workId = 'w1', status = 'verified', payload = KINSLAYER } = {}) {
+function legacyEdition(
+  repository,
+  { id = 'e1', workId = 'w1', status = 'verified', payload = KINSLAYER } = {},
+) {
   repository.createWork({
     id: workId,
     title: payload.title,
@@ -68,7 +71,11 @@ test('existing editions are upgraded from the stored MARC record without the net
         ['Jacek Czuba', 'translator'],
       ],
     );
-    assert.ok(editionSeries(repository, 'e1').some((entry) => entry.name === 'Herezja Horusa' && entry.volume === 30));
+    assert.ok(
+      editionSeries(repository, 'e1').some(
+        (entry) => entry.name === 'Herezja Horusa' && entry.volume === 30,
+      ),
+    );
     assert.equal(upgradeCatalogBibliography(repository).skipped, true, 'runs once');
   } finally {
     repository.close();
@@ -128,11 +135,29 @@ test('the original title joins translations published under different Polish tit
   try {
     legacyEdition(repository);
     upgradeCatalogBibliography(repository);
-    assert.equal(findWorkByKey(repository, 'Pogromca krewniaków', ['David Guymer'], 'Kinslayer')?.id, 'w1');
-    assert.equal(findWorkByKey(repository, 'Pogromca krewniaków', ['Inny Autor'], 'Kinslayer'), null);
-    repository.createWork({ id: 'w2', title: 'Pogromca krewniaków', authors: ['David Guymer'], verificationStatus: 'verified' });
-    repository.createEdition({ id: 'e2', workId: 'w2', title: 'Pogromca krewniaków', verificationStatus: 'verified' });
-    repository.database.prepare("UPDATE editions SET original_title='Kinslayer' WHERE id='e2'").run();
+    assert.equal(
+      findWorkByKey(repository, 'Pogromca krewniaków', ['David Guymer'], 'Kinslayer')?.id,
+      'w1',
+    );
+    assert.equal(
+      findWorkByKey(repository, 'Pogromca krewniaków', ['Inny Autor'], 'Kinslayer'),
+      null,
+    );
+    repository.createWork({
+      id: 'w2',
+      title: 'Pogromca krewniaków',
+      authors: ['David Guymer'],
+      verificationStatus: 'verified',
+    });
+    repository.createEdition({
+      id: 'e2',
+      workId: 'w2',
+      title: 'Pogromca krewniaków',
+      verificationStatus: 'verified',
+    });
+    repository.database
+      .prepare("UPDATE editions SET original_title='Kinslayer' WHERE id='e2'")
+      .run();
     const groups = findDuplicateWorkGroups(repository);
     assert.equal(groups.length, 1);
     assert.deepEqual(groups[0].works.map((work) => work.id).sort(), ['w1', 'w2']);
@@ -198,7 +223,10 @@ test('a new catalogue edition gets people and series from its BN record', async 
       originalTitle: 'Kinslayer',
       payload: KINSLAYER,
     };
-    const result = await new CatalogResolver({ repository, lookupMetadata: lookupWith(record) }).resolve({
+    const result = await new CatalogResolver({
+      repository,
+      lookupMetadata: lookupWith(record),
+    }).resolve({
       offerId: offer.id,
     });
     assert.equal(result.decision, 'created_work_and_edition');
@@ -207,7 +235,9 @@ test('a new catalogue edition gets people and series from its BN record', async 
       ['author', 'translator'],
     );
     assert.equal(
-      repository.database.prepare('SELECT original_title FROM editions WHERE id=?').get(result.editionId).original_title,
+      repository.database
+        .prepare('SELECT original_title FROM editions WHERE id=?')
+        .get(result.editionId).original_title,
       'Kinslayer',
     );
   } finally {
@@ -223,11 +253,21 @@ test('earlier automatic assignments of set listings go back to review once', () 
       ['bundle', 'Świat Dysku 6 tomów'],
       ['single', 'Zabójca krasnoludów'],
     ]) {
-      repository.upsertOffer({ id, source: 'fixture', normalizedUrl: `https://example.test/${id}`, originalTitle: title });
-      repository.assignOfferToEdition(id, 'e1', { id: `m-${id}`, method: 'structured_isbn', status: 'active' });
+      repository.upsertOffer({
+        id,
+        source: 'fixture',
+        normalizedUrl: `https://example.test/${id}`,
+        originalTitle: title,
+      });
+      repository.assignOfferToEdition(id, 'e1', {
+        id: `m-${id}`,
+        method: 'structured_isbn',
+        status: 'active',
+      });
     }
     assert.deepEqual(reviewAutomaticBundleMatches(repository), { skipped: false, requeued: 1 });
-    const status = (id) => repository.database.prepare('SELECT status FROM offer_matches WHERE id=?').get(id).status;
+    const status = (id) =>
+      repository.database.prepare('SELECT status FROM offer_matches WHERE id=?').get(id).status;
     assert.equal(status('m-bundle'), 'superseded');
     assert.equal(status('m-single'), 'active');
     assert.equal(reviewAutomaticBundleMatches(repository).skipped, true);

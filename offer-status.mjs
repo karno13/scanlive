@@ -3,14 +3,24 @@
 // that found it sold. A listing the seller took down and put up again (Vinted gives it a new
 // number) is linked to its earlier copy, so the earlier one is not mistaken for a sold book.
 
-const STATUSES = new Set(['seen', 'not_seen', 'available', 'reserved', 'sold', 'unavailable', 'unknown']);
+const STATUSES = new Set([
+  'seen',
+  'not_seen',
+  'available',
+  'reserved',
+  'sold',
+  'unavailable',
+  'unknown',
+]);
 
 export function recordOfferStatus(database, offerId, status, observedAt, via = 'scan') {
   if (!STATUSES.has(status) || !observedAt) return false;
   return (
     Number(
       database
-        .prepare('INSERT OR IGNORE INTO offer_status_history(offer_id,status,via,observed_at) VALUES(?,?,?,?)')
+        .prepare(
+          'INSERT OR IGNORE INTO offer_status_history(offer_id,status,via,observed_at) VALUES(?,?,?,?)',
+        )
         .run(offerId, status, via, String(observedAt)).changes,
     ) === 1
   );
@@ -18,7 +28,9 @@ export function recordOfferStatus(database, offerId, status, observedAt, via = '
 
 export function offerStatusHistory(database, offerId) {
   return database
-    .prepare('SELECT status, via, observed_at AS observedAt FROM offer_status_history WHERE offer_id=? ORDER BY observed_at, id')
+    .prepare(
+      'SELECT status, via, observed_at AS observedAt FROM offer_status_history WHERE offer_id=? ORDER BY observed_at, id',
+    )
     .all(offerId)
     .map((row) => ({ ...row }));
 }
@@ -53,7 +65,10 @@ const titleKey = (title) =>
     .replace(/ł/g, 'l')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
-const isbnKey = (value) => String(value ?? '').replace(/[^0-9X]/gi, '').toUpperCase();
+const isbnKey = (value) =>
+  String(value ?? '')
+    .replace(/[^0-9X]/gi, '')
+    .toUpperCase();
 
 /**
  * Links new listings to the same seller's earlier listing of the same title or ISBN that
@@ -96,7 +111,8 @@ export function detectRelists(repository, { now = () => new Date() } = {}) {
   );
   let linked = 0;
   repository.transaction(() => {
-    for (const [offerId, { previousId, reason }] of chosen) linked += Number(insert.run(offerId, previousId, reason, at, at).changes);
+    for (const [offerId, { previousId, reason }] of chosen)
+      linked += Number(insert.run(offerId, previousId, reason, at, at).changes);
   });
   return { linked };
 }
@@ -104,7 +120,9 @@ export function detectRelists(repository, { now = () => new Date() } = {}) {
 /** The operator says these are two different listings: the link stays in history as undone. */
 export function undoRelist(repository, offerId, { now = () => new Date() } = {}) {
   const result = repository.database
-    .prepare("UPDATE offer_relists SET status='undone', updated_at=? WHERE offer_id=? AND status='active'")
+    .prepare(
+      "UPDATE offer_relists SET status='undone', updated_at=? WHERE offer_id=? AND status='active'",
+    )
     .run(now().toISOString(), String(offerId));
   if (!Number(result.changes)) throw Object.assign(Error('RELIST_NOT_FOUND'), { statusCode: 404 });
   return { offerId: String(offerId), status: 'undone' };

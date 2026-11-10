@@ -90,23 +90,41 @@ test('invalid manual book does not leave partial SQLite records', () => {
 });
 
 test('a scan returns its saved offers from SQL, without price judgements or the history model', () => {
- const catalog=createProductionCatalog({databasePath:':memory:'});
- try {
-  const urls=[1,2,3].map(i => 'https://www.vinted.pl/items/'+i+'-test');
-  const all=urls.map((url,i)=>({source:'Vinted',url,title:'Test '+i,price:3000+i*1000}));
-  persistSqliteScan(catalog,{offers:all,searchedAt:first});
-  const book=createSqliteBook(catalog,{title:'Test wyceny'});
-  for(const url of urls) {
-   linkSqliteOffer(catalog,{offerId:sourceOfferId('Vinted',url),bookId:book.book.id});
+  const catalog = createProductionCatalog({ databasePath: ':memory:' });
+  try {
+    const urls = [1, 2, 3].map((i) => 'https://www.vinted.pl/items/' + i + '-test');
+    const all = urls.map((url, i) => ({
+      source: 'Vinted',
+      url,
+      title: 'Test ' + i,
+      price: 3000 + i * 1000,
+    }));
+    persistSqliteScan(catalog, { offers: all, searchedAt: first });
+    const book = createSqliteBook(catalog, { title: 'Test wyceny' });
+    for (const url of urls) {
+      linkSqliteOffer(catalog, { offerId: sourceOfferId('Vinted', url), bookId: book.book.id });
+    }
+    const result = persistSqliteScan(catalog, {
+      offers: [{ ...all[0], price: 2500 }],
+      searchedAt: second,
+    });
+    assert.equal(result.offers.length, 1);
+    assert.equal(result.offers[0].id, sourceOfferId('Vinted', urls[0]));
+    assert.equal(result.offers[0].price, 2500);
+    assert.equal(result.offers[0].bookId, book.book.id);
+    assert.equal(
+      result.offers[0].assessment,
+      undefined,
+      'statistics are computed where they are shown',
+    );
+    assert.equal(result.history.saved, 3);
+    assert.deepEqual(
+      sqliteHistoryModel(catalog.repository, { bookId: book.book.id, includePriceHistory: false })
+        .priceHistory,
+      [],
+    );
+    assert.equal(sqliteHistoryModel(catalog.repository).priceHistory.length, 4);
+  } finally {
+    catalog.close();
   }
-  const result=persistSqliteScan(catalog,{offers:[{...all[0],price:2500}],searchedAt:second});
-  assert.equal(result.offers.length,1);
-  assert.equal(result.offers[0].id,sourceOfferId('Vinted',urls[0]));
-  assert.equal(result.offers[0].price,2500);
-  assert.equal(result.offers[0].bookId,book.book.id);
-  assert.equal(result.offers[0].assessment,undefined,'statistics are computed where they are shown');
-  assert.equal(result.history.saved,3);
-  assert.deepEqual(sqliteHistoryModel(catalog.repository,{bookId:book.book.id,includePriceHistory:false}).priceHistory,[]);
-  assert.equal(sqliteHistoryModel(catalog.repository).priceHistory.length,4);
- } finally {catalog.close();}
 });

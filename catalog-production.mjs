@@ -38,8 +38,8 @@ export function createProductionCatalog({
   } catch (error) {
     console.error('BIBLIOGRAPHY_UPGRADE_FAILED', error?.message ?? error);
   }
-  const bnLimiter=new SourceRateLimiter({minIntervalMs:1_000});
-  const openLibraryLimiter=new SourceRateLimiter({minIntervalMs:1_000});
+  const bnLimiter = new SourceRateLimiter({ minIntervalMs: 1_000 });
+  const openLibraryLimiter = new SourceRateLimiter({ minIntervalMs: 1_000 });
   const bnAdapter = createBnAdapter({
     fetcher,
     limiter: bnLimiter,
@@ -66,12 +66,14 @@ export function createProductionCatalog({
     userAgent: `BookFlip/2.0 (catalog resolver; ${contact})`,
   });
   const titleBnRequest = createJsonRequester({
-    fetcher, limiter: bnLimiter,
+    fetcher,
+    limiter: bnLimiter,
     timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
     retries: 1,
   });
   const titleOlRequest = createJsonRequester({
-    fetcher, limiter: openLibraryLimiter,
+    fetcher,
+    limiter: openLibraryLimiter,
     timeoutMs: Number(process.env.BOOKFLIP_METADATA_TIMEOUT_MS ?? 8_000),
     retries: 1,
     headers: { 'User-Agent': `BookFlip/2.0 (title lookup; ${contact})` },
@@ -121,7 +123,13 @@ export function createProductionCatalog({
       });
     },
     lookupIsbn(isbn) {
-      return lookupISBN(isbn, { bnAdapter, openLibraryAdapter, eIsbnAdapter, googleBooksAdapter, cache });
+      return lookupISBN(isbn, {
+        bnAdapter,
+        openLibraryAdapter,
+        eIsbnAdapter,
+        googleBooksAdapter,
+        cache,
+      });
     },
     resolveIsbn(isbn, { dryRun = false } = {}) {
       return resolver.resolve({
@@ -162,7 +170,9 @@ export function createProductionCatalog({
         WHERE job_id=NEW.id;
       END;`);
       db.exec('DELETE FROM temp.identification_run_items');
-      db.prepare("INSERT INTO temp.identification_run_items(job_id,status) SELECT id,status FROM identification_jobs WHERE status IN ('queued','running','retry_wait')").run();
+      db.prepare(
+        "INSERT INTO temp.identification_run_items(job_id,status) SELECT id,status FROM identification_jobs WHERE status IN ('queued','running','retry_wait')",
+      ).run();
       this.identificationRunStartedAt = startedAt;
     },
     status({ runStartedAt = null } = {}) {
@@ -177,60 +187,111 @@ export function createProductionCatalog({
           .get().count,
       );
       const identification = Object.fromEntries(
-        repository.database.prepare(
-          "SELECT status, count(*) AS count FROM identification_jobs GROUP BY status",
-        ).all().map((row) => [row.status, Number(row.count)]),
+        repository.database
+          .prepare('SELECT status, count(*) AS count FROM identification_jobs GROUP BY status')
+          .all()
+          .map((row) => [row.status, Number(row.count)]),
       );
       const decisions = Object.fromEntries(
-        repository.database.prepare(
-          "SELECT json_extract(result_json, '$.decision') AS decision, count(*) AS count FROM identification_jobs WHERE status='completed' AND json_valid(result_json) GROUP BY decision",
-        ).all().filter((row) => row.decision).map((row) => [row.decision, Number(row.count)]),
+        repository.database
+          .prepare(
+            "SELECT json_extract(result_json, '$.decision') AS decision, count(*) AS count FROM identification_jobs WHERE status='completed' AND json_valid(result_json) GROUP BY decision",
+          )
+          .all()
+          .filter((row) => row.decision)
+          .map((row) => [row.decision, Number(row.count)]),
       );
-      const manualDecisions = Object.fromEntries(repository.database.prepare(
-        "SELECT action, count(*) AS count FROM review_decisions GROUP BY action",
-      ).all().map((row) => [row.action, Number(row.count)]));
+      const manualDecisions = Object.fromEntries(
+        repository.database
+          .prepare('SELECT action, count(*) AS count FROM review_decisions GROUP BY action')
+          .all()
+          .map((row) => [row.action, Number(row.count)]),
+      );
       const nowIso = new Date().toISOString();
-      const runnable = Number(repository.database.prepare(
-        "SELECT count(*) AS count FROM identification_jobs WHERE (status='queued' OR status='retry_wait') AND (run_after IS NULL OR run_after<=?)",
-      ).get(nowIso).count);
-      const waiting = Number(repository.database.prepare(
-        "SELECT count(*) AS count FROM identification_jobs WHERE status='retry_wait' AND run_after>?",
-      ).get(nowIso).count);
-      const failureReasons = repository.database.prepare(
-        "SELECT last_error AS code, count(*) AS count FROM identification_jobs WHERE status='failed' GROUP BY last_error ORDER BY count DESC LIMIT 5",
-      ).all().map((row) => ({
-        // Never expose arbitrary exception messages in the diagnostics UI.
-        code: /^[A-Z][A-Z0-9_]{1,63}$/.test(String(row.code || ''))
-          ? row.code : 'OTHER_ERROR',
-        count: Number(row.count),
-      }));
-      const reviewReasons = repository.database.prepare(
-        "SELECT je.value AS code, count(*) AS count FROM identification_jobs j, json_each(CASE WHEN json_valid(j.result_json) THEN j.result_json ELSE '{}' END, '$.reason') je WHERE j.status='review_required' AND json_valid(j.result_json) AND je.type='text' GROUP BY je.value ORDER BY count DESC LIMIT 10",
-      ).all().map((row) => ({
-        code: /^[a-z][a-z0-9_]{1,63}$/.test(String(row.code || '')) ? row.code : 'other_reason',
-        count: Number(row.count),
-      }));
+      const runnable = Number(
+        repository.database
+          .prepare(
+            "SELECT count(*) AS count FROM identification_jobs WHERE (status='queued' OR status='retry_wait') AND (run_after IS NULL OR run_after<=?)",
+          )
+          .get(nowIso).count,
+      );
+      const waiting = Number(
+        repository.database
+          .prepare(
+            "SELECT count(*) AS count FROM identification_jobs WHERE status='retry_wait' AND run_after>?",
+          )
+          .get(nowIso).count,
+      );
+      const failureReasons = repository.database
+        .prepare(
+          "SELECT last_error AS code, count(*) AS count FROM identification_jobs WHERE status='failed' GROUP BY last_error ORDER BY count DESC LIMIT 5",
+        )
+        .all()
+        .map((row) => ({
+          // Never expose arbitrary exception messages in the diagnostics UI.
+          code: /^[A-Z][A-Z0-9_]{1,63}$/.test(String(row.code || '')) ? row.code : 'OTHER_ERROR',
+          count: Number(row.count),
+        }));
+      const reviewReasons = repository.database
+        .prepare(
+          "SELECT je.value AS code, count(*) AS count FROM identification_jobs j, json_each(CASE WHEN json_valid(j.result_json) THEN j.result_json ELSE '{}' END, '$.reason') je WHERE j.status='review_required' AND json_valid(j.result_json) AND je.type='text' GROUP BY je.value ORDER BY count DESC LIMIT 10",
+        )
+        .all()
+        .map((row) => ({
+          code: /^[a-z][a-z0-9_]{1,63}$/.test(String(row.code || '')) ? row.code : 'other_reason',
+          count: Number(row.count),
+        }));
       let run = null;
       if (this.identificationRunStartedAt && this.identificationRunStartedAt === runStartedAt) {
-        const runStatuses = Object.fromEntries(repository.database.prepare(
-          'SELECT status,count(*) AS count FROM temp.identification_run_items GROUP BY status',
-        ).all().map((row) => [row.status, Number(row.count)]));
-        const runDecisions = Object.fromEntries(repository.database.prepare(
-          'SELECT decision,count(*) AS count FROM temp.identification_run_items WHERE decision IS NOT NULL GROUP BY decision',
-        ).all().map((row) => [row.decision, Number(row.count)]));
+        const runStatuses = Object.fromEntries(
+          repository.database
+            .prepare(
+              'SELECT status,count(*) AS count FROM temp.identification_run_items GROUP BY status',
+            )
+            .all()
+            .map((row) => [row.status, Number(row.count)]),
+        );
+        const runDecisions = Object.fromEntries(
+          repository.database
+            .prepare(
+              'SELECT decision,count(*) AS count FROM temp.identification_run_items WHERE decision IS NOT NULL GROUP BY decision',
+            )
+            .all()
+            .map((row) => [row.decision, Number(row.count)]),
+        );
         run = {
           startedAt: runStartedAt,
           statuses: runStatuses,
           decisions: runDecisions,
-          assigned: Number(runDecisions.matched_existing || 0) + Number(runDecisions.created_edition || 0) + Number(runDecisions.created_work_and_edition || 0),
+          assigned:
+            Number(runDecisions.matched_existing || 0) +
+            Number(runDecisions.created_edition || 0) +
+            Number(runDecisions.created_work_and_edition || 0),
         };
       }
       return {
         enabled: true,
         counts: { ...counts, identification_pending: pending, metadata_lookup_cache: cache },
-        identification: { statuses: identification, decisions, manualDecisions, runnable, waiting, failureReasons, reviewReasons,
-          assigned: Number(repository.database.prepare("SELECT count(DISTINCT offer_id) AS count FROM offer_matches WHERE status='active'").get().count),
-          batch:worker.lastBatch || null,automaticPending:runnable+waiting+Number(identification.running||0),manualReview:Number(identification.review_required||0),run },
+        identification: {
+          statuses: identification,
+          decisions,
+          manualDecisions,
+          runnable,
+          waiting,
+          failureReasons,
+          reviewReasons,
+          assigned: Number(
+            repository.database
+              .prepare(
+                "SELECT count(DISTINCT offer_id) AS count FROM offer_matches WHERE status='active'",
+              )
+              .get().count,
+          ),
+          batch: worker.lastBatch || null,
+          automaticPending: runnable + waiting + Number(identification.running || 0),
+          manualReview: Number(identification.review_required || 0),
+          run,
+        },
       };
     },
     close() {

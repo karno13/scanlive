@@ -4,7 +4,13 @@
 import { readSourceHtml } from './marketplaces.mjs';
 import { CHECK_TIERS, detectRelists, recordOfferStatus } from './offer-status.mjs';
 
-export const LIFECYCLE_SOURCES = new Set(['Vinted', 'Allegro Lokalnie', 'Tezeusz.pl', 'Dedalus.pl', 'Empik']);
+export const LIFECYCLE_SOURCES = new Set([
+  'Vinted',
+  'Allegro Lokalnie',
+  'Tezeusz.pl',
+  'Dedalus.pl',
+  'Empik',
+]);
 
 /** 'sold' | 'reserved' | 'hidden' | 'available' | null (cannot tell) from a Vinted item page. */
 export function parseVintedStatus(html, itemId) {
@@ -14,7 +20,11 @@ export function parseVintedStatus(html, itemId) {
   // Sidebar plugins: {"data":{...},"exposures":[],"name":"buyer_item_status"} — read the data object
   // that precedes the plugin name, and only when it belongs to this item.
   const plugin = (name) => {
-    for (let index = text.indexOf('"name":"' + name + '"'); index > 0; index = text.indexOf('"name":"' + name + '"', index + 1)) {
+    for (
+      let index = text.indexOf('"name":"' + name + '"');
+      index > 0;
+      index = text.indexOf('"name":"' + name + '"', index + 1)
+    ) {
       const before = text.slice(Math.max(0, index - 600), index);
       const start = before.lastIndexOf('{"data":');
       const data = start >= 0 ? before.slice(start) : '';
@@ -38,14 +48,19 @@ export function parseVintedStatus(html, itemId) {
 
 const vintedId = (url) => String(url).match(/\/items\/(\d+)/)?.[1] ?? null;
 
-export function pendingLifecycleChecks(repository, { limit = 8, now = () => new Date(), sources = [...LIFECYCLE_SOURCES] } = {}) {
+export function pendingLifecycleChecks(
+  repository,
+  { limit = 8, now = () => new Date(), sources = [...LIFECYCLE_SOURCES] } = {},
+) {
   const at = now().getTime();
   const marks = sources.map(() => '?').join(',');
   // Price tiers (CHECK_TIERS): expensive listings are checked sooner after they leave the scans and
   // again more often; within the due ones the most expensive go first, never-checked before rechecks.
   const tier = () =>
     'CASE ' +
-    CHECK_TIERS.slice(0, -1).map((t) => `WHEN coalesce(current_price,0)>=${t.minPrice} THEN ?`).join(' ') +
+    CHECK_TIERS.slice(0, -1)
+      .map((t) => `WHEN coalesce(current_price,0)>=${t.minPrice} THEN ?`)
+      .join(' ') +
     ' ELSE ? END';
   const cutoffs = (field) => CHECK_TIERS.map((t) => new Date(at - t[field]).toISOString());
   return repository.database
@@ -55,7 +70,12 @@ export function pendingLifecycleChecks(repository, { limit = 8, now = () => new 
          AND last_seen_at < ${tier()} AND (availability_checked_at IS NULL OR availability_checked_at < ${tier()})
        ORDER BY coalesce(current_price,0) DESC, availability_checked_at IS NOT NULL, availability_checked_at, last_seen_at LIMIT ?`,
     )
-    .all(...sources, ...cutoffs('notSeenMs'), ...cutoffs('recheckMs'), Math.max(1, Math.min(100, limit)));
+    .all(
+      ...sources,
+      ...cutoffs('notSeenMs'),
+      ...cutoffs('recheckMs'),
+      Math.max(1, Math.min(100, limit)),
+    );
 }
 
 function save(repository, offer, availability, at) {
@@ -73,9 +93,23 @@ function save(repository, offer, availability, at) {
 
 export async function checkOfferLifecycle(
   repository,
-  { fetchHtml = (url, source) => readSourceHtml(url, { source }), limit = 8, now = () => new Date(), signal = null } = {},
+  {
+    fetchHtml = (url, source) => readSourceHtml(url, { source }),
+    limit = 8,
+    now = () => new Date(),
+    signal = null,
+  } = {},
 ) {
-  const report = { checked: 0, sold: 0, reserved: 0, removed: 0, available: 0, unknown: 0, errors: 0, stopped: null };
+  const report = {
+    checked: 0,
+    sold: 0,
+    reserved: 0,
+    removed: 0,
+    available: 0,
+    unknown: 0,
+    errors: 0,
+    stopped: null,
+  };
   const blocked = new Set();
   for (const offer of pendingLifecycleChecks(repository, { limit, now })) {
     if (signal?.aborted) break;

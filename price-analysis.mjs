@@ -50,9 +50,19 @@ export function bookStatistics(raw, bookId) {
 // Build every book's aggregates in one pass over offers and observations.
 export function allBookStatistics(raw) {
   const history = migrateOfferHistory(raw);
-  const groups = new Map(Object.values(history.books).map(book => [book.id, {
-    book, ids: new Set(), prices: [], sum: 0, lowest: null, historical: null,
-  }]));
+  const groups = new Map(
+    Object.values(history.books).map((book) => [
+      book.id,
+      {
+        book,
+        ids: new Set(),
+        prices: [],
+        sum: 0,
+        lowest: null,
+        historical: null,
+      },
+    ]),
+  );
   for (const offer of Object.values(history.offers)) {
     const group = groups.get(offer.bookId);
     if (!group) continue;
@@ -60,17 +70,19 @@ export function allBookStatistics(raw) {
     if (offer.currentPrice > 0 && offer.availability !== 'unavailable') {
       group.prices.push(offer.currentPrice);
       group.sum += offer.currentPrice;
-      group.lowest = group.lowest === null ? offer.currentPrice : Math.min(group.lowest, offer.currentPrice);
+      group.lowest =
+        group.lowest === null ? offer.currentPrice : Math.min(group.lowest, offer.currentPrice);
     }
   }
   const offerGroups = new Map();
-  for (const group of groups.values())
-    for (const id of group.ids) offerGroups.set(id, group);
+  for (const group of groups.values()) for (const id of group.ids) offerGroups.set(id, group);
   for (const point of history.priceHistory) {
     const group = offerGroups.get(point.offerId);
-    if (group) group.historical = group.historical === null ? point.price : Math.min(group.historical, point.price);
+    if (group)
+      group.historical =
+        group.historical === null ? point.price : Math.min(group.historical, point.price);
   }
-  return [...groups.values()].map(group => ({
+  return [...groups.values()].map((group) => ({
     book: group.book,
     currentOffers: group.prices.length,
     uniqueOffers: group.ids.size,
@@ -83,8 +95,12 @@ export function allBookStatistics(raw) {
 
 function emptyAssessment() {
   return {
-    label: 'Brak oceny', code: 'none', reason: 'Za mało danych do oceny',
-    median: null, differencePercent: null, comparableOffers: 0,
+    label: 'Brak oceny',
+    code: 'none',
+    reason: 'Za mało danych do oceny',
+    median: null,
+    differencePercent: null,
+    comparableOffers: 0,
   };
 }
 
@@ -93,17 +109,21 @@ function emptyAssessment() {
 function buildComparables(history, bookIds) {
   const grouped = new Map();
   for (const offer of Object.values(history.offers)) {
-    if (!bookIds.has(offer.bookId) || !(offer.currentPrice > 0) ||
-        offer.availability === 'unavailable') continue;
+    if (
+      !bookIds.has(offer.bookId) ||
+      !(offer.currentPrice > 0) ||
+      offer.availability === 'unavailable'
+    )
+      continue;
     if (!grouped.has(offer.bookId)) grouped.set(offer.bookId, []);
     grouped.get(offer.bookId).push(offer);
   }
   const prepared = new Map();
   for (const [bookId, offers] of grouped) {
-    offers.sort((a,b) => a.currentPrice - b.currentPrice);
+    offers.sort((a, b) => a.currentPrice - b.currentPrice);
     prepared.set(bookId, {
       offers,
-      indexes: new Map(offers.map((item,index) => [item.id,index])),
+      indexes: new Map(offers.map((item, index) => [item.id, index])),
     });
   }
   return prepared;
@@ -114,31 +134,42 @@ function assessPrepared(offer, prepared, config = PRICE_CLASSIFICATION) {
   const sorted = group?.offers || [];
   const removed = group?.indexes.get(offer.id) ?? -1;
   const count = sorted.length - (removed >= 0 ? 1 : 0);
-  const nth = index => sorted[index + (removed >= 0 && index >= removed ? 1 : 0)].currentPrice;
+  const nth = (index) => sorted[index + (removed >= 0 && index >= removed ? 1 : 0)].currentPrice;
   const middle = Math.floor(count / 2);
-  const benchmark = !count ? null : count % 2 ? nth(middle) :
-    (nth(middle - 1) + nth(middle)) / 2;
+  const benchmark = !count ? null : count % 2 ? nth(middle) : (nth(middle - 1) + nth(middle)) / 2;
   if (count < config.minimumComparableOffers || !benchmark)
     return {
-      label: 'Brak oceny', code: 'none', reason: 'Za mało danych do oceny',
-      median: benchmark, differencePercent: null, comparableOffers: count,
+      label: 'Brak oceny',
+      code: 'none',
+      reason: 'Za mało danych do oceny',
+      median: benchmark,
+      differencePercent: null,
+      comparableOffers: count,
     };
   const difference = ((offer.currentPrice - benchmark) / benchmark) * 100;
   const discount = -difference;
   let label, code;
   if (discount >= config.dealDiscount) {
-    label = 'Okazja'; code = 'deal';
+    label = 'Okazja';
+    code = 'deal';
   } else if (discount >= config.goodDiscount) {
-    label = 'Dobra cena'; code = 'good';
+    label = 'Dobra cena';
+    code = 'good';
   } else if (Math.abs(difference) <= config.marketRange) {
-    label = 'Cena rynkowa'; code = 'market';
+    label = 'Cena rynkowa';
+    code = 'market';
   } else if (difference > config.marketRange) {
-    label = 'Drogo'; code = 'expensive';
+    label = 'Drogo';
+    code = 'expensive';
   } else {
-    label = 'Cena rynkowa'; code = 'market';
+    label = 'Cena rynkowa';
+    code = 'market';
   }
   return {
-    label, code, reason: null, median: benchmark,
+    label,
+    code,
+    reason: null,
+    median: benchmark,
     differencePercent: Math.round(difference * 10) / 10,
     comparableOffers: count,
   };
@@ -153,11 +184,12 @@ export function assessOffer(raw, offerId, config = PRICE_CLASSIFICATION) {
 export function analyzedOffers(raw, ids = null) {
   const history = migrateOfferHistory(raw),
     selected = ids ? new Set(ids) : null;
-  const offers = Object.values(history.offers)
-    .filter(offer => !selected || selected.has(offer.id));
-  const books = new Set(offers.map(offer => offer.bookId).filter(Boolean));
+  const offers = Object.values(history.offers).filter(
+    (offer) => !selected || selected.has(offer.id),
+  );
+  const books = new Set(offers.map((offer) => offer.bookId).filter(Boolean));
   const prepared = books.size ? buildComparables(history, books) : new Map();
-  return offers.map(offer => ({
+  return offers.map((offer) => ({
     ...offer,
     price: offer.currentPrice,
     assessment: assessPrepared(offer, prepared),

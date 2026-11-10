@@ -4,21 +4,49 @@
 // (BOOKFLIP_GOOGLE_BOOKS_KEY). The key is sent to Google only and never stored.
 import { normalizeISBN } from '../isbn-normalization.mjs';
 import { createJsonRequester } from '../metadata-http.mjs';
-import { buildNormalizedRecord, matchingISBNs, normalizedStringList, normalizedText, payloadHash } from '../metadata-record.mjs';
+import {
+  buildNormalizedRecord,
+  matchingISBNs,
+  normalizedStringList,
+  normalizedText,
+  payloadHash,
+} from '../metadata-record.mjs';
 
 export const GOOGLE_BOOKS_URL = 'https://www.googleapis.com/books/v1/volumes';
 
-const LANGUAGES = { pl: 'polski', en: 'angielski', de: 'niemiecki', fr: 'francuski', ru: 'rosyjski', cs: 'czeski' };
+const LANGUAGES = {
+  pl: 'polski',
+  en: 'angielski',
+  de: 'niemiecki',
+  fr: 'francuski',
+  ru: 'rosyjski',
+  cs: 'czeski',
+};
 
-export function createGoogleBooksAdapter({ apiKey, requester, fetcher, limiter, timeoutMs = 8_000, retries = 1, now = () => new Date() } = {}) {
+export function createGoogleBooksAdapter({
+  apiKey,
+  requester,
+  fetcher,
+  limiter,
+  timeoutMs = 8_000,
+  retries = 1,
+  now = () => new Date(),
+} = {}) {
   const request = requester ?? createJsonRequester({ fetcher, limiter, timeoutMs, retries });
   return {
     source: 'google_books',
     enabled: Boolean(apiKey),
     async lookup(isbn) {
       const requested = normalizeISBN(isbn);
-      if (!requested) return { source: 'google_books', status: 'invalid_response', reason: 'invalid_isbn', records: [] };
-      if (!apiKey) return { source: 'google_books', status: 'skipped', reason: 'no_api_key', records: [] };
+      if (!requested)
+        return {
+          source: 'google_books',
+          status: 'invalid_response',
+          reason: 'invalid_isbn',
+          records: [],
+        };
+      if (!apiKey)
+        return { source: 'google_books', status: 'skipped', reason: 'no_api_key', records: [] };
       const url = new URL(GOOGLE_BOOKS_URL);
       url.searchParams.set('q', 'isbn:' + requested);
       url.searchParams.set('maxResults', '5');
@@ -35,7 +63,9 @@ export function createGoogleBooksAdapter({ apiKey, requester, fetcher, limiter, 
       const records = [];
       for (const item of items) {
         const info = item?.volumeInfo ?? {};
-        const identifiers = (info.industryIdentifiers ?? []).map((entry) => entry?.identifier).filter(Boolean);
+        const identifiers = (info.industryIdentifiers ?? [])
+          .map((entry) => entry?.identifier)
+          .filter(Boolean);
         const matched = matchingISBNs(identifiers, requested);
         const title = normalizedText([info.title, info.subtitle].filter(Boolean).join(' : '));
         if (!matched.length || !title || !item.id) continue;
@@ -61,8 +91,22 @@ export function createGoogleBooksAdapter({ apiKey, requester, fetcher, limiter, 
           payload,
         });
       }
-      if (!records.length) return { source: 'google_books', status: 'not_found', records: [], fetchedAt, url: sourceUrl };
-      return { source: 'google_books', status: 'found', records, ambiguous: records.length > 1, fetchedAt, url: sourceUrl };
+      if (!records.length)
+        return {
+          source: 'google_books',
+          status: 'not_found',
+          records: [],
+          fetchedAt,
+          url: sourceUrl,
+        };
+      return {
+        source: 'google_books',
+        status: 'found',
+        records,
+        ambiguous: records.length > 1,
+        fetchedAt,
+        url: sourceUrl,
+      };
     },
   };
 }

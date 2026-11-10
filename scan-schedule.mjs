@@ -29,7 +29,9 @@ function fail(code, statusCode = 400) {
 }
 
 export function getScanSchedule(repository) {
-  const row = repository.database.prepare('SELECT value_json FROM app_preferences WHERE key=?').get(KEY);
+  const row = repository.database
+    .prepare('SELECT value_json FROM app_preferences WHERE key=?')
+    .get(KEY);
   const saved = row ? JSON.parse(row.value_json) : {};
   return {
     enabled: saved.enabled === true,
@@ -53,23 +55,34 @@ export const DEAD_SOURCE_PAUSE_MS = 24 * 3_600_000;
 export function sourcesToScan(repository, sources, at = Date.now()) {
   let rows = [];
   try {
-    rows = repository.database.prepare('SELECT source,status,last_checked_at FROM source_health').all();
+    rows = repository.database
+      .prepare('SELECT source,status,last_checked_at FROM source_health')
+      .all();
   } catch {
     return { sources: [...sources], skipped: [] };
   }
   const dead = new Set(
     rows
-      .filter((row) => row.status === 'failed' && at - Date.parse(row.last_checked_at || '') < DEAD_SOURCE_PAUSE_MS)
+      .filter(
+        (row) =>
+          row.status === 'failed' &&
+          at - Date.parse(row.last_checked_at || '') < DEAD_SOURCE_PAUSE_MS,
+      )
       .map((row) => row.source),
   );
-  return { sources: sources.filter((source) => !dead.has(source)), skipped: sources.filter((source) => dead.has(source)) };
+  return {
+    sources: sources.filter((source) => !dead.has(source)),
+    skipped: sources.filter((source) => dead.has(source)),
+  };
 }
 
 /** Sources that reported errors in the scan saved at or after `since`. */
 export function scanProblems(repository, since) {
   try {
     const row = repository.database
-      .prepare('SELECT summary_json FROM scan_runs WHERE scanned_at>=? ORDER BY scanned_at DESC LIMIT 1')
+      .prepare(
+        'SELECT summary_json FROM scan_runs WHERE scanned_at>=? ORDER BY scanned_at DESC LIMIT 1',
+      )
       .get(since);
     const errors = row ? JSON.parse(row.summary_json).errors || [] : [];
     return [...new Set(errors.map((error) => error.source).filter(Boolean))].sort();
@@ -90,17 +103,23 @@ export function saveScanSchedule(repository, input, now = Date.now()) {
   const enabled = input?.enabled === true;
   const profile = typeof input?.profile === 'string' ? input.profile : '';
   const everyHours = Number(input?.everyHours);
-  if (!Number.isInteger(everyHours) || everyHours < MIN_HOURS || everyHours > MAX_HOURS) fail('INVALID_SCHEDULE_INTERVAL');
+  if (!Number.isInteger(everyHours) || everyHours < MIN_HOURS || everyHours > MAX_HOURS)
+    fail('INVALID_SCHEDULE_INTERVAL');
   const current = getScanSchedule(repository);
   const quick = { ...current.quick };
   if (input?.quick !== undefined) {
     const hours = Number(input.quick?.everyHours ?? quick.everyHours);
-    if (!Number.isInteger(hours) || hours < MIN_HOURS || hours > QUICK_MAX_HOURS) fail('INVALID_QUICK_SCAN_INTERVAL');
+    if (!Number.isInteger(hours) || hours < MIN_HOURS || hours > QUICK_MAX_HOURS)
+      fail('INVALID_QUICK_SCAN_INTERVAL');
     quick.enabled = input.quick?.enabled === true;
     quick.everyHours = hours;
   }
   const profiles = listScanProfiles(repository);
-  if ((enabled || quick.enabled) && !(profile === ALL_PROFILES ? profiles.length : profiles.some((item) => item.name === profile))) fail('SCHEDULE_PROFILE_NOT_FOUND');
+  if (
+    (enabled || quick.enabled) &&
+    !(profile === ALL_PROFILES ? profiles.length : profiles.some((item) => item.name === profile))
+  )
+    fail('SCHEDULE_PROFILE_NOT_FOUND');
   store(repository, { ...current, enabled, profile, everyHours, quick }, now);
   return getScanSchedule(repository);
 }
@@ -151,7 +170,10 @@ export function createScanScheduler({
       return { skipped: due === null && quickDue === null ? 'off' : 'not-due' };
     }
     const profiles = listScanProfiles(repository);
-    const profile = schedule.profile === ALL_PROFILES ? nextProfile(profiles, schedule.lastProfile) : profiles.find((item) => item.name === schedule.profile);
+    const profile =
+      schedule.profile === ALL_PROFILES
+        ? nextProfile(profiles, schedule.lastProfile)
+        : profiles.find((item) => item.name === schedule.profile);
     running = true;
     let result;
     let skipped = [];
@@ -179,24 +201,50 @@ export function createScanScheduler({
     }
     // Record the attempt even on failure so that a broken profile cannot be retried every minute.
     const fresh = getScanSchedule(repository);
-    store(repository, { ...fresh, lastRunAt: new Date(now()).toISOString(), lastResult: result, lastProfile: profile?.name ?? fresh.lastProfile, lastSkipped: skipped, lastProblems: problems }, now());
-    onEvent({ type: 'scheduled_scan', profile: profile?.name ?? schedule.profile, result, skipped, problems });
+    store(
+      repository,
+      {
+        ...fresh,
+        lastRunAt: new Date(now()).toISOString(),
+        lastResult: result,
+        lastProfile: profile?.name ?? fresh.lastProfile,
+        lastSkipped: skipped,
+        lastProblems: problems,
+      },
+      now(),
+    );
+    onEvent({
+      type: 'scheduled_scan',
+      profile: profile?.name ?? schedule.profile,
+      result,
+      skipped,
+      problems,
+    });
     return { ran: true, result, skipped, problems };
   }
 
   async function quickTick(repository, schedule) {
     const profiles = listScanProfiles(repository);
-    const profile = schedule.profile === ALL_PROFILES ? nextProfile(profiles, schedule.quick.lastProfile) : profiles.find((item) => item.name === schedule.profile);
+    const profile =
+      schedule.profile === ALL_PROFILES
+        ? nextProfile(profiles, schedule.quick.lastProfile)
+        : profiles.find((item) => item.name === schedule.profile);
     running = true;
     let result;
     try {
-      const sortable = (profile?.sources || []).filter((source) => NEWEST_ORDER_SOURCES.has(source));
+      const sortable = (profile?.sources || []).filter((source) =>
+        NEWEST_ORDER_SOURCES.has(source),
+      );
       const plan = sourcesToScan(repository, sortable, now());
       if (!profile) result = 'profile-missing';
       else if (!sortable.length) result = 'no-sortable-source';
       else if (!plan.sources.length) result = 'all-sources-down';
       else {
-        const status = await runScan({ queries: profile.queries, sources: plan.sources, mode: 'newest' });
+        const status = await runScan({
+          queries: profile.queries,
+          sources: plan.sources,
+          mode: 'newest',
+        });
         if (status === 409) return { skipped: 'scan-running' };
         result = status >= 200 && status < 300 ? 'ok' : `http-${status}`;
       }
@@ -206,7 +254,19 @@ export function createScanScheduler({
       running = false;
     }
     const fresh = getScanSchedule(repository);
-    store(repository, { ...fresh, quick: { ...fresh.quick, lastRunAt: new Date(now()).toISOString(), lastResult: result, lastProfile: profile?.name ?? fresh.quick.lastProfile } }, now());
+    store(
+      repository,
+      {
+        ...fresh,
+        quick: {
+          ...fresh.quick,
+          lastRunAt: new Date(now()).toISOString(),
+          lastResult: result,
+          lastProfile: profile?.name ?? fresh.quick.lastProfile,
+        },
+      },
+      now(),
+    );
     onEvent({ type: 'scheduled_quick_scan', profile: profile?.name ?? schedule.profile, result });
     return { ran: true, quick: true, result };
   }

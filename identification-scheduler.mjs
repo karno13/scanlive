@@ -8,7 +8,7 @@ export function createIdentificationScheduler({
   intervalMs = 30_000,
   setIntervalFn = setInterval,
   clearIntervalFn = clearInterval,
-  yieldFn = () => new Promise(resolve => setImmediate(resolve)),
+  yieldFn = () => new Promise((resolve) => setImmediate(resolve)),
   now = () => new Date(),
 } = {}) {
   if (typeof runBatch !== 'function') throw Error('SCHEDULER_RUN_REQUIRED');

@@ -4,7 +4,11 @@
 // the results (status ok + pagination end) is allowed to conclude that an offer disappeared.
 export function completeResults(results = []) {
   return results.filter(
-    (result) => result?.status === 'ok' && result.pagination?.state === 'end' && result.source && result.query,
+    (result) =>
+      result?.status === 'ok' &&
+      result.pagination?.state === 'end' &&
+      result.source &&
+      result.query,
   );
 }
 

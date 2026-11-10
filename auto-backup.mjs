@@ -18,7 +18,9 @@ async function autoFiles(directory, base) {
     if (error.code === 'ENOENT') return [];
     throw error;
   });
-  return names.filter((name) => name.startsWith(`${base}-${AUTO_PREFIX}`) && name.endsWith('.sqlite')).sort();
+  return names
+    .filter((name) => name.startsWith(`${base}-${AUTO_PREFIX}`) && name.endsWith('.sqlite'))
+    .sort();
 }
 
 function stampOf(name, base) {
@@ -33,22 +35,42 @@ async function backupInto(source, directory, { now, keep, minAgeMs }) {
   const existing = await autoFiles(directory, base);
   const newest = existing.length ? stampOf(existing.at(-1), base) : 0;
   if (newest && now.getTime() - newest < minAgeMs) return { created: null, removed: [] };
-  const created = await backupCatalog({ source, destination: join(directory, `${base}-${AUTO_PREFIX}${stamp(now)}.sqlite`) });
+  const created = await backupCatalog({
+    source,
+    destination: join(directory, `${base}-${AUTO_PREFIX}${stamp(now)}.sqlite`),
+  });
   const all = await autoFiles(directory, base);
   const removed = all.slice(0, Math.max(0, all.length - keep));
   for (const name of removed) await rm(join(directory, name), { force: true });
   return { created, removed };
 }
 
-export async function runAutoBackup(source, { now = new Date(), keep = 7, minAgeMs = 20 * 3_600_000, extraDirectory = process.env.BOOKFLIP_BACKUP_DIR || null } = {}) {
+export async function runAutoBackup(
+  source,
+  {
+    now = new Date(),
+    keep = 7,
+    minAgeMs = 20 * 3_600_000,
+    extraDirectory = process.env.BOOKFLIP_BACKUP_DIR || null,
+  } = {},
+) {
   if (!source || source === ':memory:') return { skipped: true };
-  const result = { local: await backupInto(source, join(dirname(source), 'backups'), { now, keep, minAgeMs }) };
-  if (extraDirectory) result.extra = await backupInto(source, extraDirectory, { now, keep, minAgeMs });
+  const result = {
+    local: await backupInto(source, join(dirname(source), 'backups'), { now, keep, minAgeMs }),
+  };
+  if (extraDirectory)
+    result.extra = await backupInto(source, extraDirectory, { now, keep, minAgeMs });
   return result;
 }
 
 /** Checks every few hours; a copy is made when the newest automatic one is older than ~a day. */
-export function createAutoBackupScheduler({ getPath, onEvent = () => {}, everyMs = 6 * 3_600_000, setTimer = setInterval, clearTimer = clearInterval }) {
+export function createAutoBackupScheduler({
+  getPath,
+  onEvent = () => {},
+  everyMs = 6 * 3_600_000,
+  setTimer = setInterval,
+  clearTimer = clearInterval,
+}) {
   let timer = null;
   let running = null;
   async function tick() {
@@ -58,10 +80,19 @@ export function createAutoBackupScheduler({ getPath, onEvent = () => {}, everyMs
       if (!path) return null;
       try {
         const result = await runAutoBackup(path);
-        if (result.local?.created || result.extra?.created) onEvent({ type: 'auto_backup', path: result.local?.created ?? null, extra: result.extra?.created ?? null, removed: (result.local?.removed.length ?? 0) + (result.extra?.removed.length ?? 0) });
+        if (result.local?.created || result.extra?.created)
+          onEvent({
+            type: 'auto_backup',
+            path: result.local?.created ?? null,
+            extra: result.extra?.created ?? null,
+            removed: (result.local?.removed.length ?? 0) + (result.extra?.removed.length ?? 0),
+          });
         return result;
       } catch (error) {
-        onEvent({ type: 'auto_backup_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'AUTO_BACKUP_FAILED' });
+        onEvent({
+          type: 'auto_backup_error',
+          code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'AUTO_BACKUP_FAILED',
+        });
         return null;
       }
     })();

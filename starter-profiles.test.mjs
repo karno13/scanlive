@@ -2,7 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { listScanProfiles, putScanProfile } from './scan-profiles-api.mjs';
-import { ALL_PROFILES, createScanScheduler, getScanSchedule, nextProfile, saveScanSchedule } from './scan-schedule.mjs';
+import {
+  ALL_PROFILES,
+  createScanScheduler,
+  getScanSchedule,
+  nextProfile,
+  saveScanSchedule,
+} from './scan-schedule.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import { STARTER_SOURCES, ensureStarterProfiles } from './starter-profiles.mjs';
 
@@ -12,7 +18,11 @@ test('first run creates the niche profiles without blocked sources and a rotatin
     assert.deepEqual(ensureStarterProfiles(repository).created, ['Uniwersa', 'Autorzy i cykle']);
     const profiles = listScanProfiles(repository);
     assert.equal(profiles.length, 2);
-    assert.ok(profiles.every((profile) => !profile.sources.includes('Allegro') && !profile.sources.includes('OLX')));
+    assert.ok(
+      profiles.every(
+        (profile) => !profile.sources.includes('Allegro') && !profile.sources.includes('OLX'),
+      ),
+    );
     assert.deepEqual(profiles[0].sources, STARTER_SOURCES);
     const schedule = getScanSchedule(repository);
     assert.equal(schedule.enabled, true);

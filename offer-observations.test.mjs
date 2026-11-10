@@ -8,7 +8,11 @@ import { createProductionCatalog } from './catalog-production.mjs';
 import { searchOffers } from './local-app.mjs';
 import { parseMarketplace } from './marketplaces.mjs';
 import { conditionClass, listedAtFromAge, rawSnapshot } from './offer-observations.mjs';
-import { createScanState, persistSqliteScan, persistSqliteScanBatch } from './sqlite-single-store.mjs';
+import {
+  createScanState,
+  persistSqliteScan,
+  persistSqliteScanBatch,
+} from './sqlite-single-store.mjs';
 import { parseVintedDetail } from './vinted-detail.mjs';
 import { pendingSetDescriptions } from './set-descriptions.mjs';
 import { markOfferAsSet } from './offer-sets.mjs';
@@ -20,8 +24,17 @@ const empikPage = JSON.parse(fixture('marketplaces/empik-tiles-captured.json')).
 
 function catalog() {
   const directory = mkdtempSync(join(tmpdir(), 'bookflip-observations-'));
-  const store = createProductionCatalog({ databasePath: join(directory, 'catalog.sqlite'), fetcher: async () => assert.fail('no network') });
-  return { store, close: () => { store.repository.close(); rmSync(directory, { recursive: true, force: true, maxRetries: 3 }); } };
+  const store = createProductionCatalog({
+    databasePath: join(directory, 'catalog.sqlite'),
+    fetcher: async () => assert.fail('no network'),
+  });
+  return {
+    store,
+    close: () => {
+      store.repository.close();
+      rmSync(directory, { recursive: true, force: true, maxRetries: 3 });
+    },
+  };
 }
 
 test('condition texts of the sources fall into five classes', () => {
@@ -47,19 +60,45 @@ test('a Vinted age becomes an approximate listing date', () => {
 });
 
 test('likes do not make a new raw snapshot; a price does', () => {
-  const card = { id: 1, title: 'Mort', price: { amount: '20' }, favouriteCount: 1, thumbnails: ['x'] };
+  const card = {
+    id: 1,
+    title: 'Mort',
+    price: { amount: '20' },
+    favouriteCount: 1,
+    thumbnails: ['x'],
+  };
   assert.equal(rawSnapshot(card).digest, rawSnapshot({ ...card, favouriteCount: 7 }).digest);
-  assert.notEqual(rawSnapshot(card).digest, rawSnapshot({ ...card, price: { amount: '25' } }).digest);
+  assert.notEqual(
+    rawSnapshot(card).digest,
+    rawSnapshot({ ...card, price: { amount: '25' } }).digest,
+  );
   assert.ok(!rawSnapshot(card).payload.includes('thumbnails'));
 });
 
 test('Empik tiles carry the real availability and the seller', () => {
-  const task = { source: 'Empik', host: 'www.empik.com', mode: 'discovery', title: 'pratchett', searchQuery: 'pratchett', category: 'pratchett' };
+  const task = {
+    source: 'Empik',
+    host: 'www.empik.com',
+    mode: 'discovery',
+    title: 'pratchett',
+    searchQuery: 'pratchett',
+    category: 'pratchett',
+  };
   const rows = parseMarketplace(empikPage, task, '2026-11-10T10:00:00.000Z');
-  assert.deepEqual(rows.map((row) => [row.sellerId, row.sourceAvailability]), [['0', 'PRE_SALE'], ['18517', 'IN_24_H'], ['3720', 'IN_24_H']]);
+  assert.deepEqual(
+    rows.map((row) => [row.sellerId, row.sourceAvailability]),
+    [
+      ['0', 'PRE_SALE'],
+      ['18517', 'IN_24_H'],
+      ['3720', 'IN_24_H'],
+    ],
+  );
   assert.equal(rows[1].sellerName, 'Antykwariat i Księgarnia Tezeusz');
   // A tile Empik marks as not available is not an offer any more.
-  const gone = empikPage.replace('data-availabilityType="IN_24_H"', 'data-availabilityType="UNAVAILABLE"');
+  const gone = empikPage.replace(
+    'data-availabilityType="IN_24_H"',
+    'data-availabilityType="UNAVAILABLE"',
+  );
   assert.equal(parseMarketplace(gone, task, '2026-11-10T10:00:00.000Z').length, 2);
 });
 
@@ -93,11 +132,16 @@ test('a scanned Vinted listing is saved with condition, fee, seller, description
     assert.equal(reads.length, 3);
     assert.deepEqual(result.summary.rejected, { language: 1, language_unknown: 1 });
     persistSqliteScan(store, {
-      offers: result.offers, searchedAt: scanAt, scanState: state, rejected: result.summary.rejected,
+      offers: result.offers,
+      searchedAt: scanAt,
+      scanState: state,
+      rejected: result.summary.rejected,
       scanContext: { queries: ['pratchett'], sources: ['Vinted'], results: result.results },
     });
 
-    const row = db.prepare("SELECT * FROM offers WHERE normalized_url LIKE '%/items/9000000002-%'").get();
+    const row = db
+      .prepare("SELECT * FROM offers WHERE normalized_url LIKE '%/items/9000000002-%'")
+      .get();
     assert.equal(row.condition_text, 'Bardzo dobry');
     assert.equal(row.condition_class, 'very_good');
     assert.equal(row.buyer_fee, 445);
@@ -106,37 +150,67 @@ test('a scanned Vinted listing is saved with condition, fee, seller, description
     assert.equal(row.photo_count, 3);
     assert.equal(row.favourite_count, 1);
     assert.equal(row.listed_at_text, '3 godz.');
-    assert.ok(Math.abs(Date.parse(row.listed_at) - Date.parse('2026-11-10T09:00:00.000Z')) < 60_000);
+    assert.ok(
+      Math.abs(Date.parse(row.listed_at) - Date.parse('2026-11-10T09:00:00.000Z')) < 60_000,
+    );
     assert.equal(row.shipping_cost, null, 'Vinted pages do not carry the shipping price');
     assert.equal(row.view_count, null, 'nor the number of views');
     // Only the listing in Polish was saved.
     assert.equal(db.prepare('SELECT count(*) AS n FROM offers').get().n, 1);
 
-    const description = db.prepare('SELECT text, status FROM offer_descriptions WHERE offer_id=?').get(row.id);
+    const description = db
+      .prepare('SELECT text, status FROM offer_descriptions WHERE offer_id=?')
+      .get(row.id);
     assert.equal(description.status, 'found');
     assert.match(description.text, /Wydanie kieszonkowe/);
     // Marked as a set later: its description is already there, the page is not read again.
     markOfferAsSet(store.repository, row.id);
     assert.equal(pendingSetDescriptions(store.repository).length, 0);
 
-    const kinds = db.prepare('SELECT kind FROM offer_raw_snapshots WHERE offer_id=? ORDER BY kind').all(row.id).map((r) => r.kind);
+    const kinds = db
+      .prepare('SELECT kind FROM offer_raw_snapshots WHERE offer_id=? ORDER BY kind')
+      .all(row.id)
+      .map((r) => r.kind);
     assert.deepEqual(kinds, ['detail', 'listing']);
-    const listing = JSON.parse(db.prepare("SELECT payload FROM offer_raw_snapshots WHERE offer_id=? AND kind='listing'").get(row.id).payload);
+    const listing = JSON.parse(
+      db
+        .prepare("SELECT payload FROM offer_raw_snapshots WHERE offer_id=? AND kind='listing'")
+        .get(row.id).payload,
+    );
     assert.equal(listing.itemBox.secondLine, 'Bardzo dobry');
 
-    const summary = JSON.parse(db.prepare('SELECT summary_json FROM scan_runs WHERE scanned_at=?').get(scanAt).summary_json);
+    const summary = JSON.parse(
+      db.prepare('SELECT summary_json FROM scan_runs WHERE scanned_at=?').get(scanAt).summary_json,
+    );
     assert.deepEqual(summary.rejected, { language: 1, language_unknown: 1 });
 
     // Seen again with more likes: the stored count follows, but no new raw snapshot is written.
-    const again = parseMarketplace(searchPage.replace('\\"favouriteCount\\":1', '\\"favouriteCount\\":5'), {
-      source: 'Vinted', host: 'www.vinted.pl', mode: 'discovery', title: 'pratchett', searchQuery: 'pratchett', category: 'pratchett',
-    }, '2026-11-11T12:00:00.000Z').filter((offer) => offer.url.includes('9000000002'));
-    store.ingestOffers(again.map((offer) => ({ ...offer, source: 'Vinted', language: 'Polski' })), '2026-11-11T12:00:00.000Z');
-    const later = db.prepare('SELECT favourite_count, condition_text, listed_at_text FROM offers WHERE id=?').get(row.id);
+    const again = parseMarketplace(
+      searchPage.replace('\\"favouriteCount\\":1', '\\"favouriteCount\\":5'),
+      {
+        source: 'Vinted',
+        host: 'www.vinted.pl',
+        mode: 'discovery',
+        title: 'pratchett',
+        searchQuery: 'pratchett',
+        category: 'pratchett',
+      },
+      '2026-11-11T12:00:00.000Z',
+    ).filter((offer) => offer.url.includes('9000000002'));
+    store.ingestOffers(
+      again.map((offer) => ({ ...offer, source: 'Vinted', language: 'Polski' })),
+      '2026-11-11T12:00:00.000Z',
+    );
+    const later = db
+      .prepare('SELECT favourite_count, condition_text, listed_at_text FROM offers WHERE id=?')
+      .get(row.id);
     assert.equal(later.favourite_count, 5);
     assert.equal(later.condition_text, 'Bardzo dobry');
     assert.equal(later.listed_at_text, '3 godz.', 'the first, closest age is kept');
-    assert.equal(db.prepare('SELECT count(*) AS n FROM offer_raw_snapshots WHERE offer_id=?').get(row.id).n, 2);
+    assert.equal(
+      db.prepare('SELECT count(*) AS n FROM offer_raw_snapshots WHERE offer_id=?').get(row.id).n,
+      2,
+    );
   } finally {
     close();
   }
@@ -146,15 +220,39 @@ test('conditions read earlier from listing pages are copied once at start-up', (
   const directory = mkdtempSync(join(tmpdir(), 'bookflip-observations-'));
   const path = join(directory, 'catalog.sqlite');
   try {
-    let store = createProductionCatalog({ databasePath: path, fetcher: async () => assert.fail('no network') });
-    const offer = store.repository.upsertOffer({ source: 'Allegro Lokalnie', normalizedUrl: 'https://allegrolokalnie.pl/oferta/mort', originalTitle: 'Mort', currentPrice: 2000, at: '2026-11-01T10:00:00Z' });
+    let store = createProductionCatalog({
+      databasePath: path,
+      fetcher: async () => assert.fail('no network'),
+    });
+    const offer = store.repository.upsertOffer({
+      source: 'Allegro Lokalnie',
+      normalizedUrl: 'https://allegrolokalnie.pl/oferta/mort',
+      originalTitle: 'Mort',
+      currentPrice: 2000,
+      at: '2026-11-01T10:00:00Z',
+    });
     store.repository.database
-      .prepare("INSERT INTO offer_enrichment(offer_id,source,outcome,attempts,attempted_at,facts_json) VALUES(?,?,?,1,?,?)")
-      .run(offer.id, 'Allegro Lokalnie', 'no_isbn', '2026-11-01T10:00:00Z', JSON.stringify({ condition: 'Bardzo dobry' }));
-    store.repository.database.prepare("DELETE FROM app_preferences WHERE key='offer_condition_backfill_v1'").run();
+      .prepare(
+        'INSERT INTO offer_enrichment(offer_id,source,outcome,attempts,attempted_at,facts_json) VALUES(?,?,?,1,?,?)',
+      )
+      .run(
+        offer.id,
+        'Allegro Lokalnie',
+        'no_isbn',
+        '2026-11-01T10:00:00Z',
+        JSON.stringify({ condition: 'Bardzo dobry' }),
+      );
+    store.repository.database
+      .prepare("DELETE FROM app_preferences WHERE key='offer_condition_backfill_v1'")
+      .run();
     store.repository.close();
-    store = createProductionCatalog({ databasePath: path, fetcher: async () => assert.fail('no network') });
-    const row = store.repository.database.prepare('SELECT condition_text, condition_class FROM offers WHERE id=?').get(offer.id);
+    store = createProductionCatalog({
+      databasePath: path,
+      fetcher: async () => assert.fail('no network'),
+    });
+    const row = store.repository.database
+      .prepare('SELECT condition_text, condition_class FROM offers WHERE id=?')
+      .get(offer.id);
     assert.deepEqual({ ...row }, { condition_text: 'Bardzo dobry', condition_class: 'very_good' });
     store.repository.close();
   } finally {

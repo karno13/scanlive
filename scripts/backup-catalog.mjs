@@ -14,8 +14,15 @@ export async function backupCatalog({
   const input = resolve(source);
   await access(input, constants.R_OK);
   const output = resolve(
-    destination || join(dirname(input), 'backups', basename(input, extname(input)) + '-' +
-      new Date().toISOString().replace(/[:.]/g, '-') + '.sqlite'),
+    destination ||
+      join(
+        dirname(input),
+        'backups',
+        basename(input, extname(input)) +
+          '-' +
+          new Date().toISOString().replace(/[:.]/g, '-') +
+          '.sqlite',
+      ),
   );
   if (input === output) throw Error('BACKUP_SOURCE_EQUALS_DESTINATION');
   await mkdir(dirname(output), { recursive: true });
@@ -53,5 +60,8 @@ export async function backupCatalog({
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   backupCatalog({ destination: process.argv[2] })
     .then((path) => console.log('Backup SQLite:', path))
-    .catch((error) => { console.error('Backup failed:', error.message); process.exitCode = 1; });
+    .catch((error) => {
+      console.error('Backup failed:', error.message);
+      process.exitCode = 1;
+    });
 }

@@ -17,7 +17,9 @@ const decode = (value) =>
 
 function jsonLdBlocks(html) {
   const blocks = [];
-  for (const match of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+  for (const match of html.matchAll(
+    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  )) {
     try {
       const parsed = JSON.parse(match[1]);
       for (const node of Array.isArray(parsed) ? parsed : [parsed]) {
@@ -34,7 +36,10 @@ function jsonLdBlocks(html) {
 const typesOf = (node) => [].concat(node?.['@type'] ?? []).map(String);
 const isBookProduct = (node) => {
   const types = typesOf(node);
-  return types.includes('Book') || (types.includes('Product') && ('isbn' in node || 'gtin13' in node || 'gtin' in node));
+  return (
+    types.includes('Book') ||
+    (types.includes('Product') && ('isbn' in node || 'gtin13' in node || 'gtin' in node))
+  );
 };
 
 function bookIsbn(value) {
@@ -46,7 +51,10 @@ function bookIsbn(value) {
 }
 
 const names = (value) =>
-  [].concat(value ?? []).map((item) => decode(typeof item === 'string' ? item : item?.name)).filter(Boolean);
+  []
+    .concat(value ?? [])
+    .map((item) => decode(typeof item === 'string' ? item : item?.name))
+    .filter(Boolean);
 
 function attributeRows(html) {
   const rows = {};
@@ -61,7 +69,9 @@ function attributeRows(html) {
   for (const match of html.matchAll(
     /<td class="mlc-params__parameter-name"[^>]*>([\s\S]*?)<\/td>\s*<td class="mlc-params__parameter-value"[^>]*>([\s\S]*?)<\/td>/gi,
   )) {
-    const label = decode(match[1].replace(/<[^>]*>/g, ' ')).toLowerCase().replace(/:$/, '');
+    const label = decode(match[1].replace(/<[^>]*>/g, ' '))
+      .toLowerCase()
+      .replace(/:$/, '');
     const value = decode(match[2].replace(/<[^>]*>/g, ' '));
     if (label && value && !(label in rows)) rows[label] = value;
   }
@@ -73,15 +83,23 @@ export function parseProductDetail(html) {
   const node = jsonLdBlocks(text).find(isBookProduct) ?? null;
   const rows = attributeRows(text);
   const isbn =
-    bookIsbn(node?.isbn) ?? bookIsbn(node?.gtin13) ?? bookIsbn(node?.gtin) ?? bookIsbn(rows.isbn) ?? bookIsbn(rows.ean) ?? null;
+    bookIsbn(node?.isbn) ??
+    bookIsbn(node?.gtin13) ??
+    bookIsbn(node?.gtin) ??
+    bookIsbn(rows.isbn) ??
+    bookIsbn(rows.ean) ??
+    null;
   const publisher = names(node?.publisher)[0] ?? rows['wydawnictwo'] ?? null;
   const rowAuthors = rows['autor'] ? [rows['autor']] : [];
-  const year = String(node?.datePublished ?? rows['rok wydania'] ?? '').match(/\b(1[5-9]\d\d|20\d\d)\b/)?.[1] ?? null;
+  const year =
+    String(node?.datePublished ?? rows['rok wydania'] ?? '').match(
+      /\b(1[5-9]\d\d|20\d\d)\b/,
+    )?.[1] ?? null;
   const pages = Number(node?.numberOfPages ?? rows['ilość stron']) || null;
   return {
     isbn,
     isbnSource: isbn ? (node ? 'json-ld' : 'attribute') : null,
-    title: node?.name ? decode(node.name) : rows['tytuł'] ?? null,
+    title: node?.name ? decode(node.name) : (rows['tytuł'] ?? null),
     authors: names(node?.author).length ? names(node?.author) : rowAuthors,
     publisher,
     year: year ? Number(year) : null,
@@ -104,7 +122,9 @@ export function empikCategories(html) {
   const block = text.slice(start, start + 4000);
   const end = block.indexOf(']');
   const names = [];
-  for (const match of (end > 0 ? block.slice(0, end) : block).matchAll(/"__typename":"Category","id":"\d+","name":"((?:[^"\\]|\\.)*)"/g)) {
+  for (const match of (end > 0 ? block.slice(0, end) : block).matchAll(
+    /"__typename":"Category","id":"\d+","name":"((?:[^"\\]|\\.)*)"/g,
+  )) {
     try {
       names.push(JSON.parse('"' + match[1] + '"'));
     } catch {}

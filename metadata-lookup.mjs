@@ -138,7 +138,9 @@ function externalRecordInput(record, target = {}) {
     id: databaseId,
     // Providers without their own CHECK value are stored as 'other' with a prefixed id.
     provider: NATIVE_PROVIDERS.has(record.source) ? record.source : 'other',
-    externalId: NATIVE_PROVIDERS.has(record.source) ? record.externalRecordId : `${record.source}:${record.externalRecordId}`,
+    externalId: NATIVE_PROVIDERS.has(record.source)
+      ? record.externalRecordId
+      : `${record.source}:${record.externalRecordId}`,
     recordType: 'edition',
     workId: target.workId ?? null,
     editionId: target.editionId ?? null,
@@ -235,18 +237,26 @@ async function lookupWithCache(adapter, isbn, cache) {
       cache: { hit: true, fetchedAt: cached.fetchedAt, expiresAt: cached.expiresAt },
       timing: { durationMs: Math.round(performance.now() - startedAt), cached: true },
     };
-  let pending=inFlightLookups.get(adapter);
-  if(!pending){pending=new Map();inFlightLookups.set(adapter,pending);}
-  const key=canonicalLookupKey(isbn);
-  const coalesced=pending.has(key);
-  if(!coalesced) {
-    const work=Promise.resolve().then(()=>adapter.lookup(key)).then(result=>({result,stored:cache?.set(adapter.source,key,result) ?? false}));
-    pending.set(key,work);
+  let pending = inFlightLookups.get(adapter);
+  if (!pending) {
+    pending = new Map();
+    inFlightLookups.set(adapter, pending);
   }
-  const work=pending.get(key);
-  let result,stored;
-  try { ({result,stored}=await work); }
-  finally {if(pending.get(key)===work)pending.delete(key);}
+  const key = canonicalLookupKey(isbn);
+  const coalesced = pending.has(key);
+  if (!coalesced) {
+    const work = Promise.resolve()
+      .then(() => adapter.lookup(key))
+      .then((result) => ({ result, stored: cache?.set(adapter.source, key, result) ?? false }));
+    pending.set(key, work);
+  }
+  const work = pending.get(key);
+  let result, stored;
+  try {
+    ({ result, stored } = await work);
+  } finally {
+    if (pending.get(key) === work) pending.delete(key);
+  }
   return {
     ...result,
     cache: { hit: false, stored, coalesced },
@@ -256,7 +266,15 @@ async function lookupWithCache(adapter, isbn, cache) {
 
 export async function lookupISBN(
   isbn,
-  { bnAdapter, openLibraryAdapter, eIsbnAdapter = null, googleBooksAdapter = null, cache = null, repository = null, target = {} } = {},
+  {
+    bnAdapter,
+    openLibraryAdapter,
+    eIsbnAdapter = null,
+    googleBooksAdapter = null,
+    cache = null,
+    repository = null,
+    target = {},
+  } = {},
 ) {
   if (!canonicalLookupKey(isbn)) throw new Error('INVALID_ISBN');
   if (!bnAdapter || !openLibraryAdapter) throw new TypeError('Both metadata adapters are required');
@@ -268,29 +286,61 @@ export async function lookupISBN(
   // The national ISBN registry (e-ISBN) when neither BN nor Open Library knows the ISBN: publishers
   // register books there before BN catalogues them.
   const eIsbn =
-    eIsbnAdapter?.enabled && ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status !== 'found'
+    eIsbnAdapter?.enabled &&
+    ['not_found', 'temporary_error'].includes(bn.status) &&
+    openLibrary.status !== 'found'
       ? await lookupWithCache(eIsbnAdapter, isbn, cache)
-      : { source: 'e_isbn', status: 'skipped', records: [], reason: eIsbnAdapter?.enabled ? 'not_needed' : 'not_configured' };
+      : {
+          source: 'e_isbn',
+          status: 'skipped',
+          records: [],
+          reason: eIsbnAdapter?.enabled ? 'not_needed' : 'not_configured',
+        };
   // Google Books (with the operator's key) when neither the national nor the open catalogue has it.
   const googleBooks =
-    googleBooksAdapter?.enabled && ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status === 'not_found' && eIsbn.status !== 'found'
+    googleBooksAdapter?.enabled &&
+    ['not_found', 'temporary_error'].includes(bn.status) &&
+    openLibrary.status === 'not_found' &&
+    eIsbn.status !== 'found'
       ? await lookupWithCache(googleBooksAdapter, isbn, cache)
-      : { source: 'google_books', status: 'skipped', records: [], reason: googleBooksAdapter?.enabled ? 'not_needed' : 'not_configured' };
+      : {
+          source: 'google_books',
+          status: 'skipped',
+          records: [],
+          reason: googleBooksAdapter?.enabled ? 'not_needed' : 'not_configured',
+        };
   const selected =
-    ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status !== 'found' && eIsbn.status === 'found'
+    ['not_found', 'temporary_error'].includes(bn.status) &&
+    openLibrary.status !== 'found' &&
+    eIsbn.status === 'found'
       ? eIsbn
-      : ['not_found', 'temporary_error'].includes(bn.status) && openLibrary.status !== 'found' && googleBooks.status === 'found'
-      ? googleBooks
-      : bn.status === 'not_found' || (bn.status === 'temporary_error' && openLibrary.status === 'found')
-        ? openLibrary
-        : bn;
+      : ['not_found', 'temporary_error'].includes(bn.status) &&
+          openLibrary.status !== 'found' &&
+          googleBooks.status === 'found'
+        ? googleBooks
+        : bn.status === 'not_found' ||
+            (bn.status === 'temporary_error' && openLibrary.status === 'found')
+          ? openLibrary
+          : bn;
   const comparison = {
-    status: selected.status === 'found' ? 'single_source'
-      : selected.status === 'not_found' ? 'not_found' : 'incomplete',
+    status:
+      selected.status === 'found'
+        ? 'single_source'
+        : selected.status === 'not_found'
+          ? 'not_found'
+          : 'incomplete',
     conflicts: [],
   };
   const persistence = repository
     ? persistMetadataResults(repository, [bn, openLibrary, eIsbn, googleBooks], target)
     : null;
-  return { isbn: canonicalLookupKey(isbn), bn, openLibrary, eIsbn, googleBooks, comparison, persistence };
+  return {
+    isbn: canonicalLookupKey(isbn),
+    bn,
+    openLibrary,
+    eIsbn,
+    googleBooks,
+    comparison,
+    persistence,
+  };
 }

@@ -24,6 +24,7 @@ export function blockedSources(repository, { recentRuns = 3 } = {}) {
   });
   const blocked = {};
   // Blocked only when every recent scan that asked the source was refused.
-  for (const [source, code] of perRun[0]) if (perRun.every((codes) => codes.has(source))) blocked[source] = code;
+  for (const [source, code] of perRun[0])
+    if (perRun.every((codes) => codes.has(source))) blocked[source] = code;
   return blocked;
 }

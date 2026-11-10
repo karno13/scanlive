@@ -13,23 +13,58 @@ import { lookupUnknownIsbns } from './isbn-lookups.mjs';
 import { getPolishOnly, rejectForeignEditions } from './language-policy.mjs';
 import { blockedSources } from './source-blocks.mjs';
 import { reassignOffer, unassignOffer } from './offer-assignment.mjs';
-import { editionForWorkAssignment, mergeVariants, setEditionVariant, workPriceOverview } from './edition-variants.mjs';
+import {
+  editionForWorkAssignment,
+  mergeVariants,
+  setEditionVariant,
+  workPriceOverview,
+} from './edition-variants.mjs';
 import { createAutoBackupScheduler } from './auto-backup.mjs';
 import { createScanScheduler, localScanRunner } from './scan-schedule.mjs';
-import { computeProposal, loadProposal, refreshProposals, rescoreStoredProposals } from './title-proposals.mjs';
+import {
+  computeProposal,
+  loadProposal,
+  refreshProposals,
+  rescoreStoredProposals,
+} from './title-proposals.mjs';
 import { repairCatalogTitles } from './title-repair.mjs';
 import { historyBookLabels } from './history-brief.mjs';
 import { scanCancelled, awaitScan } from './scan-cancellation.mjs';
 import { createVintedDetailCache } from './vinted-detail-cache.mjs';
-import { listOfferWorkspace, setOfferWorkspace, importOfferWorkspace } from './offer-workspace-api.mjs';
+import {
+  listOfferWorkspace,
+  setOfferWorkspace,
+  importOfferWorkspace,
+} from './offer-workspace-api.mjs';
 import { listWorkSeries, updateWorkSeries } from './work-series-api.mjs';
-import { createScanDiagnostics, addScanEvent, scanProgress, scanTelemetry } from './scan-diagnostics.mjs';
-import { listOfferSets, markOfferAsSet, updateSetEdition, unmarkOfferSet, setCandidates, cycleVolumeEditions } from './offer-sets.mjs';
+import {
+  createScanDiagnostics,
+  addScanEvent,
+  scanProgress,
+  scanTelemetry,
+} from './scan-diagnostics.mjs';
+import {
+  listOfferSets,
+  markOfferAsSet,
+  updateSetEdition,
+  unmarkOfferSet,
+  setCandidates,
+  cycleVolumeEditions,
+} from './offer-sets.mjs';
 import { defaultCatalogPath } from './catalog-data-location.mjs';
 import { normalizeISBN } from './isbn-normalization.mjs';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { readFile, appendFile, writeFile, mkdir, rename, stat, rm, realpath } from 'node:fs/promises';
+import {
+  readFile,
+  appendFile,
+  writeFile,
+  mkdir,
+  rename,
+  stat,
+  rm,
+  realpath,
+} from 'node:fs/promises';
 import { extname, join, dirname, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as wait } from 'node:timers/promises';
@@ -53,7 +88,11 @@ import {
   sureReviewPlan,
   applySureReviewPlan,
 } from './catalog-api.mjs';
-import { offerEditionDraft, createEditionFromOffer, recheckOfferEditions } from './offer-editions.mjs';
+import {
+  offerEditionDraft,
+  createEditionFromOffer,
+  recheckOfferEditions,
+} from './offer-editions.mjs';
 import { inferListingSeries } from './edition-series.mjs';
 import { analyzedOffers, bookHistory, allBookStatistics } from './price-analysis.mjs';
 import { sqliteHistoryModel } from './sqlite-history-read.mjs';
@@ -68,9 +107,19 @@ import {
 import { createIdentificationScheduler } from './identification-scheduler.mjs';
 import { createBuybackService } from './buyback-quotes.mjs';
 import { createSkupksiazekClient } from './buyback-skupksiazek.mjs';
-import { createImageBackfill, fetchCachedImage, offerImageUrl, proxiedImage } from './offer-images.mjs';
+import {
+  createImageBackfill,
+  fetchCachedImage,
+  offerImageUrl,
+  proxiedImage,
+} from './offer-images.mjs';
 import { catalogInsights } from './catalog-insights.mjs';
-import { catalogSeries, setWorkUniverse, getSeriesDefinition, saveSeriesDefinition } from './catalog-series.mjs';
+import {
+  catalogSeries,
+  setWorkUniverse,
+  getSeriesDefinition,
+  saveSeriesDefinition,
+} from './catalog-series.mjs';
 import { catalogPersons, personWorks } from './catalog-bibliography.mjs';
 
 let imageBackfill = null;
@@ -108,11 +157,22 @@ export function validateSearchInput(input) {
   )
     throw Object.assign(Error('INVALID_SOURCES'), { statusCode: 400 });
   if (input?.tasks !== undefined) {
-    if (!Array.isArray(input.tasks) || !input.tasks.length || input.tasks.length>70 ||
-        input.tasks.some(task=>!queries.includes(task?.query)||!sources.includes(task?.source)))
-      throw Object.assign(Error('INVALID_SCAN_TASKS'),{statusCode:400});
-    const tasks=[...new Map(input.tasks.map(task=>[JSON.stringify([task.source,task.query]),{source:task.source,query:task.query}])).values()];
-    return {queries,sources,tasks,...newestMode(input, sources)};
+    if (
+      !Array.isArray(input.tasks) ||
+      !input.tasks.length ||
+      input.tasks.length > 70 ||
+      input.tasks.some((task) => !queries.includes(task?.query) || !sources.includes(task?.source))
+    )
+      throw Object.assign(Error('INVALID_SCAN_TASKS'), { statusCode: 400 });
+    const tasks = [
+      ...new Map(
+        input.tasks.map((task) => [
+          JSON.stringify([task.source, task.query]),
+          { source: task.source, query: task.query },
+        ]),
+      ).values(),
+    ];
+    return { queries, sources, tasks, ...newestMode(input, sources) };
   }
   return { queries, sources, ...newestMode(input, sources) };
 }
@@ -148,14 +208,18 @@ function isRetryable(error) {
 }
 export function retryDelay(error, attempt) {
   const retryAfter = error?.retryAfter;
-  const suggested = retryAfter === null || retryAfter === undefined ? NaN : Number(retryAfter) * 1000;
+  const suggested =
+    retryAfter === null || retryAfter === undefined ? NaN : Number(retryAfter) * 1000;
   if (Number.isFinite(suggested) && suggested >= 0)
     return Math.min(24 * 60 * 60 * 1000, Math.max(1000, suggested));
   // A rate limit without Retry-After clears in tens of seconds, not in one or two.
   if (error?.status === 429) return 30000 * attempt;
   return Math.min(30000, Math.max(1000, 1000 * 2 ** (attempt - 1)));
 }
-async function retryRead(read, { onProgress = () => {}, waiter = wait, context = {}, signal = null } = {}) {
+async function retryRead(
+  read,
+  { onProgress = () => {}, waiter = wait, context = {}, signal = null } = {},
+) {
   for (let attempt = 1; attempt <= retryLimit; attempt++)
     try {
       return { value: await awaitScan(read(), signal), error: null };
@@ -200,13 +264,27 @@ export async function searchOffers(
       // its remaining phrases are reported at once instead of being asked and retried one by one.
       let blockedBy = null;
       for (const query of queries) {
-        if(tasks && !tasks.some(task=>task.source===source && task.query===query)) continue;
+        if (tasks && !tasks.some((task) => task.source === source && task.query === query))
+          continue;
         if (newest && !NEWEST_ORDER_SOURCES.has(source)) continue;
         scanCancelled(signal);
         if (blockedBy) {
           onProgress({ type: 'source-error', source, query, code: blockedBy.code, partial: 0 });
-          results.push({ source, query, status: 'unavailable', offers: [], diagnostic: { ...blockedBy, skipped: true } });
-          onProgress({ type: 'source-done', source, query, offers: 0, pages: 0, status: 'unavailable' });
+          results.push({
+            source,
+            query,
+            status: 'unavailable',
+            offers: [],
+            diagnostic: { ...blockedBy, skipped: true },
+          });
+          onProgress({
+            type: 'source-done',
+            source,
+            query,
+            offers: 0,
+            pages: 0,
+            status: 'unavailable',
+          });
           continue;
         }
         const task = {
@@ -248,7 +326,8 @@ export async function searchOffers(
             );
             offers = filtered.offers;
             diagnostic = diagnostic || filtered.diagnostic;
-            for (const [reason, count] of Object.entries(filtered.rejected)) rejected[reason] = (rejected[reason] || 0) + count;
+            for (const [reason, count] of Object.entries(filtered.rejected))
+              rejected[reason] = (rejected[reason] || 0) + count;
           }
           const status = diagnostic ? (offers.length ? 'partial' : 'unavailable') : 'ok';
           if (diagnostic?.blocked && !offers.length) blockedBy = diagnostic;
@@ -272,7 +351,11 @@ export async function searchOffers(
           });
           if (onOffers && offers.length) {
             scanCancelled(signal);
-            await onOffers({ source, query, offers: offers.map((offer) => ({ ...offer, source, matchedQueries: [query] })) });
+            await onOffers({
+              source,
+              query,
+              offers: offers.map((offer) => ({ ...offer, source, matchedQueries: [query] })),
+            });
           }
           onProgress({
             type: 'source-done',
@@ -288,7 +371,14 @@ export async function searchOffers(
           if (diagnostic.blocked) blockedBy = diagnostic;
           onProgress({ type: 'source-error', source, query, code: diagnostic.code, partial: 0 });
           results.push({ source, query, status: 'unavailable', offers: [], diagnostic });
-          onProgress({type:'source-done',source,query,offers:0,pages:0,status:'unavailable'});
+          onProgress({
+            type: 'source-done',
+            source,
+            query,
+            offers: 0,
+            pages: 0,
+            status: 'unavailable',
+          });
         }
       }
     }),
@@ -311,7 +401,8 @@ export async function searchOffers(
   // Listings left out before saving, by reason (language, topic, product; Vinted: unknown language).
   const rejected = {};
   for (const row of results)
-    for (const [reason, count] of Object.entries(row.rejected || {})) rejected[reason] = (rejected[reason] || 0) + count;
+    for (const [reason, count] of Object.entries(row.rejected || {}))
+      rejected[reason] = (rejected[reason] || 0) + count;
   return {
     searchedAt: now().toISOString(),
     category: 'books',
@@ -330,7 +421,14 @@ export async function searchOffers(
     results: results.map(({ offers, ...row }) => ({ ...row, count: offers.length })),
   };
 }
-async function scanAllPages(task, scanner, onProgress = () => {}, waiter = wait, signal = null, maxPages = 50) {
+async function scanAllPages(
+  task,
+  scanner,
+  onProgress = () => {},
+  waiter = wait,
+  signal = null,
+  maxPages = 50,
+) {
   const offers = [],
     seenPages = new Set(),
     pages = [],
@@ -345,7 +443,7 @@ async function scanAllPages(task, scanner, onProgress = () => {}, waiter = wait,
     }
     seenPages.add(current.page);
     onProgress({ type: 'page-start', page: current.page });
-    const read = await retryRead(() => scanner(current, {signal}), {
+    const read = await retryRead(() => scanner(current, { signal }), {
       onProgress,
       waiter,
       signal,
@@ -357,7 +455,8 @@ async function scanAllPages(task, scanner, onProgress = () => {}, waiter = wait,
     }
     const scan = read.value;
     offers.push(...scan.offers);
-    for (const [reason, count] of Object.entries(scan.rejected || {})) rejected[reason] = (rejected[reason] || 0) + count;
+    for (const [reason, count] of Object.entries(scan.rejected || {}))
+      rejected[reason] = (rejected[reason] || 0) + count;
     pages.push({
       page: current.page,
       count: scan.offers.length,
@@ -399,14 +498,22 @@ async function filterVintedPolishOffers(
   // At most two requests in flight, with one new Vinted request per second.
   // Cache hits require no network request and do not consume rate-limit slots.
   const accepted = new Array(offers.length);
-  let next = 0, checked = 0, unknown = 0, cached = 0, foreign = 0;
-  let diagnostic = null, stopped = false, lastRequestAt = 0;
+  let next = 0,
+    checked = 0,
+    unknown = 0,
+    cached = 0,
+    foreign = 0;
+  let diagnostic = null,
+    stopped = false,
+    lastRequestAt = 0;
   let startGate = Promise.resolve();
 
   async function startDetailRead(url, index) {
     let release;
     const previous = startGate;
-    startGate = new Promise(resolve => { release = resolve; });
+    startGate = new Promise((resolve) => {
+      release = resolve;
+    });
     await previous;
     try {
       if (stopped) return { stopped: true };
@@ -420,7 +527,7 @@ async function filterVintedPolishOffers(
     } finally {
       release();
     }
-    const read = await retryRead(() => languageReader(url, {signal}), {
+    const read = await retryRead(() => languageReader(url, { signal }), {
       onProgress,
       waiter,
       signal,
@@ -480,7 +587,8 @@ async function filterVintedPolishOffers(
 // condition, photos, age) instead of reading it again later. Cached decisions carry none of these.
 function vintedDetailFields(detail, now = new Date()) {
   const out = {};
-  if (typeof detail.description === 'string' && detail.description) out.listingDescription = detail.description.slice(0, 8000);
+  if (typeof detail.description === 'string' && detail.description)
+    out.listingDescription = detail.description.slice(0, 8000);
   for (const field of ['conditionText', 'listedAtText', 'photoCount', 'favouriteCount', 'sellerId'])
     if (detail[field] != null) out[field] = detail[field];
   if (detail.listedAtText) {
@@ -551,19 +659,23 @@ let logWriteQueue = Promise.resolve();
 const maxLogBytes = 5 * 1024 * 1024;
 function recordProgress(event) {
   const safe = { at: new Date().toISOString(), ...event };
-  logWriteQueue = logWriteQueue.then(async () => {
-    await mkdir(runtimeDataDirectory, { recursive: true });
-    const bytes = Buffer.byteLength(JSON.stringify(safe) + '\n');
-    const size = await stat(logPath).then(file => file.size).catch(error => {
-      if (error.code === 'ENOENT') return 0;
-      throw error;
-    });
-    if (size + bytes > maxLogBytes) {
-      await rm(logPath + '.1', { force: true });
-      if (size) await rename(logPath, logPath + '.1');
-    }
-    await appendFile(logPath, JSON.stringify(safe) + '\n');
-  }).catch(() => {});
+  logWriteQueue = logWriteQueue
+    .then(async () => {
+      await mkdir(runtimeDataDirectory, { recursive: true });
+      const bytes = Buffer.byteLength(JSON.stringify(safe) + '\n');
+      const size = await stat(logPath)
+        .then((file) => file.size)
+        .catch((error) => {
+          if (error.code === 'ENOENT') return 0;
+          throw error;
+        });
+      if (size + bytes > maxLogBytes) {
+        await rm(logPath + '.1', { force: true });
+        if (size) await rename(logPath, logPath + '.1');
+      }
+      await appendFile(logPath, JSON.stringify(safe) + '\n');
+    })
+    .catch(() => {});
   return safe;
 }
 function streamHeaders(response, type = 'application/x-ndjson; charset=utf-8') {
@@ -584,8 +696,9 @@ function historySnapshot(history) {
   return {
     updatedAt: history.updatedAt,
     lastScan: history.lastScan,
-    books: allBookStatistics(history)
-      .sort((a, b) => String(b.book.lastSeenAt).localeCompare(String(a.book.lastSeenAt))),
+    books: allBookStatistics(history).sort((a, b) =>
+      String(b.book.lastSeenAt).localeCompare(String(a.book.lastSeenAt)),
+    ),
     offers: analyzedOffers(history).sort((a, b) =>
       String(b.lastSeenAt).localeCompare(String(a.lastSeenAt)),
     ),
@@ -597,13 +710,16 @@ function historySnapshot(history) {
 export function catalogHistorySnapshot(repository) {
   const history = sqliteHistoryModel(repository, { includePriceHistory: false });
   const snapshot = historySnapshot(history);
-  const books = new Map(snapshot.books.map(row => [row.book.id, row]));
-  for (const point of repository.database.prepare(
-    'SELECT offer_id, min(price) AS price FROM offer_price_history GROUP BY offer_id',
-  ).all()) {
+  const books = new Map(snapshot.books.map((row) => [row.book.id, row]));
+  for (const point of repository.database
+    .prepare('SELECT offer_id, min(price) AS price FROM offer_price_history GROUP BY offer_id')
+    .all()) {
     const book = books.get(history.offers[point.offer_id]?.bookId);
-    if (book) book.historicalMinimum = book.historicalMinimum === null
-      ? point.price : Math.min(book.historicalMinimum, point.price);
+    if (book)
+      book.historicalMinimum =
+        book.historicalMinimum === null
+          ? point.price
+          : Math.min(book.historicalMinimum, point.price);
   }
   return snapshot;
 }
@@ -629,17 +745,27 @@ export async function withHistoryWriteLock(work) {
 const enrichmentPausedUntil = new Map();
 const ENRICHMENT_PAUSE_MS = 30 * 60_000;
 async function enrichPendingOffers(catalogStore) {
-  if (String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0' || !catalogStore.repository?.database) return null;
+  if (
+    String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0' ||
+    !catalogStore.repository?.database
+  )
+    return null;
   try {
     const now = Date.now();
-    const sources = [...DETAIL_SOURCES].filter((source) => !(enrichmentPausedUntil.get(source) > now));
+    const sources = [...DETAIL_SOURCES].filter(
+      (source) => !(enrichmentPausedUntil.get(source) > now),
+    );
     if (!sources.length) return null;
     const report = await enrichOffers(catalogStore.repository, { limit: 10, sources });
-    for (const source of report.paused ?? []) enrichmentPausedUntil.set(source, Date.now() + ENRICHMENT_PAUSE_MS);
+    for (const source of report.paused ?? [])
+      enrichmentPausedUntil.set(source, Date.now() + ENRICHMENT_PAUSE_MS);
     if (report.checked) recordProgress({ type: 'detail_enrichment', ...report });
     return report;
   } catch (error) {
-    recordProgress({ type: 'detail_enrichment_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'ENRICHMENT_ERROR' });
+    recordProgress({
+      type: 'detail_enrichment_error',
+      code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'ENRICHMENT_ERROR',
+    });
     return null;
   }
 }
@@ -651,7 +777,8 @@ let proposalsPausedUntil = 0;
 function scheduleProposalRefresh(catalogStore) {
   if (runningProposals || String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0') return;
   if (Date.now() < proposalsPausedUntil) return;
-  if (typeof catalogStore.findIsbnsByTitle !== 'function' || !catalogStore.repository?.database) return;
+  if (typeof catalogStore.findIsbnsByTitle !== 'function' || !catalogStore.repository?.database)
+    return;
   runningProposals = refreshProposals(catalogStore, { limit: 4 })
     .then((report) => {
       if (report.computed) recordProgress({ type: 'title_proposals', ...report });
@@ -659,7 +786,10 @@ function scheduleProposalRefresh(catalogStore) {
       if (report.unavailable) proposalsPausedUntil = Date.now() + 10 * 60_000;
     })
     .catch((error) =>
-      recordProgress({ type: 'title_proposals_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'PROPOSAL_ERROR' }),
+      recordProgress({
+        type: 'title_proposals_error',
+        code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'PROPOSAL_ERROR',
+      }),
     )
     .finally(() => {
       runningProposals = null;
@@ -675,17 +805,28 @@ let lifecycleNextAt = 0;
 let runningIsbnLookups = null;
 let isbnLookupsNextAt = 0;
 function scheduleIsbnLookups(catalogStore) {
-  if (runningIsbnLookups || Date.now() < isbnLookupsNextAt || String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0') return;
+  if (
+    runningIsbnLookups ||
+    Date.now() < isbnLookupsNextAt ||
+    String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0'
+  )
+    return;
   if (!catalogStore.repository?.database) return;
   isbnLookupsNextAt = Date.now() + 2 * 60_000;
   const repository = catalogStore.repository;
-  runningIsbnLookups = lookupUnknownIsbns(repository, { draftOf: (jobId) => offerEditionDraft(repository, jobId), limit: 2 })
+  runningIsbnLookups = lookupUnknownIsbns(repository, {
+    draftOf: (jobId) => offerEditionDraft(repository, jobId),
+    limit: 2,
+  })
     .then((report) => {
       if (report.paused) isbnLookupsNextAt = Date.now() + 30 * 60_000;
       if (report.checked) recordProgress({ type: 'isbn_lookups', ...report });
     })
     .catch((error) =>
-      recordProgress({ type: 'isbn_lookups_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'ISBN_LOOKUP_ERROR' }),
+      recordProgress({
+        type: 'isbn_lookups_error',
+        code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'ISBN_LOOKUP_ERROR',
+      }),
     )
     .finally(() => {
       runningIsbnLookups = null;
@@ -697,7 +838,12 @@ function scheduleIsbnLookups(catalogStore) {
 let runningSetDescriptions = null;
 let setDescriptionsNextAt = 0;
 function scheduleSetDescriptions(catalogStore) {
-  if (runningSetDescriptions || Date.now() < setDescriptionsNextAt || String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0') return;
+  if (
+    runningSetDescriptions ||
+    Date.now() < setDescriptionsNextAt ||
+    String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0'
+  )
+    return;
   if (!catalogStore.repository?.database) return;
   setDescriptionsNextAt = Date.now() + 3 * 60_000;
   runningSetDescriptions = fillSetsFromDescriptions(catalogStore.repository, { limit: 4 })
@@ -706,7 +852,10 @@ function scheduleSetDescriptions(catalogStore) {
       if (report.checked) recordProgress({ type: 'set_descriptions', ...report });
     })
     .catch((error) =>
-      recordProgress({ type: 'set_descriptions_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'SET_DESCRIPTION_ERROR' }),
+      recordProgress({
+        type: 'set_descriptions_error',
+        code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'SET_DESCRIPTION_ERROR',
+      }),
     )
     .finally(() => {
       runningSetDescriptions = null;
@@ -714,7 +863,12 @@ function scheduleSetDescriptions(catalogStore) {
 }
 
 function scheduleLifecycleCheck(catalogStore) {
-  if (runningLifecycle || Date.now() < lifecycleNextAt || String(process.env.BOOKFLIP_OFFER_LIFECYCLE ?? '1') === '0') return;
+  if (
+    runningLifecycle ||
+    Date.now() < lifecycleNextAt ||
+    String(process.env.BOOKFLIP_OFFER_LIFECYCLE ?? '1') === '0'
+  )
+    return;
   if (!catalogStore.repository?.database) return;
   lifecycleNextAt = Date.now() + 10 * 60_000;
   runningLifecycle = checkOfferLifecycle(catalogStore.repository, { limit: 8 })
@@ -722,7 +876,10 @@ function scheduleLifecycleCheck(catalogStore) {
       if (report.checked || report.errors) recordProgress({ type: 'offer_lifecycle', ...report });
     })
     .catch((error) =>
-      recordProgress({ type: 'offer_lifecycle_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'LIFECYCLE_ERROR' }),
+      recordProgress({
+        type: 'offer_lifecycle_error',
+        code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'LIFECYCLE_ERROR',
+      }),
     )
     .finally(() => {
       runningLifecycle = null;
@@ -738,7 +895,10 @@ function scheduleListingSeries(catalogStore) {
     const report = inferListingSeries(catalogStore.repository);
     if (report.works) recordProgress({ type: 'listing_series', ...report });
   } catch (error) {
-    recordProgress({ type: 'listing_series_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'LISTING_SERIES_ERROR' });
+    recordProgress({
+      type: 'listing_series_error',
+      code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'LISTING_SERIES_ERROR',
+    });
   }
 }
 
@@ -746,7 +906,12 @@ function scheduleListingSeries(catalogStore) {
 let runningOfferEditions = null;
 let offerEditionsNextAt = 0;
 function scheduleOfferEditionRecheck(catalogStore) {
-  if (runningOfferEditions || Date.now() < offerEditionsNextAt || typeof catalogStore.lookupIsbn !== 'function') return;
+  if (
+    runningOfferEditions ||
+    Date.now() < offerEditionsNextAt ||
+    typeof catalogStore.lookupIsbn !== 'function'
+  )
+    return;
   if (!catalogStore.repository?.database) return;
   offerEditionsNextAt = Date.now() + 60 * 60_000;
   runningOfferEditions = recheckOfferEditions(catalogStore, { limit: 5 })
@@ -754,7 +919,10 @@ function scheduleOfferEditionRecheck(catalogStore) {
       if (report.checked) recordProgress({ type: 'offer_editions_recheck', ...report });
     })
     .catch((error) =>
-      recordProgress({ type: 'offer_editions_recheck_error', code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'RECHECK_ERROR' }),
+      recordProgress({
+        type: 'offer_editions_recheck_error',
+        code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'RECHECK_ERROR',
+      }),
     )
     .finally(() => {
       runningOfferEditions = null;
@@ -807,7 +975,12 @@ const sharedVintedDetailCache = createVintedDetailCache();
 async function searchAndStore(
   input,
   onProgress = () => {},
-  { catalogProvider = getProductionCatalog, search = searchOffers, signal = null, shouldAutoResolve = () => true } = {},
+  {
+    catalogProvider = getProductionCatalog,
+    search = searchOffers,
+    signal = null,
+    shouldAutoResolve = () => true,
+  } = {},
 ) {
   storageMode();
   const catalog = catalogProvider();
@@ -826,19 +999,31 @@ async function searchAndStore(
   const onOffers = async ({ source, query, offers }) => {
     for (const offer of offers) {
       const known = savedOffers.get(offer.url);
-      if (known) known.matchedQueries = [...new Set([...known.matchedQueries, ...offer.matchedQueries])];
+      if (known)
+        known.matchedQueries = [...new Set([...known.matchedQueries, ...offer.matchedQueries])];
       else savedOffers.set(offer.url, { ...offer, matchedQueries: [...offer.matchedQueries] });
     }
     const report = await withHistoryWriteLock(async () =>
       persistSqliteScanBatch(catalog, { offers, scanAt: scanAt.toISOString(), state: scanState }),
     );
     savedDuringScan += report.saved;
-    onProgress({ type: 'offers-saved', source, query, saved: report.saved, newOffers: report.newOffers, total: savedDuringScan });
-    if (String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0' && shouldAutoResolve()) scheduleCatalogResolution(catalog);
+    onProgress({
+      type: 'offers-saved',
+      source,
+      query,
+      saved: report.saved,
+      newOffers: report.newOffers,
+      total: savedDuringScan,
+    });
+    if (String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0' && shouldAutoResolve())
+      scheduleCatalogResolution(catalog);
   };
   let result;
   try {
-    result = await awaitScan(search(input, { onProgress, detailCache, signal, onOffers, now: () => scanAt }), signal);
+    result = await awaitScan(
+      search(input, { onProgress, detailCache, signal, onOffers, now: () => scanAt }),
+      signal,
+    );
     scanCancelled(signal);
   } catch (error) {
     // Cancelled after some tasks finished: their offers are already saved; record the run too, so
@@ -846,8 +1031,18 @@ async function searchAndStore(
     // the scan did not finish.
     if (error?.message === 'SCAN_CANCELLED' && savedOffers.size)
       await withHistoryWriteLock(async () =>
-        persistSqliteScan(catalog, { offers: [...savedOffers.values()], searchedAt: scanAt.toISOString(), errors: [], scanState,
-          scanContext: { queries: input.queries, sources: input.sources, results: [], cancelled: true } }),
+        persistSqliteScan(catalog, {
+          offers: [...savedOffers.values()],
+          searchedAt: scanAt.toISOString(),
+          errors: [],
+          scanState,
+          scanContext: {
+            queries: input.queries,
+            sources: input.sources,
+            results: [],
+            cancelled: true,
+          },
+        }),
       ).catch(() => {});
     throw error;
   }
@@ -864,9 +1059,19 @@ async function searchAndStore(
     }));
   const saved = await withHistoryWriteLock(async () => {
     scanCancelled(signal);
-    return persistSqliteScan(catalog, { offers: result.offers, searchedAt: result.searchedAt, errors, scanState,
+    return persistSqliteScan(catalog, {
+      offers: result.offers,
+      searchedAt: result.searchedAt,
+      errors,
+      scanState,
       rejected: result.summary?.rejected,
-      scanContext: { queries: input.queries, sources: input.sources, results: result.results, ...(result.mode ? { mode: result.mode } : {}) } });
+      scanContext: {
+        queries: input.queries,
+        sources: input.sources,
+        results: result.results,
+        ...(result.mode ? { mode: result.mode } : {}),
+      },
+    });
   });
   if (String(process.env.BOOKFLIP_CATALOG_AUTO_RESOLVE ?? '1') !== '0' && shouldAutoResolve())
     scheduleCatalogResolution(catalog);
@@ -923,7 +1128,13 @@ export function createLocalAppServer({
       const buyback = getBuyback();
       if (!buyback) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
       if (request.method === 'GET' && url.pathname === '/api/buyback/quotes')
-        return send(response, 200, JSON.stringify({ quotes: buyback.many((url.searchParams.get('isbn') || '').split(',').slice(0, 200)) }));
+        return send(
+          response,
+          200,
+          JSON.stringify({
+            quotes: buyback.many((url.searchParams.get('isbn') || '').split(',').slice(0, 200)),
+          }),
+        );
       if (request.method === 'GET' && url.pathname === '/api/buyback/batch')
         return send(response, 200, JSON.stringify(buyback.status()));
       if (request.method === 'POST' && url.pathname === '/api/buyback/batch')
@@ -937,7 +1148,11 @@ export function createLocalAppServer({
       if (request.method === 'POST' && url.pathname === '/api/buyback/check') {
         const input = await readJson(request);
         try {
-          return send(response, 200, JSON.stringify(await buyback.check(input?.isbn, { force: input?.force === true })));
+          return send(
+            response,
+            200,
+            JSON.stringify(await buyback.check(input?.isbn, { force: input?.force === true })),
+          );
         } catch (error) {
           return send(response, error.status || 502, JSON.stringify({ error: error.message }));
         }
@@ -951,40 +1166,75 @@ export function createLocalAppServer({
       if (request.method === 'GET' && url.pathname === '/api/images/backfill')
         return send(response, 200, JSON.stringify(imageBackfill.status()));
       if (request.method === 'POST')
-        return send(response, 202, JSON.stringify(url.pathname.endsWith('/cancel') ? imageBackfill.cancel() : imageBackfill.start()));
+        return send(
+          response,
+          202,
+          JSON.stringify(
+            url.pathname.endsWith('/cancel') ? imageBackfill.cancel() : imageBackfill.start(),
+          ),
+        );
       return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
     })
     // Smaller routes live in trading-api.mjs; its route table says which paths are its own.
     .add('GET', '/api/scan/diagnostics', async ({ request, response, url, params }) => {
-      const scan = currentScan || await readScanStatus();
-      return send(response, 200, JSON.stringify({ ...scan, progress: scanProgress(scan.diagnostics), telemetry: scanTelemetry(scan.diagnostics, { running: scan.status === 'running' }) }));
+      const scan = currentScan || (await readScanStatus());
+      return send(
+        response,
+        200,
+        JSON.stringify({
+          ...scan,
+          progress: scanProgress(scan.diagnostics),
+          telemetry: scanTelemetry(scan.diagnostics, { running: scan.status === 'running' }),
+        }),
+      );
     })
     .add('GET', '/api/scan/status', async ({ request, response, url, params }) => {
-      return send(response, 200, JSON.stringify(currentScan || await readScanStatus()));
+      return send(response, 200, JSON.stringify(currentScan || (await readScanStatus())));
     })
     .add('PUT', '/api/catalog/universe/:id', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
       const id = params.id;
-      return send(response, 200, JSON.stringify(setWorkUniverse(catalog.repository, id, await readJson(request))));
+      return send(
+        response,
+        200,
+        JSON.stringify(setWorkUniverse(catalog.repository, id, await readJson(request))),
+      );
     })
     // Catalogue seeding from BN: the list, a new seed, a seed's status, removing one.
     .add(['GET', 'POST'], '/api/catalog/seeds', async ({ request, response }) => {
       const catalog = getProductionCatalog();
-      if (!catalog?.seeds) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      if (request.method === 'GET') return send(response, 200, JSON.stringify(catalog.seeds.list()));
+      if (!catalog?.seeds)
+        return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      if (request.method === 'GET')
+        return send(response, 200, JSON.stringify(catalog.seeds.list()));
       return send(response, 201, JSON.stringify(catalog.seeds.add(await readJson(request))));
     })
     .add(['PUT', 'DELETE'], '/api/catalog/seeds/:id', async ({ request, response, params }) => {
       const catalog = getProductionCatalog();
-      if (!catalog?.seeds) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      if (request.method === 'DELETE') return send(response, 200, JSON.stringify(catalog.seeds.remove(params.id)));
-      return send(response, 200, JSON.stringify(catalog.seeds.setStatus(params.id, (await readJson(request))?.status)));
+      if (!catalog?.seeds)
+        return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      if (request.method === 'DELETE')
+        return send(response, 200, JSON.stringify(catalog.seeds.remove(params.id)));
+      return send(
+        response,
+        200,
+        JSON.stringify(catalog.seeds.setStatus(params.id, (await readJson(request))?.status)),
+      );
     })
     .add('GET', '/api/catalog/persons', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      return send(response, 200, JSON.stringify({ items: catalogPersons(catalog.repository, { query: url.searchParams.get('q') || '', limit: url.searchParams.get('limit') || 200 }) }));
+      return send(
+        response,
+        200,
+        JSON.stringify({
+          items: catalogPersons(catalog.repository, {
+            query: url.searchParams.get('q') || '',
+            limit: url.searchParams.get('limit') || 200,
+          }),
+        }),
+      );
     })
     .add('GET', '/api/catalog/persons/:id', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
@@ -999,8 +1249,20 @@ export function createLocalAppServer({
     .add('*', '/api/catalog/series-definition', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      if (request.method === 'GET') return send(response, 200, JSON.stringify(getSeriesDefinition(catalog.repository, url.searchParams.get('name') || '')));
-      if (request.method === 'PUT') return send(response, 200, JSON.stringify(saveSeriesDefinition(catalog.repository, await readJson(request))));
+      if (request.method === 'GET')
+        return send(
+          response,
+          200,
+          JSON.stringify(
+            getSeriesDefinition(catalog.repository, url.searchParams.get('name') || ''),
+          ),
+        );
+      if (request.method === 'PUT')
+        return send(
+          response,
+          200,
+          JSON.stringify(saveSeriesDefinition(catalog.repository, await readJson(request))),
+        );
       return send(response, 405, JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }));
     })
     .add('GET', '/api/catalog/insights', async ({ request, response, url, params }) => {
@@ -1014,34 +1276,62 @@ export function createLocalAppServer({
       return send(response, 200, JSON.stringify(catalog.repository.counts()));
     })
     .add('GET', '/api/scan-profiles', async ({ request, response, url, params }) => {
-      const catalog=getProductionCatalog();
-      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-      return send(response,200,JSON.stringify({items:listScanProfiles(catalog.repository)}));
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify({ items: listScanProfiles(catalog.repository) }));
     })
     .add('POST', '/api/scan-profiles/import', async ({ request, response, url, params }) => {
-      const catalog=getProductionCatalog();
-      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-      const input=await readJson(request);
-      return send(response,200,JSON.stringify(putScanProfile(catalog.repository,input?.name,input,{onlyIfAbsent:true})));
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      return send(
+        response,
+        200,
+        JSON.stringify(
+          putScanProfile(catalog.repository, input?.name, input, { onlyIfAbsent: true }),
+        ),
+      );
     })
     .add('POST', '/api/scan-profiles', async ({ request, response, url, params }) => {
-      const catalog=getProductionCatalog();
-      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-      const input=await readJson(request);
-      const result=putScanProfile(catalog.repository,input?.name,input,{onlyIfAbsent:true});
-      return send(response,result.created?201:409,JSON.stringify(result.created?result:{error:'PROFILE_ALREADY_EXISTS'}));
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      const result = putScanProfile(catalog.repository, input?.name, input, { onlyIfAbsent: true });
+      return send(
+        response,
+        result.created ? 201 : 409,
+        JSON.stringify(result.created ? result : { error: 'PROFILE_ALREADY_EXISTS' }),
+      );
     })
-    .add(['PUT', 'DELETE'], '/api/scan-profiles/:name', async ({ request, response, url, params }) => {
-      const catalog=getProductionCatalog();
-      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-      const name=params.name;
-      if (request.method === 'DELETE')
-        return send(response,200,JSON.stringify(deleteScanProfile(catalog.repository,name)));
-      const input=await readJson(request);
-      return send(response,200,JSON.stringify(putScanProfile(catalog.repository,name,input)));
-    })
+    .add(
+      ['PUT', 'DELETE'],
+      '/api/scan-profiles/:name',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const name = params.name;
+        if (request.method === 'DELETE')
+          return send(response, 200, JSON.stringify(deleteScanProfile(catalog.repository, name)));
+        const input = await readJson(request);
+        return send(response, 200, JSON.stringify(putScanProfile(catalog.repository, name, input)));
+      },
+    )
     .add('GET', '/api/sources', async ({ request, response, url, params }) => {
-      return send(response, 200, JSON.stringify({ sources: Object.keys(localSourceHosts), blocked: (() => { try { const catalog = getProductionCatalog(); return catalog ? blockedSources(catalog.repository) : {}; } catch { return {}; } })() }));
+      return send(
+        response,
+        200,
+        JSON.stringify({
+          sources: Object.keys(localSourceHosts),
+          blocked: (() => {
+            try {
+              const catalog = getProductionCatalog();
+              return catalog ? blockedSources(catalog.repository) : {};
+            } catch {
+              return {};
+            }
+          })(),
+        }),
+      );
     })
     .add('GET', '/api/history/brief', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
@@ -1077,34 +1367,42 @@ export function createLocalAppServer({
         JSON.stringify({
           book: created.book,
           editionId: created.editionId,
-          catalog: url.searchParams.get('compact') === '1'
-            ? historyBookLabels(catalog.repository)
-            : catalogHistorySnapshot(catalog.repository),
+          catalog:
+            url.searchParams.get('compact') === '1'
+              ? historyBookLabels(catalog.repository)
+              : catalogHistorySnapshot(catalog.repository),
           catalogSync: { mode: 'sqlite' },
         }),
       );
     })
     .add('POST', '/api/identification/control', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
-      if (!catalog || !identificationControl) return send(response, 503, JSON.stringify({ error: 'IDENTIFICATION_UNAVAILABLE' }));
+      if (!catalog || !identificationControl)
+        return send(response, 503, JSON.stringify({ error: 'IDENTIFICATION_UNAVAILABLE' }));
       const { action, retryUnresolved = false } = await readJson(request);
       let retried = null;
       if (action === 'start') {
-        if (retryUnresolved)
-          retried = retryIdentificationJobs(catalog.repository, 'unresolved');
+        if (retryUnresolved) retried = retryIdentificationJobs(catalog.repository, 'unresolved');
         const startedAt = new Date().toISOString();
         catalog.beginIdentificationRun(startedAt);
         identificationControl.start({ newRun: true, startedAt });
         void identificationControl.tick();
-      }
-      else if (action === 'stop') identificationControl.pause();
+      } else if (action === 'stop') identificationControl.pause();
       else return send(response, 400, JSON.stringify({ error: 'INVALID_IDENTIFICATION_ACTION' }));
       return send(response, 200, JSON.stringify({ ...identificationControl.status(), retried }));
     })
     .add('GET', '/api/catalog/status', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       const scheduler = identificationControl?.status() ?? { available: false };
-      return send(response, 200, JSON.stringify(catalog ? { ...catalog.status({ runStartedAt: scheduler.runStartedAt }), scheduler } : { enabled: false }));
+      return send(
+        response,
+        200,
+        JSON.stringify(
+          catalog
+            ? { ...catalog.status({ runStartedAt: scheduler.runStartedAt }), scheduler }
+            : { enabled: false },
+        ),
+      );
     })
     .add('GET', '/api/catalog/series', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
@@ -1124,9 +1422,7 @@ export function createLocalAppServer({
       return send(
         response,
         200,
-        JSON.stringify(
-          listCatalogWorks(catalog.repository, Object.fromEntries(url.searchParams)),
-        ),
+        JSON.stringify(listCatalogWorks(catalog.repository, Object.fromEntries(url.searchParams))),
       );
     })
     // Prices of a book over all its editions, and its price variants.
@@ -1134,19 +1430,40 @@ export function createLocalAppServer({
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
       const data = workPriceOverview(catalog.repository, params.id);
-      return data ? send(response, 200, JSON.stringify(data)) : send(response, 404, JSON.stringify({ error: 'WORK_NOT_FOUND' }));
+      return data
+        ? send(response, 200, JSON.stringify(data))
+        : send(response, 404, JSON.stringify({ error: 'WORK_NOT_FOUND' }));
     })
-    .add('POST', '/api/catalog/works/:id/variants/merge', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const input = await readJson(request);
-      return send(response, 200, JSON.stringify(mergeVariants(catalog.repository, params.id, String(input?.from ?? ''), String(input?.to ?? ''))));
-    })
+    .add(
+      'POST',
+      '/api/catalog/works/:id/variants/merge',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        return send(
+          response,
+          200,
+          JSON.stringify(
+            mergeVariants(
+              catalog.repository,
+              params.id,
+              String(input?.from ?? ''),
+              String(input?.to ?? ''),
+            ),
+          ),
+        );
+      },
+    )
     .add('PUT', '/api/catalog/editions/:id/variant', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
       const input = await readJson(request);
-      return send(response, 200, JSON.stringify(setEditionVariant(catalog.repository, params.id, input?.variantKey ?? null)));
+      return send(
+        response,
+        200,
+        JSON.stringify(setEditionVariant(catalog.repository, params.id, input?.variantKey ?? null)),
+      );
     })
     .add('GET', '/api/catalog/works/:id', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog(),
@@ -1167,28 +1484,38 @@ export function createLocalAppServer({
         : send(response, 404, JSON.stringify({ error: 'EDITION_NOT_FOUND' }));
     })
     .add('GET', '/api/offer-workspace', async ({ request, response, url, params }) => {
-      const catalog=getProductionCatalog();
-      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-      return send(response,200,JSON.stringify({items:listOfferWorkspace(catalog.repository)}));
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify({ items: listOfferWorkspace(catalog.repository) }));
     })
     .add('POST', '/api/offer-workspace/import', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error:'CATALOG_DISABLED' }));
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
       const input = await readJson(request);
-      return send(response, 200, JSON.stringify(importOfferWorkspace(catalog.repository, input?.entries)));
+      return send(
+        response,
+        200,
+        JSON.stringify(importOfferWorkspace(catalog.repository, input?.entries)),
+      );
     })
     .add('PUT', '/api/offer-workspace/:id', async ({ request, response, url, params }) => {
-      const catalog=getProductionCatalog();
-      if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-      const id=params.id;
-      const input=await readJson(request);
-      return send(response,200,JSON.stringify(setOfferWorkspace(catalog.repository,id,input)));
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const id = params.id;
+      const input = await readJson(request);
+      return send(response, 200, JSON.stringify(setOfferWorkspace(catalog.repository, id, input)));
     })
     // Oferty → "Wg książki": one row per edition with its listings' count and price range.
     .add('GET', '/api/offer-groups', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      return send(response, 200, JSON.stringify(listCatalogOfferGroups(catalog.repository, Object.fromEntries(url.searchParams))));
+      return send(
+        response,
+        200,
+        JSON.stringify(
+          listCatalogOfferGroups(catalog.repository, Object.fromEntries(url.searchParams)),
+        ),
+      );
     })
     .add('GET', '/api/offers', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
@@ -1196,26 +1523,38 @@ export function createLocalAppServer({
       return send(
         response,
         200,
-        JSON.stringify(
-          listCatalogOffers(catalog.repository, Object.fromEntries(url.searchParams)),
-        ),
+        JSON.stringify(listCatalogOffers(catalog.repository, Object.fromEntries(url.searchParams))),
       );
     })
     // Operator changes or removes an offer's edition (catalogue and offer panel).
-    .add(['PUT', 'DELETE'], '/api/offers/:id/assignment', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const offerId = params.id;
-      const input = await readJson(request);
-      // A book without a named edition: the edition the listing points at, or its unknown edition.
-      const editionId = request.method === 'PUT' && !input?.editionId && input?.workId
-        ? catalog.repository.transaction(() => editionForWorkAssignment(catalog.repository, String(input.workId), offerId).editionId)
-        : input?.editionId;
-      const result = request.method === 'PUT'
-        ? reassignOffer(catalog.repository, offerId, editionId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null })
-        : unassignOffer(catalog.repository, offerId, { reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null });
-      return send(response, 200, JSON.stringify(result));
-    })
+    .add(
+      ['PUT', 'DELETE'],
+      '/api/offers/:id/assignment',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const offerId = params.id;
+        const input = await readJson(request);
+        // A book without a named edition: the edition the listing points at, or its unknown edition.
+        const editionId =
+          request.method === 'PUT' && !input?.editionId && input?.workId
+            ? catalog.repository.transaction(
+                () =>
+                  editionForWorkAssignment(catalog.repository, String(input.workId), offerId)
+                    .editionId,
+              )
+            : input?.editionId;
+        const result =
+          request.method === 'PUT'
+            ? reassignOffer(catalog.repository, offerId, editionId, {
+                reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null,
+              })
+            : unassignOffer(catalog.repository, offerId, {
+                reason: typeof input?.reason === 'string' ? input.reason.slice(0, 300) : null,
+              });
+        return send(response, 200, JSON.stringify(result));
+      },
+    )
     .add('GET', '/api/offers/:id', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog(),
         id = params.id;
@@ -1245,21 +1584,41 @@ export function createLocalAppServer({
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
       const input = await readJson(request);
-      if (typeof input?.offerId !== 'string' || !input.offerId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_OFFER_ID' }));
+      if (typeof input?.offerId !== 'string' || !input.offerId.trim())
+        return send(response, 400, JSON.stringify({ error: 'INVALID_OFFER_ID' }));
       return send(response, 200, JSON.stringify(markOfferAsSet(catalog.repository, input.offerId)));
     })
     // GET: suggestions from the listing title; POST {text}: books named in a pasted description.
-    .add(['GET', 'POST'], '/api/sets/:offerId/candidates', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const input = request.method === 'POST' ? await readJson(request) : {};
-      const text = typeof input?.text === 'string' ? input.text.slice(0, 20000) : '';
-      return send(response, 200, JSON.stringify(setCandidates(catalog.repository, params.offerId, { text })));
-    })
+    .add(
+      ['GET', 'POST'],
+      '/api/sets/:offerId/candidates',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = request.method === 'POST' ? await readJson(request) : {};
+        const text = typeof input?.text === 'string' ? input.text.slice(0, 20000) : '';
+        return send(
+          response,
+          200,
+          JSON.stringify(setCandidates(catalog.repository, params.offerId, { text })),
+        );
+      },
+    )
     .add('GET', '/api/sets-cycle-volumes', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      return send(response, 200, JSON.stringify(cycleVolumeEditions(catalog.repository, url.searchParams.get('name') || '', url.searchParams.get('from'), url.searchParams.get('to'))));
+      return send(
+        response,
+        200,
+        JSON.stringify(
+          cycleVolumeEditions(
+            catalog.repository,
+            url.searchParams.get('name') || '',
+            url.searchParams.get('from'),
+            url.searchParams.get('to'),
+          ),
+        ),
+      );
     })
     // A set's books: add one, remove one; or unmark the set. (The path used to be split by hand:
     // counted with the leading "/api/sets", adding a book, removing one and unmarking never matched.)
@@ -1267,18 +1626,33 @@ export function createLocalAppServer({
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
       const input = await readJson(request);
-      if (typeof input?.editionId !== 'string' || !input.editionId.trim()) return send(response, 400, JSON.stringify({ error:'INVALID_EDITION_ID' }));
-      return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, params.offerId, input.editionId, true)));
+      if (typeof input?.editionId !== 'string' || !input.editionId.trim())
+        return send(response, 400, JSON.stringify({ error: 'INVALID_EDITION_ID' }));
+      return send(
+        response,
+        200,
+        JSON.stringify(updateSetEdition(catalog.repository, params.offerId, input.editionId, true)),
+      );
     })
     .add('DELETE', '/api/sets/:offerId/editions/:editionId', async ({ response, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      return send(response, 200, JSON.stringify(updateSetEdition(catalog.repository, params.offerId, params.editionId, false)));
+      return send(
+        response,
+        200,
+        JSON.stringify(
+          updateSetEdition(catalog.repository, params.offerId, params.editionId, false),
+        ),
+      );
     })
     .add('DELETE', '/api/sets/:offerId', async ({ response, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      return send(response, 200, JSON.stringify(unmarkOfferSet(catalog.repository, params.offerId)));
+      return send(
+        response,
+        200,
+        JSON.stringify(unmarkOfferSet(catalog.repository, params.offerId)),
+      );
     })
     .add('GET', '/api/identification-jobs', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
@@ -1292,107 +1666,161 @@ export function createLocalAppServer({
       );
     })
     // "Szybkie" tab: the sure decisions to look through, then apply the ones the operator kept.
-    .add('POST', '/api/identification-jobs/sure-plan', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const input = await readJson(request);
-      const jobIds = Array.isArray(input?.jobIds) ? input.jobIds.map(String).slice(0, 2000) : null;
-      return send(response, 200, JSON.stringify(sureReviewPlan(catalog.repository, { jobIds })));
-    })
-    .add('POST', '/api/identification-jobs/sure-apply', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const input = await readJson(request);
-      const result = await applySureReviewPlan(catalog, Array.isArray(input?.items) ? input.items : []);
-      // Approvals add ISBNs to the catalogue: the sibling offers with them are matched next.
-      if (result.approved && identificationControl) {
-        identificationControl.start();
-        void identificationControl.tick();
-      }
-      return send(response, 200, JSON.stringify(result));
-    })
+    .add(
+      'POST',
+      '/api/identification-jobs/sure-plan',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        const jobIds = Array.isArray(input?.jobIds)
+          ? input.jobIds.map(String).slice(0, 2000)
+          : null;
+        return send(response, 200, JSON.stringify(sureReviewPlan(catalog.repository, { jobIds })));
+      },
+    )
+    .add(
+      'POST',
+      '/api/identification-jobs/sure-apply',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        const result = await applySureReviewPlan(
+          catalog,
+          Array.isArray(input?.items) ? input.items : [],
+        );
+        // Approvals add ISBNs to the catalogue: the sibling offers with them are matched next.
+        if (result.approved && identificationControl) {
+          identificationControl.start();
+          void identificationControl.tick();
+        }
+        return send(response, 200, JSON.stringify(result));
+      },
+    )
     // ISBN that no source knows: a draft built from the listings, then the edition in one click.
-    .add(['GET', 'POST'], '/api/identification-jobs/:id/offer-edition', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const jobId = params.id;
-      if (request.method === 'GET') return send(response, 200, JSON.stringify(offerEditionDraft(catalog.repository, jobId)));
-      const result = createEditionFromOffer(catalog.repository, jobId, await readJson(request));
-      if (identificationControl) {
-        identificationControl.start();
-        void identificationControl.tick();
-      }
-      return send(response, 200, JSON.stringify(result));
-    })
-    .add('POST', '/api/identification-jobs/:id/decision', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog(),
-        id = params.id;
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const input = await readJson(request);
-      const result = decideIdentificationJob(catalog.repository, id, input);
-      if (input.action === 'requeued' && identificationControl) {
-        identificationControl.start();
-        void identificationControl.tick();
-      }
-      return send(
-        response,
-        200,
-        JSON.stringify(result),
-      );
-    })
-    .add('GET', '/api/identification-jobs/:id/local-candidates', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const job = catalog.repository.database
-        .prepare('SELECT o.id AS offer_id, o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=?')
-        .get(params.id);
-      if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
-      return send(response, 200, JSON.stringify({ items: localWorkCandidates(catalog.repository, job.original_title, { offerId: job.offer_id }) }));
-    })
-    .add(['GET', 'POST'], '/api/identification-jobs/:id/proposals', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const id = params.id;
-      const job = catalog.repository.database
-        .prepare(
-          "SELECT j.id,j.offer_id,o.original_title,o.observed_isbn FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=? AND j.status='review_required'",
-        )
-        .get(id);
-      if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
-      // GET reads the stored proposal and computes one when missing; POST forces a fresh lookup.
-      const stored = request.method === 'GET' ? loadProposal(catalog.repository, id) : null;
-      if (stored) return send(response, 200, JSON.stringify(stored));
-      const fresh = await computeProposal(catalog, job);
-      return send(
-        response,
-        200,
-        JSON.stringify({ jobId: id, queries: fresh.queries, candidates: fresh.candidates, confidence: fresh.confidence, unavailable: fresh.unavailable }),
-      );
-    })
-    .add('POST', '/api/identification-jobs/:id/find-isbn', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const id = params.id;
-      const job = catalog.repository.database.prepare(
-        "SELECT j.id,o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=? AND j.status='review_required'",
-      ).get(id);
-      if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
-      const input = await readJson(request);
-      return send(response, 200, JSON.stringify(
-        await catalog.findIsbnsByTitle(input?.title || job.original_title),
-      ));
-    })
-    .add('POST', '/api/identification-jobs/:id/match-isbn', async ({ request, response, url, params }) => {
-      const catalog = getProductionCatalog();
-      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
-      const id = params.id;
-      const input = await readJson(request);
-      return send(
-        response,
-        200,
-        JSON.stringify(await matchIdentificationJobByIsbn(catalog, id, input)),
-      );
-    })
+    .add(
+      ['GET', 'POST'],
+      '/api/identification-jobs/:id/offer-edition',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const jobId = params.id;
+        if (request.method === 'GET')
+          return send(response, 200, JSON.stringify(offerEditionDraft(catalog.repository, jobId)));
+        const result = createEditionFromOffer(catalog.repository, jobId, await readJson(request));
+        if (identificationControl) {
+          identificationControl.start();
+          void identificationControl.tick();
+        }
+        return send(response, 200, JSON.stringify(result));
+      },
+    )
+    .add(
+      'POST',
+      '/api/identification-jobs/:id/decision',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog(),
+          id = params.id;
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = await readJson(request);
+        const result = decideIdentificationJob(catalog.repository, id, input);
+        if (input.action === 'requeued' && identificationControl) {
+          identificationControl.start();
+          void identificationControl.tick();
+        }
+        return send(response, 200, JSON.stringify(result));
+      },
+    )
+    .add(
+      'GET',
+      '/api/identification-jobs/:id/local-candidates',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const job = catalog.repository.database
+          .prepare(
+            'SELECT o.id AS offer_id, o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=?',
+          )
+          .get(params.id);
+        if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
+        return send(
+          response,
+          200,
+          JSON.stringify({
+            items: localWorkCandidates(catalog.repository, job.original_title, {
+              offerId: job.offer_id,
+            }),
+          }),
+        );
+      },
+    )
+    .add(
+      ['GET', 'POST'],
+      '/api/identification-jobs/:id/proposals',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const id = params.id;
+        const job = catalog.repository.database
+          .prepare(
+            "SELECT j.id,j.offer_id,o.original_title,o.observed_isbn FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=? AND j.status='review_required'",
+          )
+          .get(id);
+        if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
+        // GET reads the stored proposal and computes one when missing; POST forces a fresh lookup.
+        const stored = request.method === 'GET' ? loadProposal(catalog.repository, id) : null;
+        if (stored) return send(response, 200, JSON.stringify(stored));
+        const fresh = await computeProposal(catalog, job);
+        return send(
+          response,
+          200,
+          JSON.stringify({
+            jobId: id,
+            queries: fresh.queries,
+            candidates: fresh.candidates,
+            confidence: fresh.confidence,
+            unavailable: fresh.unavailable,
+          }),
+        );
+      },
+    )
+    .add(
+      'POST',
+      '/api/identification-jobs/:id/find-isbn',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const id = params.id;
+        const job = catalog.repository.database
+          .prepare(
+            "SELECT j.id,o.original_title FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE j.id=? AND j.status='review_required'",
+          )
+          .get(id);
+        if (!job) return send(response, 404, JSON.stringify({ error: 'REVIEW_JOB_NOT_FOUND' }));
+        const input = await readJson(request);
+        return send(
+          response,
+          200,
+          JSON.stringify(await catalog.findIsbnsByTitle(input?.title || job.original_title)),
+        );
+      },
+    )
+    .add(
+      'POST',
+      '/api/identification-jobs/:id/match-isbn',
+      async ({ request, response, url, params }) => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const id = params.id;
+        const input = await readJson(request);
+        return send(
+          response,
+          200,
+          JSON.stringify(await matchIdentificationJobByIsbn(catalog, id, input)),
+        );
+      },
+    )
     .add('POST', '/api/catalog/isbn-check', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
@@ -1400,21 +1828,29 @@ export function createLocalAppServer({
       const isbn = normalizeISBN(raw);
       if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
       const edition = catalog.repository.findEditionByISBN(isbn);
-      return send(response, 200, JSON.stringify({
-        isbn, found: Boolean(edition),
-        edition: edition ? { id: edition.id, title: edition.title, workId: edition.work_id, workTitle: edition.work_title } : null,
-      }));
+      return send(
+        response,
+        200,
+        JSON.stringify({
+          isbn,
+          found: Boolean(edition),
+          edition: edition
+            ? {
+                id: edition.id,
+                title: edition.title,
+                workId: edition.work_id,
+                workTitle: edition.work_title,
+              }
+            : null,
+        }),
+      );
     })
     .add('POST', '/api/catalog/lookup-preview', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
       const isbn = normalizeISBN((await readJson(request))?.isbn);
       if (!isbn) return send(response, 400, JSON.stringify({ error: 'INVALID_ISBN' }));
-      return send(
-        response,
-        200,
-        JSON.stringify(await catalog.lookupIsbn(isbn)),
-      );
+      return send(response, 200, JSON.stringify(await catalog.lookupIsbn(isbn)));
     })
     .add('POST', '/api/catalog/lookup-confirm', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
@@ -1437,7 +1873,9 @@ export function createLocalAppServer({
       const input = await readJson(request);
       const catalog = getProductionCatalog();
       if (!catalog) throw Error('SQLITE_STORAGE_REQUIRES_CATALOG');
-      await withHistoryWriteLock(async () => linkSqliteOffer(catalog, input, { returnHistory: false }));
+      await withHistoryWriteLock(async () =>
+        linkSqliteOffer(catalog, input, { returnHistory: false }),
+      );
       return send(response, 200, JSON.stringify(catalogHistorySnapshot(catalog.repository)));
     })
     .add('POST', '/api/search/cancel', async ({ request, response, url, params }) => {
@@ -1454,18 +1892,29 @@ export function createLocalAppServer({
       try {
         const scanInput = validateSearchInput(await readJson(request));
         // "Tylko polskie wydania" (scanner form, saved in the database; scheduled scans use it too).
-        try { const store = getProductionCatalog(); if (store?.repository) scanInput.polishOnly = getPolishOnly(store.repository); } catch {}
+        try {
+          const store = getProductionCatalog();
+          if (store?.repository) scanInput.polishOnly = getPolishOnly(store.repository);
+        } catch {}
         scanStarted = true;
         scanAbortController = new AbortController();
-        currentScan = { status: 'running', startedAt: new Date().toISOString(),
-          diagnostics: createScanDiagnostics({ queries: scanInput.queries || [], sources: scanInput.sources || [], tasks: scanInput.tasks || null }) };
+        currentScan = {
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          diagnostics: createScanDiagnostics({
+            queries: scanInput.queries || [],
+            sources: scanInput.sources || [],
+            tasks: scanInput.tasks || null,
+          }),
+        };
         await persistScanStatus(currentScan);
         if (url.searchParams.get('stream') === '1') {
           streamHeaders(response);
           const emit = (event) => {
             const safe = recordProgress(event);
             addScanEvent(currentScan.diagnostics, safe);
-            if (!response.destroyed) response.write(JSON.stringify({ type: 'progress', event: safe }) + '\n');
+            if (!response.destroyed)
+              response.write(JSON.stringify({ type: 'progress', event: safe }) + '\n');
           };
           try {
             const result = await searchAndStore(scanInput, emit, {
@@ -1474,35 +1923,59 @@ export function createLocalAppServer({
               signal: scanAbortController.signal,
               shouldAutoResolve: () => identificationControl?.status().running ?? true,
             });
-            currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: { ...result.summary, scanAt: result.lastScan?.at ?? null } };
+            currentScan = {
+              ...currentScan,
+              status: 'completed',
+              finishedAt: new Date().toISOString(),
+              summary: { ...result.summary, scanAt: result.lastScan?.at ?? null },
+            };
             await persistScanStatus(currentScan);
-            if (!response.destroyed) response.write(JSON.stringify({ type: 'result', result }) + '\n');
+            if (!response.destroyed)
+              response.write(JSON.stringify({ type: 'result', result }) + '\n');
             if (!response.destroyed) response.end();
           } catch (error) {
-            currentScan = { ...currentScan, status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed', finishedAt: new Date().toISOString() };
+            currentScan = {
+              ...currentScan,
+              status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed',
+              finishedAt: new Date().toISOString(),
+            };
             await persistScanStatus(currentScan);
-            if (!response.destroyed) response.write(
-              JSON.stringify({
-                type: 'error',
-                error: /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'LOCAL_APP_ERROR',
-              }) + '\n',
-            );
+            if (!response.destroyed)
+              response.write(
+                JSON.stringify({
+                  type: 'error',
+                  error: /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'LOCAL_APP_ERROR',
+                }) + '\n',
+              );
             if (!response.destroyed) response.end();
           }
           return;
         }
-        const result = await searchAndStore(scanInput, (event) => addScanEvent(currentScan.diagnostics, recordProgress(event)), {
-          catalogProvider,
-          search,
-          signal: scanAbortController.signal,
-          shouldAutoResolve: () => identificationControl?.status().running ?? true,
-        });
-        currentScan = { ...currentScan, status: 'completed', finishedAt: new Date().toISOString(), summary: { ...result.summary, scanAt: result.lastScan?.at ?? null } };
+        const result = await searchAndStore(
+          scanInput,
+          (event) => addScanEvent(currentScan.diagnostics, recordProgress(event)),
+          {
+            catalogProvider,
+            search,
+            signal: scanAbortController.signal,
+            shouldAutoResolve: () => identificationControl?.status().running ?? true,
+          },
+        );
+        currentScan = {
+          ...currentScan,
+          status: 'completed',
+          finishedAt: new Date().toISOString(),
+          summary: { ...result.summary, scanAt: result.lastScan?.at ?? null },
+        };
         await persistScanStatus(currentScan);
         return send(response, 200, JSON.stringify(result));
       } catch (error) {
         if (scanStarted) {
-          currentScan = { ...currentScan, status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed', finishedAt: new Date().toISOString() };
+          currentScan = {
+            ...currentScan,
+            status: error.message === 'SCAN_CANCELLED' ? 'cancelled' : 'failed',
+            finishedAt: new Date().toISOString(),
+          };
           await persistScanStatus(currentScan);
         }
         throw error;
@@ -1510,8 +1983,7 @@ export function createLocalAppServer({
         scanAbortController = null;
         scanInFlight = false;
       }
-    })
-  ;
+    });
   const server = createServer(async (request, response) => {
     try {
       const rejected = validateBookflipRequest(request, tailscaleAccess);
@@ -1522,10 +1994,15 @@ export function createLocalAppServer({
       const tradingMatch = tradingRoutes.match(request.method, url.pathname);
       if (tradingMatch?.handler) {
         const catalog = getProductionCatalog();
-        if (!catalog) return send(response,503,JSON.stringify({error:'CATALOG_DISABLED'}));
-        const input = ['PUT','POST'].includes(request.method) ? await readJson(request) : null;
-        const data = await tradingMatch.handler({ repo: catalog.repository, method: request.method, input, params: tradingMatch.params });
-        return send(response,200,JSON.stringify(data ?? null));
+        if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+        const input = ['PUT', 'POST'].includes(request.method) ? await readJson(request) : null;
+        const data = await tradingMatch.handler({
+          repo: catalog.repository,
+          method: request.method,
+          input,
+          params: tradingMatch.params,
+        });
+        return send(response, 200, JSON.stringify(data ?? null));
       }
       const route = localRoutes.match(request.method, url.pathname);
       if (route?.handler) {
@@ -1541,7 +2018,8 @@ export function createLocalAppServer({
       try {
         requested = await realpath(join(root, file));
       } catch (error) {
-        if (error.code === 'ENOENT') return send(response, 404, 'Nie znaleziono', 'text/plain; charset=utf-8');
+        if (error.code === 'ENOENT')
+          return send(response, 404, 'Nie znaleziono', 'text/plain; charset=utf-8');
         throw error;
       }
       if (!requested.startsWith(root + sep))
@@ -1587,10 +2065,11 @@ async function main() {
       return catalog ? scheduleCatalogResolution(catalog) : null;
     },
     intervalMs,
-    onError: (error) => recordProgress({
-      type: 'catalog_scheduler_error',
-      code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'CATALOG_INTEGRATION_ERROR',
-    }),
+    onError: (error) =>
+      recordProgress({
+        type: 'catalog_scheduler_error',
+        code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'CATALOG_INTEGRATION_ERROR',
+      }),
   });
   const server = createLocalAppServer({ identificationControl: scheduler });
   // Recurring scans of the saved profile (off until the user enables it in the Scanner view).
@@ -1604,7 +2083,13 @@ async function main() {
     getPath: () => getProductionCatalog()?.repository?.path ?? null,
     onEvent: (event) => recordProgress(event),
   });
-  server.on('close', () => { void scheduler.stop(); scanScheduler.stop(); buyback?.stopAuto(); productionCatalog?.seeds?.stop(); autoBackup.stop(); });
+  server.on('close', () => {
+    void scheduler.stop();
+    scanScheduler.stop();
+    buyback?.stopAuto();
+    productionCatalog?.seeds?.stop();
+    autoBackup.stop();
+  });
   server.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
       console.log(`BookFlip Scanner już działa pod adresem ${url}`);
@@ -1628,7 +2113,8 @@ async function main() {
     }
     if (String(process.env.BOOKFLIP_SCHEDULED_SCANS ?? '1') !== '0') scanScheduler.start();
     if (String(process.env.BOOKFLIP_BUYBACK_AUTO ?? '1') !== '0') getBuyback()?.startAuto();
-    if (String(process.env.BOOKFLIP_CATALOG_SEEDS ?? '1') !== '0') getProductionCatalog()?.seeds?.start();
+    if (String(process.env.BOOKFLIP_CATALOG_SEEDS ?? '1') !== '0')
+      getProductionCatalog()?.seeds?.start();
     if (String(process.env.BOOKFLIP_AUTO_BACKUP ?? '1') !== '0') autoBackup.start();
     console.log(`BookFlip Scanner działa: ${url}`);
     openLocalApp(url);

@@ -18,7 +18,9 @@ test('fresh Windows installation uses persistent LocalAppData without legacy imp
     const reopened = new SqliteCatalogRepository(path);
     assert.equal(reopened.counts().works, 0);
     reopened.close();
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('pre-upgrade backup captures SQLite and verifies integrity', async () => {
@@ -26,7 +28,9 @@ test('pre-upgrade backup captures SQLite and verifies integrity', async () => {
   try {
     const path = join(root, 'catalog.sqlite');
     const db = new DatabaseSync(path);
-    db.exec("CREATE TABLE legacy_notes(note TEXT); INSERT INTO legacy_notes VALUES('keep this data')");
+    db.exec(
+      "CREATE TABLE legacy_notes(note TEXT); INSERT INTO legacy_notes VALUES('keep this data')",
+    );
     db.close();
     const backup = backupBeforeMigrations(path);
     assert.ok(backup);
@@ -35,5 +39,7 @@ test('pre-upgrade backup captures SQLite and verifies integrity', async () => {
     assert.equal(copy.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
     copy.close();
     assert.equal((await readdir(dirname(backup))).length, 1);
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

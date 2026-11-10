@@ -85,8 +85,12 @@ export class IdentificationWorker {
       // A source that keeps failing (e.g. BN with an expired certificate) is asked less and less
       // often: 5, 10, 20, 40 min, then hourly. When it answers again the backlog is woken up below.
       const attempts = Math.max(1, Number(job.attempt_count) || 1);
-      const delay = Math.min(this.retryDelayMs * 2 ** Math.min(attempts - 1, 20), this.maxRetryDelayMs);
-      const runAfter = status === 'retry_wait' ? new Date(now.getTime() + delay).toISOString() : null;
+      const delay = Math.min(
+        this.retryDelayMs * 2 ** Math.min(attempts - 1, 20),
+        this.maxRetryDelayMs,
+      );
+      const runAfter =
+        status === 'retry_wait' ? new Date(now.getTime() + delay).toISOString() : null;
       const saved = this.repository.database
         .prepare(
           `UPDATE identification_jobs
@@ -129,7 +133,10 @@ export class IdentificationWorker {
         );
       const now = this.now();
       const shouldRetry = retryable && Number(job.attempt_count) < this.maxAttempts;
-      const delay = Math.min(this.retryDelayMs * 2 ** Math.max(0, Number(job.attempt_count) - 1), 24 * 60 * 60_000);
+      const delay = Math.min(
+        this.retryDelayMs * 2 ** Math.max(0, Number(job.attempt_count) - 1),
+        24 * 60 * 60_000,
+      );
       this.repository.database
         .prepare(
           `UPDATE identification_jobs
@@ -157,7 +164,8 @@ export class IdentificationWorker {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000)
       throw new Error('INVALID_BATCH_LIMIT');
     const started = performance.now();
-    const items = [], errors = [];
+    const items = [],
+      errors = [];
     let reservations = 0;
     const concurrency = Math.min(3, limit);
     // Claiming and database writes stay synchronous/transactional; only
@@ -177,11 +185,23 @@ export class IdentificationWorker {
       }
     });
     await Promise.all(work);
-    const now=iso(this.now());
-    const hasMore=Boolean(this.repository.database.prepare(`SELECT 1 FROM identification_jobs
+    const now = iso(this.now());
+    const hasMore = Boolean(
+      this.repository.database
+        .prepare(
+          `SELECT 1 FROM identification_jobs
       WHERE (status IN ('queued','retry_wait') AND (run_after IS NULL OR run_after<=?))
-      OR (status='running' AND lease_expires_at<=?) LIMIT 1`).get(now,now));
-    this.lastBatch={processed:items.length,failed:errors.length,durationMs:Math.round(performance.now()-started),finishedAt:now,hasMore};
+      OR (status='running' AND lease_expires_at<=?) LIMIT 1`,
+        )
+        .get(now, now),
+    );
+    this.lastBatch = {
+      processed: items.length,
+      failed: errors.length,
+      durationMs: Math.round(performance.now() - started),
+      finishedAt: now,
+      hasMore,
+    };
     return { ...this.lastBatch, errors, items };
   }
 

@@ -22,18 +22,30 @@ test('first surname handles BN "Surname, Name (years)" and "Name Surname"', () =
 });
 
 test('the key needs both a title and an author, so authorless records never group', () => {
-  assert.equal(workKey('Blask fantastyczny / Light fantastic', ['Pratchett, Terry']), 'blask fantastyczny|pratchett');
+  assert.equal(
+    workKey('Blask fantastyczny / Light fantastic', ['Pratchett, Terry']),
+    'blask fantastyczny|pratchett',
+  );
   assert.equal(workKey('Blask fantastyczny', ['Terry Pratchett']), 'blask fantastyczny|pratchett');
   assert.equal(workKey('Blask fantastyczny', []), null);
   assert.equal(workKey('AB', ['Terry Pratchett']), null);
   // A different book by the same author is a different key.
-  assert.notEqual(workKey('Straż! Straż!', ['Pratchett, Terry']), workKey('Blask fantastyczny', ['Pratchett, Terry']));
+  assert.notEqual(
+    workKey('Straż! Straż!', ['Pratchett, Terry']),
+    workKey('Blask fantastyczny', ['Pratchett, Terry']),
+  );
 });
 
 function seed() {
   const repo = new SqliteCatalogRepository(':memory:');
   const work = (id, title, authors, editions = 1) => {
-    repo.createWork({ id, title, normalizedTitle: title.toLowerCase(), authors, at: '2026-01-01T00:00:00Z' });
+    repo.createWork({
+      id,
+      title,
+      normalizedTitle: title.toLowerCase(),
+      authors,
+      at: '2026-01-01T00:00:00Z',
+    });
     for (let i = 0; i < editions; i++)
       repo.createEdition({ id: `${id}-e${i}`, workId: id, title, at: '2026-01-01T00:00:00Z' });
   };
@@ -50,9 +62,15 @@ test('duplicate groups join reprints by the same author and ignore look-alikes b
   assert.equal(groups.length, 1);
   assert.deepEqual(groups[0].works.map((w) => w.id).sort(), ['w1', 'w2']);
   assert.equal(groups[0].targetId, 'w1', 'the work with more editions is kept');
-  assert.equal(findWorkByKey(repo, 'Blask fantastyczny / Light fantastic', ['Pratchett, Terry'])?.id, undefined,
-    'ambiguous key (two works) must not be silently reused');
-  assert.equal(findWorkByKey(repo, 'Straż! Straż! / Guards! Guards!', ['Terry Pratchett'])?.id, 'w3');
+  assert.equal(
+    findWorkByKey(repo, 'Blask fantastyczny / Light fantastic', ['Pratchett, Terry'])?.id,
+    undefined,
+    'ambiguous key (two works) must not be silently reused',
+  );
+  assert.equal(
+    findWorkByKey(repo, 'Straż! Straż! / Guards! Guards!', ['Terry Pratchett'])?.id,
+    'w3',
+  );
 });
 
 test('merging a group moves editions and refuses works outside the group', () => {
@@ -61,8 +79,15 @@ test('merging a group moves editions and refuses works outside the group', () =>
   assert.throws(() => mergeWorkGroup(repo, 'w1', ['w4']), /NOT_A_DUPLICATE_GROUP/);
   const result = mergeWorkGroup(repo, 'w1', ['w2']);
   assert.equal(result.merged[0].merged, true);
-  assert.equal(repo.database.prepare("SELECT work_id FROM editions WHERE id='w2-e0'").get().work_id, 'w1');
-  assert.equal(findDuplicateWorkGroups(repo).length, 0, 'merged works disappear from duplicate groups');
+  assert.equal(
+    repo.database.prepare("SELECT work_id FROM editions WHERE id='w2-e0'").get().work_id,
+    'w1',
+  );
+  assert.equal(
+    findDuplicateWorkGroups(repo).length,
+    0,
+    'merged works disappear from duplicate groups',
+  );
 });
 
 test('merging works that own immutable external records succeeds and re-points the work-level link', () => {
@@ -74,11 +99,15 @@ test('merging works that own immutable external records succeeds and re-points t
     )
     .run();
   repo.database
-    .prepare("INSERT INTO external_record_links(external_record_id,work_id,edition_id,linked_at) VALUES('x1','w2',NULL,'t')")
+    .prepare(
+      "INSERT INTO external_record_links(external_record_id,work_id,edition_id,linked_at) VALUES('x1','w2',NULL,'t')",
+    )
     .run();
   mergeWorkGroup(repo, 'w1', ['w2']);
   const links = repo.database
-    .prepare("SELECT work_id FROM external_record_links WHERE external_record_id='x1' ORDER BY work_id")
+    .prepare(
+      "SELECT work_id FROM external_record_links WHERE external_record_id='x1' ORDER BY work_id",
+    )
     .all()
     .map((row) => row.work_id);
   assert.deepEqual(links, ['w1', 'w2'], 'the target gains the link; the original stays as history');
@@ -87,7 +116,9 @@ test('merging works that own immutable external records succeeds and re-points t
 test('universe prefix on the cover does not split a work', () => {
   assert.equal(
     workKey('World of Warcraft: Illidan', ['William King']),
-    workKey('Illidan / World of Warcraft (Insignis Media)', ['King, William (1959- ) Repeczko, Dominika']),
+    workKey('Illidan / World of Warcraft (Insignis Media)', [
+      'King, William (1959- ) Repeczko, Dominika',
+    ]),
   );
   assert.notEqual(
     workKey('World of Warcraft : kronika. T. 1 /', ['Lacroix, Joseph']),
@@ -98,14 +129,28 @@ test('universe prefix on the cover does not split a work', () => {
 test('a work without author joins the one authored work of the same title; brackets are branding', () => {
   assert.equal(mainTitle('Blask fantastyczny (ŚWIAT DYSKU)'), 'Blask fantastyczny');
   const repo = new SqliteCatalogRepository(':memory:');
-  const work = (id, title, authors) => repo.createWork({ id, title, normalizedTitle: title.toLowerCase(), authors, at: '2026-01-01T00:00:00Z' });
+  const work = (id, title, authors) =>
+    repo.createWork({
+      id,
+      title,
+      normalizedTitle: title.toLowerCase(),
+      authors,
+      at: '2026-01-01T00:00:00Z',
+    });
   work('a', 'Kosiarz', ['Terry Pratchett']);
   work('b', 'Kosiarz (Świat Dysku)', []);
   work('c', 'Legion', ['Richard Knaak']);
   work('d', 'Legion', ['Dan Abnett']);
   work('e', 'Legion', []);
   const groups = findDuplicateWorkGroups(repo);
-  assert.equal(groups.length, 1, 'an authorless "Legion" is ambiguous between two authors and stays alone');
-  assert.deepEqual(groups[0].works.map((w) => w.id), ['a', 'b']);
+  assert.equal(
+    groups.length,
+    1,
+    'an authorless "Legion" is ambiguous between two authors and stays alone',
+  );
+  assert.deepEqual(
+    groups[0].works.map((w) => w.id),
+    ['a', 'b'],
+  );
   assert.equal(groups[0].targetId, 'a', 'the work with an author is kept');
 });

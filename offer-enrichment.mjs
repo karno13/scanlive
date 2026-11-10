@@ -9,7 +9,9 @@ const RETRY_AFTER_MS = 60 * 60 * 1000;
 // never uses up one of the offer's attempts (offers burnt by HTTP 429 earlier are retried too).
 const THROTTLE_ERRORS = ['SOURCE_HTTP_429', 'SOURCE_CAPTCHA', 'SOURCE_HTTP_403'];
 export const isThrottleError = (error) =>
-  error?.blocked === true || error?.status === 429 || THROTTLE_ERRORS.includes(String(error?.message));
+  error?.blocked === true ||
+  error?.status === 429 ||
+  THROTTLE_ERRORS.includes(String(error?.message));
 
 const stableId = (...parts) =>
   'enrich_' + createHash('sha256').update(parts.join('\u0000')).digest('hex').slice(0, 32);
@@ -31,7 +33,13 @@ export function pendingEnrichment(
               AND (e.attempts < ? OR e.last_error IN (${THROTTLE_ERRORS.map(() => '?').join(',')}))))
        ORDER BY o.last_seen_at DESC LIMIT ?`,
     )
-    .all(...sources, retryBefore, MAX_ATTEMPTS, ...THROTTLE_ERRORS, Math.max(1, Math.min(500, limit)));
+    .all(
+      ...sources,
+      retryBefore,
+      MAX_ATTEMPTS,
+      ...THROTTLE_ERRORS,
+      Math.max(1, Math.min(500, limit)),
+    );
 }
 
 /** Sends a job back to the resolver when new evidence arrived. Manual decisions and bundles stay put. */
@@ -51,7 +59,12 @@ export function requeueForNewEvidence(repository, offerId, at) {
   return Number(result.changes) > 0;
 }
 
-function record(repository, offer, { outcome, isbn = null, facts = null, error = null, countAttempt = true }, at) {
+function record(
+  repository,
+  offer,
+  { outcome, isbn = null, facts = null, error = null, countAttempt = true },
+  at,
+) {
   const step = countAttempt ? 1 : 0;
   repository.database
     .prepare(
@@ -74,7 +87,15 @@ export async function enrichOffers(
     onProgress = () => {},
   } = {},
 ) {
-  const report = { checked: 0, isbnFound: 0, noIsbn: 0, errors: 0, requeued: 0, stopped: null, paused: [] };
+  const report = {
+    checked: 0,
+    isbnFound: 0,
+    noIsbn: 0,
+    errors: 0,
+    requeued: 0,
+    stopped: null,
+    paused: [],
+  };
   for (const offer of pendingEnrichment(repository, { sources, limit, now })) {
     if (signal?.aborted) {
       report.stopped = 'aborted';
@@ -90,7 +111,16 @@ export async function enrichOffers(
       report.checked += 1;
       report.errors += 1;
       const throttled = isThrottleError(error);
-      record(repository, offer, { outcome: 'error', error: String(error?.message ?? error).slice(0, 200), countAttempt: !throttled }, at);
+      record(
+        repository,
+        offer,
+        {
+          outcome: 'error',
+          error: String(error?.message ?? error).slice(0, 200),
+          countAttempt: !throttled,
+        },
+        at,
+      );
       // A challenge or rate limit applies to the whole source: leave it alone (the caller also
       // pauses it for a while) instead of hammering it.
       if (throttled) {
@@ -105,14 +135,22 @@ export async function enrichOffers(
     // The page's condition ("bardzo dobry") is more precise than the result card's "Używany".
     if (detail.condition)
       repository.database
-        .prepare("UPDATE offers SET condition_text=?, condition_class=? WHERE id=? AND (condition_text IS NULL OR coalesce(condition_class,'unknown')='unknown')")
-        .run(String(detail.condition).trim().slice(0, 200), conditionClass(detail.condition), offer.id);
+        .prepare(
+          "UPDATE offers SET condition_text=?, condition_class=? WHERE id=? AND (condition_text IS NULL OR coalesce(condition_class,'unknown')='unknown')",
+        )
+        .run(
+          String(detail.condition).trim().slice(0, 200),
+          conditionClass(detail.condition),
+          offer.id,
+        );
     if (offer.source === 'Empik') {
       const categories = empikCategories(html);
       facts.category = categories.join(' / ') || null;
       // An import from "Książki obcojęzyczne": no Polish source will know it.
       if (categories[0] === 'Książki obcojęzyczne') {
-        repository.database.prepare("UPDATE offers SET language='obcojęzyczna' WHERE id=?").run(offer.id);
+        repository.database
+          .prepare("UPDATE offers SET language='obcojęzyczna' WHERE id=?")
+          .run(offer.id);
         if (requeueForNewEvidence(repository, offer.id, at)) report.requeued += 1;
         report.foreign = (report.foreign || 0) + 1;
       }
@@ -123,7 +161,9 @@ export async function enrichOffers(
     } else {
       repository.transaction(() => {
         repository.database
-          .prepare("UPDATE offers SET observed_isbn=? WHERE id=? AND (observed_isbn IS NULL OR observed_isbn='')")
+          .prepare(
+            "UPDATE offers SET observed_isbn=? WHERE id=? AND (observed_isbn IS NULL OR observed_isbn='')",
+          )
           .run(detail.isbn, offer.id);
         repository.putMetadataEvidence({
           id: stableId(offer.id, detail.isbn),

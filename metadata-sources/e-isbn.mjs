@@ -5,11 +5,23 @@
 // BN and Open Library have nothing; records are publisher-supplied, not library descriptions.
 import { normalizeISBN } from '../isbn-normalization.mjs';
 import { SourceRateLimiter } from '../metadata-http.mjs';
-import { buildNormalizedRecord, matchingISBNs, normalizedText, payloadHash } from '../metadata-record.mjs';
+import {
+  buildNormalizedRecord,
+  matchingISBNs,
+  normalizedText,
+  payloadHash,
+} from '../metadata-record.mjs';
 
 export const E_ISBN_URL = 'https://e-isbn.pl/IsbnWeb/api.xml';
 
-const LANGUAGES = { pol: 'polski', eng: 'angielski', ger: 'niemiecki', fre: 'francuski', rus: 'rosyjski', cze: 'czeski' };
+const LANGUAGES = {
+  pol: 'polski',
+  eng: 'angielski',
+  ger: 'niemiecki',
+  fre: 'francuski',
+  rus: 'rosyjski',
+  cze: 'czeski',
+};
 const BINDINGS = { BB: 'twarda', BC: 'miękka' };
 
 const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
@@ -17,12 +29,17 @@ const decode = (text) =>
   String(text ?? '')
     .replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, code) =>
       code[0] === '#'
-        ? String.fromCodePoint(code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : Number(code.slice(1)))
+        ? String.fromCodePoint(
+            code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : Number(code.slice(1)),
+          )
         : ENTITIES[code.toLowerCase()],
     )
     .replace(/\s+/g, ' ')
     .trim();
-const blocks = (xml, tag) => [...String(xml).matchAll(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`, 'g'))].map((m) => m[1]);
+const blocks = (xml, tag) =>
+  [...String(xml).matchAll(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`, 'g'))].map(
+    (m) => m[1],
+  );
 const first = (xml, tag) => {
   const value = blocks(xml, tag)[0];
   return value === undefined ? null : decode(value);
@@ -47,9 +64,17 @@ export function parseOnixProduct(product) {
   const fullDetail = blocks(product, 'DescriptiveDetail')[0] ?? '';
   // The series (<Collection>) has its own TitleDetail: read the book's title without it.
   const detail = fullDetail.replace(/<Collection\b[\s\S]*?<\/Collection>/g, '');
-  const titleDetail = blocks(detail, 'TitleDetail').find((block) => first(block, 'TitleType') === '01') ?? blocks(detail, 'TitleDetail')[0] ?? '';
+  const titleDetail =
+    blocks(detail, 'TitleDetail').find((block) => first(block, 'TitleType') === '01') ??
+    blocks(detail, 'TitleDetail')[0] ??
+    '';
   const element = blocks(titleDetail, 'TitleElement')[0] ?? '';
-  const title = [first(element, 'TitlePrefix'), first(element, 'TitleWithoutPrefix') ?? first(element, 'TitleText')].filter(Boolean).join(' ');
+  const title = [
+    first(element, 'TitlePrefix'),
+    first(element, 'TitleWithoutPrefix') ?? first(element, 'TitleText'),
+  ]
+    .filter(Boolean)
+    .join(' ');
   const subtitle = first(element, 'Subtitle');
   const authors = blocks(detail, 'Contributor')
     .filter((block) => ['A01', 'A02', 'A12'].includes(first(block, 'ContributorRole')))
@@ -59,11 +84,13 @@ export function parseOnixProduct(product) {
     .filter((block) => first(block, 'ContributorRole') === 'B06')
     .map(contributorName)
     .filter(Boolean);
-  const series = blocks(fullDetail, 'Collection').map((block) => {
-    const name = first(blocks(block, 'TitleElement')[0] ?? '', 'TitleText');
-    const part = first(blocks(block, 'TitleElement')[0] ?? '', 'PartNumber');
-    return name ? { name, part } : null;
-  }).filter(Boolean);
+  const series = blocks(fullDetail, 'Collection')
+    .map((block) => {
+      const name = first(blocks(block, 'TitleElement')[0] ?? '', 'TitleText');
+      const part = first(blocks(block, 'TitleElement')[0] ?? '', 'PartNumber');
+      return name ? { name, part } : null;
+    })
+    .filter(Boolean);
   const publishing = blocks(product, 'PublishingDetail')[0] ?? '';
   const imprint = first(blocks(publishing, 'Imprint')[0] ?? '', 'ImprintName');
   const publisher = first(blocks(publishing, 'Publisher')[0] ?? '', 'PublisherName');
@@ -101,7 +128,13 @@ export function createEIsbnAdapter({
     enabled,
     async lookup(isbn) {
       const requested = normalizeISBN(isbn);
-      if (!requested) return { source: 'e_isbn', status: 'invalid_response', reason: 'invalid_isbn', records: [] };
+      if (!requested)
+        return {
+          source: 'e_isbn',
+          status: 'invalid_response',
+          reason: 'invalid_isbn',
+          records: [],
+        };
       const url = new URL(E_ISBN_URL);
       url.searchParams.set('isbn', requested);
       let xml;
@@ -112,13 +145,34 @@ export function createEIsbnAdapter({
           redirect: 'follow',
           signal: AbortSignal.timeout(timeoutMs),
         });
-        if (response.status === 404) return { source: 'e_isbn', status: 'not_found', records: [], url: url.href };
-        if (!response.ok) return { source: 'e_isbn', status: 'temporary_error', httpStatus: response.status, records: [], url: url.href };
+        if (response.status === 404)
+          return { source: 'e_isbn', status: 'not_found', records: [], url: url.href };
+        if (!response.ok)
+          return {
+            source: 'e_isbn',
+            status: 'temporary_error',
+            httpStatus: response.status,
+            records: [],
+            url: url.href,
+          };
         xml = await response.text();
       } catch (error) {
-        return { source: 'e_isbn', status: 'temporary_error', error: { code: error?.name || 'FETCH_FAILED' }, records: [], url: url.href };
+        return {
+          source: 'e_isbn',
+          status: 'temporary_error',
+          error: { code: error?.name || 'FETCH_FAILED' },
+          records: [],
+          url: url.href,
+        };
       }
-      if (!/<ONIXMessage\b/.test(xml)) return { source: 'e_isbn', status: 'invalid_response', reason: 'not_onix', records: [], url: url.href };
+      if (!/<ONIXMessage\b/.test(xml))
+        return {
+          source: 'e_isbn',
+          status: 'invalid_response',
+          reason: 'not_onix',
+          records: [],
+          url: url.href,
+        };
       const fetchedAt = now().toISOString();
       const records = [];
       for (const product of blocks(xml, 'Product')) {
@@ -148,8 +202,16 @@ export function createEIsbnAdapter({
           payload,
         });
       }
-      if (!records.length) return { source: 'e_isbn', status: 'not_found', records: [], fetchedAt, url: url.href };
-      return { source: 'e_isbn', status: 'found', records, ambiguous: records.length > 1, fetchedAt, url: url.href };
+      if (!records.length)
+        return { source: 'e_isbn', status: 'not_found', records: [], fetchedAt, url: url.href };
+      return {
+        source: 'e_isbn',
+        status: 'found',
+        records,
+        ambiguous: records.length > 1,
+        fetchedAt,
+        url: url.href,
+      };
     },
   };
 }

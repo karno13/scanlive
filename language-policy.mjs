@@ -9,7 +9,9 @@ export const POLISH_ONLY_AUTHOR = 'auto_polish_only';
 
 export function getPolishOnly(repository) {
   try {
-    const row = repository.database.prepare('SELECT value_json FROM app_preferences WHERE key=?').get(KEY);
+    const row = repository.database
+      .prepare('SELECT value_json FROM app_preferences WHERE key=?')
+      .get(KEY);
     return row ? JSON.parse(row.value_json).polishOnly !== false : true;
   } catch {
     return true;
@@ -53,8 +55,19 @@ export function rejectForeignEditions(repository, { now = () => new Date() } = {
          last_error=NULL, result_json=?, updated_at=? WHERE id=?`,
     );
     for (const row of rows) {
-      decision.run(`polish_only_${row.id}_${at}`, row.id, row.offer_id, reason, POLISH_ONLY_AUTHOR, at);
-      close.run(JSON.stringify({ manualDecision: 'excluded', automatic: true, reason, decidedAt: at }), at, row.id);
+      decision.run(
+        `polish_only_${row.id}_${at}`,
+        row.id,
+        row.offer_id,
+        reason,
+        POLISH_ONLY_AUTHOR,
+        at,
+      );
+      close.run(
+        JSON.stringify({ manualDecision: 'excluded', automatic: true, reason, decidedAt: at }),
+        at,
+        row.id,
+      );
     }
   });
   return { rejected: rows.length };

@@ -17,19 +17,19 @@ function isTrackingParameter(name) {
 }
 
 const allowedMarketplaces = new Map([
-  ['Vinted',['vinted.pl']],
-  ['Allegro',['allegro.pl']],
-  ['Allegro Lokalnie',['allegrolokalnie.pl']],
-  ['OLX',['olx.pl']],
-  ['Empik',['empik.com']],
-  ['Tezeusz.pl',['tezeusz.pl']],
-  ['Dedalus.pl',['dedalus.pl']],
+  ['Vinted', ['vinted.pl']],
+  ['Allegro', ['allegro.pl']],
+  ['Allegro Lokalnie', ['allegrolokalnie.pl']],
+  ['OLX', ['olx.pl']],
+  ['Empik', ['empik.com']],
+  ['Tezeusz.pl', ['tezeusz.pl']],
+  ['Dedalus.pl', ['dedalus.pl']],
 ]);
 export function trustedOfferUrl(source, raw) {
   const normalized = normalizeOfferUrl(raw);
   const url = new URL(normalized);
   const domains = allowedMarketplaces.get(source);
-  if (domains && !domains.some(host => url.hostname === host || url.hostname === 'www.' + host))
+  if (domains && !domains.some((host) => url.hostname === host || url.hostname === 'www.' + host))
     throw Error('UNTRUSTED_OFFER_HOST');
   return normalized;
 }

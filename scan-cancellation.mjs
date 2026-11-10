@@ -11,8 +11,14 @@ export function awaitScan(promise, signal) {
     };
     signal.addEventListener('abort', cancelled, { once: true });
     Promise.resolve(promise).then(
-      value => { signal.removeEventListener('abort', cancelled); resolve(value); },
-      error => { signal.removeEventListener('abort', cancelled); reject(error); },
+      (value) => {
+        signal.removeEventListener('abort', cancelled);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener('abort', cancelled);
+        reject(error);
+      },
     );
   });
 }

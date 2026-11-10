@@ -33,7 +33,13 @@ test('obsolete UI audit assets and hosted-runner docs are not shipped', async ()
 });
 
 test('unreachable hosted runner scripts are not shipped', async () => {
-  for (const path of ['run.mjs','process.mjs','continuation.mjs','enrich.mjs','page-cursor.mjs']) {
+  for (const path of [
+    'run.mjs',
+    'process.mjs',
+    'continuation.mjs',
+    'enrich.mjs',
+    'page-cursor.mjs',
+  ]) {
     await assert.rejects(access(new URL('./' + path, import.meta.url)));
   }
 });
