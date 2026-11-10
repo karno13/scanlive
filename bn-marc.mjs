@@ -3,7 +3,7 @@
 // Przygody Gotreka i Felixa t. 7 Czarna Biblioteka 22", author "King, William Bonikowski, Grzegorz
 // Copernicus Corporation"); MARC keeps title, people with roles, publisher and series apart.
 import { fold } from './title-proposals.mjs';
-import { UNIVERSE_SERIES } from './universes.mjs';
+import { universeSeriesPattern } from './universes.mjs';
 
 /** [{tag, ind1, ind2, subfields: [[code, value]]}] from BN's {"fields":[{"245":{...}}]} shape. */
 export function marcFields(marc) {
@@ -107,7 +107,7 @@ export function seriesName(value, publisher = null) {
 
 export function seriesKind(name) {
   const key = fold(name);
-  if (UNIVERSE_SERIES.test(key)) return 'universe';
+  if (universeSeriesPattern().test(key)) return 'universe';
   if (PUBLISHER_LINE.test(key)) return 'publisher_line';
   return 'cycle';
 }

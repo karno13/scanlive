@@ -5,13 +5,14 @@
 // (and can be reopened in "Ostatnie decyzje i poprawianie pomyłek" like any other).
 
 import { normalizeISBN } from './isbn-normalization.mjs';
-import { UNIVERSE_WORDS } from './universes.mjs';
+import { universeWords } from './universes.mjs';
 
 const REJECTED = "('excluded','not_book')";
 export const AUTO_REJECT_AUTHOR = 'auto_same_as_rejected';
 
 // Universe and sales words: on every listing, they never tell one product from another.
-const COMMON = new Set([...UNIVERSE_WORDS, ...'ksiazka ksiazki nowa nowy tom'.split(' ')]);
+const SALES_WORDS = 'the fantasy ksiazka ksiazki nowa nowy tom'.split(' ');
+const common = () => new Set([...universeWords(), ...SALES_WORDS]);
 
 /** "World of Warcraft - Der letzte Wächter " → "world of warcraft der letzte wachter"; any script. */
 export function rejectionTitleKey(title) {
@@ -23,6 +24,7 @@ export function rejectionTitleKey(title) {
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
   // Short titles ("Warcraft", "Fourth Wing") and universe names alone name a kind of offer, not one product.
+  const COMMON = common();
   const own = key.split(' ').filter((word) => word.length >= 4 && !COMMON.has(word));
   return key.length >= 12 && key.split(' ').length >= 3 && own.length ? key : null;
 }

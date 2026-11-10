@@ -1,4 +1,4 @@
-import { BRAND_WORDS } from './universes.mjs';
+import { brandWords } from './universes.mjs';
 // Suggests catalogue editions for offers that have no ISBN, using only the offer's title.
 // The result is advice for the operator: it is stored and displayed, never applied automatically
 // (the same work exists in many editions, translations and ISBNs).
@@ -13,7 +13,8 @@ const SELLER_NOISE = new Set([
   'oprawa', 'okladka', 'unikat', 'rzadkosc', 'kolekcjonerskie',
 ]);
 // Universe / brand names that appear on the cover but rarely in the catalogued title.
-const BRAND = new Set(BRAND_WORDS);
+// Universe / brand words, from the universes table.
+const BRAND = { has: (word) => brandWords().has(word) };
 
 export const fold = (value) =>
   String(value ?? '')

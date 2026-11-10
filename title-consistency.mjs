@@ -3,19 +3,19 @@
 // The check is deliberately lenient: one shared word (title, series, universe or author surname)
 // is enough. Only a listing that shares *nothing* with the record is held back for review.
 import { titleTokens, fold } from './title-proposals.mjs';
-import { UNIVERSE_SYNONYMS } from './universes.mjs';
+import { universeSynonyms } from './universes.mjs';
 
 // The same universe written two ways on covers and in BN records.
-const SYNONYMS = UNIVERSE_SYNONYMS;
+
 
 const stem = (token) => token.slice(0, 5);
 
 function stems(text) {
   let folded = fold(text);
-  for (const [a, b] of SYNONYMS) {
-    if (folded.includes(a)) folded += ' ' + b;
-    if (folded.includes(b)) folded += ' ' + a;
-  }
+  // Names, lines and markers of one universe stand for each other (universes table).
+  const words = ` ${folded} `;
+  for (const group of universeSynonyms())
+    if (group.some((name) => name && words.includes(` ${name} `))) folded += ' ' + group.join(' ');
   return new Set(titleTokens(folded).filter((token) => !/^\d{1,3}$/.test(token)).map(stem));
 }
 

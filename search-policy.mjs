@@ -1,4 +1,4 @@
-import { SEARCH_FAMILIES, topicTerms } from './universes.mjs';
+import { searchFamilies, topicTerms } from './universes.mjs';
 // Retrieval aliases never confer edition identity or bibliographic verification.
 export const normalizeSearch = (s) =>
   String(s || '')
@@ -8,11 +8,13 @@ export const normalizeSearch = (s) =>
     .replace(/ł/g, 'l')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-const families = SEARCH_FAMILIES;
+// Universe spellings (universes table) and cycles known under two names.
+const CYCLE_FAMILIES = [['Herezja Horusa', 'Horus Heresy']];
+const familiesNow = () => [...searchFamilies(), ...CYCLE_FAMILIES];
 export function searchAliases(title) {
   const key = normalizeSearch(title);
   return (
-    families
+    familiesNow()
       .find((g) => g.some((t) => normalizeSearch(t) === key))
       ?.filter((t) => normalizeSearch(t) !== key) || []
   );

@@ -9,15 +9,25 @@ import { fold } from './title-proposals.mjs';
 import { mainTitle } from './work-grouping.mjs';
 import { BRAND_ONLY, NOT_A_CYCLE, cycleFromTitle } from './catalog-series.mjs';
 import { seriesKind } from './bn-marc.mjs';
-import { LISTING_UNIVERSE_PHRASES } from './universes.mjs';
+import { listingUniversePhrases } from './universes.mjs';
 
 const VOLUME_WORD = /^(?:tom|t|ksiega|ks|vol|volume|czesc|cz|#)$/;
 const PRIMARY_VOLUME_WORD = /^(?:tom|t|ksiega|ks|vol|volume|#)$/;
 // Universe names and sales words that sit next to the cycle in listings.
-const NOISE_PHRASES = [
-  ...LISTING_UNIVERSE_PHRASES,
+const SALES_PHRASES = [
   'ksiazka', 'ksiazki', 'nowa', 'nowy', 'unikat', 'bdb', 'stan bardzo dobry', 'stan dobry', 'wyd', 'wydanie', 'isa', 'mag',
 ].map((phrase) => phrase.split(' '));
+// Universe names (from the universes table) first, longest first, then sales words.
+let noiseFor = null;
+let noisePhrases = [];
+function NOISE_PHRASES_NOW() {
+  const universes = listingUniversePhrases();
+  if (noiseFor !== universes) {
+    noiseFor = universes;
+    noisePhrases = [...universes.map((phrase) => phrase.split(' ')), ...SALES_PHRASES];
+  }
+  return noisePhrases;
+}
 
 const ROMAN = { i: 1, v: 5, x: 10, l: 50, c: 100 };
 function romanValue(text) {
@@ -115,7 +125,7 @@ export function seriesFromListing(listing, context = {}) {
     const rest = list.filter((word) => !authorTokens.has(word.key));
     if (rest.length && BRAND_ONLY.test(rest.map((word) => word.key).join(' ')))
       return { universe: sentence(rest.map((word) => word.raw).join(' ')), volume: hit.volume };
-    for (const phrase of NOISE_PHRASES) list = removeRun(list, phrase);
+    for (const phrase of NOISE_PHRASES_NOW()) list = removeRun(list, phrase);
     // Authors, single letters and another volume statement ("Część 2") are not part of a cycle name.
     list = list.filter(
       (word, index, all) =>

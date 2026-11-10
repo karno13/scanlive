@@ -1,78 +1,173 @@
-// Universe names (Świat Dysku, Warhammer, Warcraft, Dragonlance, Forgotten Realms) and their
-// variant spellings, in one place. They are on every cover and in every listing, so many parts of
-// the app need them: to strip branding from titles, to tell a universe from a story cycle, to widen
-// a search. Each list below is the one a module used before; their users are named.
+// Universes (Świat Dysku, Warhammer, Warcraft…) as data: the `universes` table (migration 126),
+// edited in Katalog → „Wydawcy i serie”. Their names are on every cover and in every listing, so
+// many parts of the app need them: to strip branding from titles, to tell a universe from a story
+// cycle, to widen a search. Every list those parts use is derived here from one set of records:
+//
+//   names   — how the universe itself is written ("Discworld series", "Warhammer 40 000", "WH40K");
+//   lines   — publisher lines tied to it ("Black Library"): branding, but a line, not the universe;
+//   markers — cycles and heroes that tell the universe ("Herezja Horusa", "Drizzt"); never removed
+//             from a title, because they are part of it.
+//
+// Until the table is read (and in tests that open no catalogue) the built-in records apply; they
+// are the same as the table's initial rows.
 
-// bn-marc.mjs: series statements that name a universe or a franchise rather than a story cycle.
-export const UNIVERSE_SERIES =
-  /^(?:discworld(?: series)?|swiat dysku|warhammer(?: 40 ?000| fantasy| chronicles| age of sigmar)?(?: black library)?|age of sigmar|world of warcraft|warcraft|blizzard legends|dragonlance(?: saga)?|forgotten realms|zapomniane krainy)$/;
-
-// catalog-series.mjs: universe names that appear on covers / in BN series statements, with the label shown.
-export const SERIES_UNIVERSES = [
-  [/\b(?:discworld|swiat dysku)\b/, 'Świat Dysku'],
-  [/\bwarcraft\b/, 'Warcraft'],
-  [/\bwarhammer\b|\bage of sigmar\b|\bherezja horusa\b|\bczarna biblioteka\b/, 'Warhammer'],
-  [/\bdragonlance\b/, 'Dragonlance'],
-  [/\bforgotten realms\b|\bdrizzt/, 'Forgotten Realms'],
-];
-// catalog-series.mjs: brand words that are not a cycle on their own ("Discworld series t. 14").
-export const BRAND_ONLY = /^(?:discworld(?: series)?|swiat dysku|warhammer(?: 40[ .,]?000| fantasy| chronicles)?|world of warcraft|warcraft|dragonlance(?: saga)?|forgotten realms)$/;
-
-// edition-series.mjs: universe names that sit next to the cycle in listings (folded, word lists).
-export const LISTING_UNIVERSE_PHRASES = [
-  'warhammer 40 000', 'warhammer 40000', 'warhammer 40k', 'warhammer fantasy', 'warhammer', 'wh40k', 'w40k', '40k', '40000', '40 000',
-  'world of warcraft', 'warcraft', 'diablo', 'starcraft', 'dragonlance', 'forgotten realms', 'swiat dysku', 'discworld', 'black library',
-];
-
-// offer-editions.mjs: universe names in listing text (regex sources, matched as whole words).
-export const LISTING_UNIVERSE_PATTERNS = [
-  'warhammer(?:\\s*(?:40\\s*[.,]?\\s*000|40\\s*k|40k|fantasy|age of sigmar|horus heresy))?',
-  '40\\s*k',
-  '40[.,]?000',
-  'w40k',
-  'world of warcraft',
-  'warcraft',
-  'dragonlance',
-  'forgotten realms',
-  'świat dysku',
-  'swiat dysku',
-  'discworld',
+export const DEFAULT_UNIVERSES = [
+  { name: 'Świat Dysku', names: ['Świat Dysku', 'Discworld', 'Discworld series'], lines: [], markers: [] },
+  { name: 'Warcraft', names: ['World of Warcraft', 'Warcraft', 'Blizzard Legends'], lines: [], markers: [] },
+  {
+    name: 'Warhammer',
+    names: ['Warhammer', 'Warhammer 40 000', 'Warhammer 40K', 'WH40K', 'W40K', '40K', '40 000', 'Warhammer Fantasy', 'Warhammer Chronicles', 'Warhammer Age of Sigmar', 'Age of Sigmar'],
+    lines: ['Black Library', 'Czarna Biblioteka'],
+    markers: ['Herezja Horusa', 'Horus Heresy', 'Horus'],
+  },
+  { name: 'Dragonlance', names: ['Dragonlance', 'Dragonlance Saga'], lines: [], markers: [] },
+  { name: 'Forgotten Realms', names: ['Forgotten Realms', 'Zapomniane Krainy'], lines: [], markers: ['Drizzt'] },
+  { name: 'Diablo', names: ['Diablo'], lines: [], markers: [] },
+  { name: 'StarCraft', names: ['StarCraft'], lines: [], markers: [] },
+  { name: 'Star Wars', names: ['Star Wars'], lines: [], markers: [] },
 ];
 
-// rejected-offers.mjs: universe words that never tell one product from another.
-export const UNIVERSE_WORDS = 'world of the warcraft warhammer 40k 40000 000 fantasy dragonlance forgotten realms swiat dysku discworld star wars'.split(' ');
+/** Lower case, no diacritics, punctuation as spaces ("Warhammer 40.000" → "warhammer 40 000"). */
+export const foldName = (value) =>
+  String(value ?? '')
+    .toLowerCase()
+    .replace(/ł/g, 'l')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// "40 000" is also written "40000", "40.000", "40,000".
+const folded = (name) => escape(foldName(name)).replace(/(\d+) (000)\b/g, '$1 ?$2');
+const raw = (name) =>
+  [...new Set([String(name).toLowerCase().trim(), foldName(name)])]
+    .map((text) => escape(text).replace(/(\d+)(?:\\?[ .,])?(000)\b/g, '$1[\\s.,]?$2').replace(/ +/g, '\\s+'))
+    .join('|');
+const longestFirst = (list) => [...new Set(list)].sort((a, b) => b.length - a.length || a.localeCompare(b));
 
-// search-policy.mjs: names a search for one also finds (retrieval only, never identity).
-export const SEARCH_FAMILIES = [
-  ['Warhammer', 'Warhammer 40,000', 'WH40K', 'Warhammer 40K'],
-  ['Herezja Horusa', 'Horus Heresy'],
-  ['Warcraft', 'World of Warcraft'],
-  ['Forgotten Realms', 'Zapomniane Krainy'],
-];
-// search-policy.mjs: words a discovery phrase of a universe accepts in listing titles.
-export function topicTerms(category) {
-  return category.includes('warcraft')
-    ? ['Warcraft', 'World of Warcraft']
-    : category.includes('warhammer') || category.includes('horus') || category.includes('herezja')
-      ? ['Warhammer', 'Warhammer 40,000', 'WH40K', 'Warhammer 40K', 'Horus', 'Horus Heresy', 'Herezja Horusa']
-      : [];
+function clean(list, limit = 40) {
+  if (!Array.isArray(list)) return [];
+  return [...new Set(list.map((value) => String(value ?? '').trim().replace(/\s+/g, ' ')).filter((value) => value && value.length <= 100 && foldName(value)))].slice(0, limit);
+}
+function normalize(record) {
+  const name = String(record?.name ?? '').trim().replace(/\s+/g, ' ');
+  const names = clean([name, ...(record?.names || [])]);
+  return { name, names, lines: clean(record?.lines), markers: clean(record?.markers) };
 }
 
-// title-consistency.mjs: the same universe written two ways on covers and in BN records.
-export const UNIVERSE_SYNONYMS = [
-  ['discworld', 'swiat dysku'],
-  ['warhammer', '40000 40k'],
-  ['horus heresy', 'herezja horusa'],
-  ['forgotten realms', 'drizzt'],
-];
+const GENERIC_WORDS = new Set(['of', 'the', 'fantasy', 'saga', 'series', 'chronicles', 'age', 'legends']);
 
-// title-proposals.mjs: brand words that appear on the cover but rarely in the catalogued title.
-export const BRAND_WORDS = ['warhammer', '40000', '40k', 'warcraft', 'world', 'dragonlance', 'forgotten', 'realms', 'swiat', 'dysku', 'discworld'];
+function derive(universes) {
+  const names = universes.flatMap((u) => u.names);
+  const lines = universes.flatMap((u) => u.lines);
+  const alt = (list, form) => longestFirst(list.map(form)).join('|') || '(?!)';
+  const foldedNames = alt(names, folded);
+  const rawNames = alt(names, raw);
+  return {
+    // bn-marc: a series statement that is the universe (optionally with its line) names no cycle.
+    series: new RegExp(`^(?:${foldedNames})(?: (?:${alt(lines, folded)}))?$`),
+    // catalog-series: the universe a title belongs to, first match in table order.
+    labels: universes.map((u) => [new RegExp(`\\b(?:${alt([...u.names, ...u.lines, ...u.markers], folded)})\\b`), u.name]),
+    brandOnly: new RegExp(`^(?:${foldedNames})$`),
+    // edition-series: words around the cycle in listings (longest first, as word lists).
+    phrases: longestFirst([...names, ...lines].map(foldName)),
+    // offer-editions: the same in raw listing text.
+    patterns: longestFirst([...names, ...lines].map(raw)),
+    // rejected-offers: words that never tell one product from another.
+    words: [...new Set([...names, ...lines].flatMap((name) => foldName(name).replace(/(\d+) (000)\b/g, '$1$2 $1 $2').split(' ')))],
+    // search-policy: a search for one name also finds the others (retrieval only).
+    families: universes.filter((u) => u.names.length > 1).map((u) => u.names),
+    topics: universes.map((u) => ({ keys: [...u.names, ...u.markers].map(foldName), terms: [...u.names, ...u.markers] })),
+    // title-consistency: names, lines and markers of one universe stand for each other.
+    synonyms: universes.map((u) => [...u.names, ...u.lines, ...u.markers].map(foldName)),
+    // title-proposals: brand words that are on the cover but rarely in the catalogued title.
+    brandWords: new Set(names.flatMap((name) => foldName(name).split(' ')).filter((word) => !GENERIC_WORDS.has(word)).concat(names.map((name) => foldName(name).replace(/ /g, '')).filter((word) => /^\d+$/.test(word)))),
+    // work-grouping: the universe before ":" / "." or in brackets after the title is branding.
+    prefix: new RegExp(`^\\s*(?:${rawNames})\\s*[:.]\\s+`, 'iu'),
+    suffix: new RegExp(`\\s*[([](?:${rawNames})[)\\]]\\s*$`, 'iu'),
+  };
+}
 
-// work-grouping.mjs: a universe before ":" / "." or in brackets after the title is cover branding.
-export const UNIVERSE_PREFIX =
-  /^\s*(?:world of warcraft|warcraft|warhammer(?: 40[ ,.]?000| 40k)?|dragonlance|forgotten realms|świat dysku)\s*[:.]\s+/i;
-export const UNIVERSE_SUFFIX =
-  /\s*[([](?:world of warcraft|warcraft|warhammer(?: 40[ ,.]?000| 40k)?|dragonlance|forgotten realms|świat dysku|swiat dysku|discworld)[)\]]\s*$/i;
-// work-grouping.mjs: an original title that is only a universe name names no single work.
-export const BRAND_ONLY_ORIGINAL = /^(?:world of warcraft|warcraft|warhammer(?: 40 ?000)?|discworld(?: series)?|dragonlance|forgotten realms)$/;
+let records = DEFAULT_UNIVERSES.map(normalize);
+let derived = derive(records);
+
+/** Replaces the universes in use (the table after an edit, or the defaults in tests). */
+export function setUniverses(list) {
+  records = list.map(normalize).filter((record) => record.name);
+  derived = derive(records);
+  return currentUniverses();
+}
+export function currentUniverses() {
+  return records.map((record) => ({ ...record, names: record.names.filter((name) => name !== record.name) }));
+}
+
+// The derived lists, for their single users (see the header).
+export const universeSeriesPattern = () => derived.series;
+export const seriesUniverses = () => derived.labels;
+export const brandOnlyPattern = () => derived.brandOnly;
+export const listingUniversePhrases = () => derived.phrases;
+export const listingUniversePatterns = () => derived.patterns;
+export const universeWords = () => derived.words;
+export const searchFamilies = () => derived.families;
+export const universeSynonyms = () => derived.synonyms;
+export const brandWords = () => derived.brandWords;
+export const universePrefix = () => derived.prefix;
+export const universeSuffix = () => derived.suffix;
+
+/** Words a discovery phrase of a universe accepts in listing titles: all names and markers of it. */
+export function topicTerms(category) {
+  const key = ` ${foldName(category)} `;
+  return derived.topics.find((topic) => topic.keys.some((name) => name && key.includes(` ${name} `)))?.terms ?? [];
+}
+
+// --- the table (migration 126)
+
+export function loadUniverses(repository) {
+  let rows;
+  try {
+    rows = repository.database.prepare('SELECT name, names_json, lines_json, markers_json FROM universes ORDER BY position, name').all();
+  } catch {
+    return currentUniverses();
+  }
+  return setUniverses(rows.map((row) => ({ name: row.name, names: JSON.parse(row.names_json), lines: JSON.parse(row.lines_json), markers: JSON.parse(row.markers_json) })));
+}
+
+function fail(code, statusCode = 400) {
+  throw Object.assign(Error(code), { statusCode });
+}
+
+export function listUniverses(repository) {
+  return { items: loadUniverses(repository) };
+}
+
+/** Adds or replaces one universe; `previousName` renames it. */
+export function saveUniverse(repository, input = {}, { now = () => new Date() } = {}) {
+  const record = normalize(input);
+  if (!record.name || record.name.length > 100) fail('INVALID_UNIVERSE_NAME');
+  for (const field of ['names', 'lines', 'markers']) if (input[field] != null && !Array.isArray(input[field])) fail('INVALID_UNIVERSE_FIELDS');
+  const previous = typeof input.previousName === 'string' && input.previousName.trim() ? input.previousName.trim() : record.name;
+  const db = repository.database;
+  // A spelling may belong to one universe only: otherwise a title would be filed under two.
+  const taken = new Map();
+  for (const other of loadUniverses(repository)) if (other.name !== previous) for (const name of [other.name, ...other.names]) taken.set(foldName(name), other.name);
+  const clash = record.names.find((name) => taken.has(foldName(name)));
+  if (clash) throw Object.assign(Error('UNIVERSE_NAME_TAKEN'), { statusCode: 409, detail: `${clash} → ${taken.get(foldName(clash))}` });
+  const at = now().toISOString();
+  repository.transaction(() => {
+    const old = db.prepare('SELECT position FROM universes WHERE name=?').get(previous);
+    const position = old?.position ?? Number(db.prepare('SELECT coalesce(max(position),-1)+1 AS next FROM universes').get().next);
+    if (old && previous !== record.name) db.prepare('DELETE FROM universes WHERE name=?').run(previous);
+    db.prepare(
+      `INSERT INTO universes(name,names_json,lines_json,markers_json,position,updated_at) VALUES(?,?,?,?,?,?)
+       ON CONFLICT(name) DO UPDATE SET names_json=excluded.names_json, lines_json=excluded.lines_json,
+         markers_json=excluded.markers_json, updated_at=excluded.updated_at`,
+    ).run(record.name, JSON.stringify(record.names.filter((name) => name !== record.name)), JSON.stringify(record.lines), JSON.stringify(record.markers), position, at);
+  });
+  return listUniverses(repository);
+}
+
+export function deleteUniverse(repository, name) {
+  const result = repository.database.prepare('DELETE FROM universes WHERE name=?').run(String(name ?? ''));
+  if (!Number(result.changes)) fail('UNIVERSE_NOT_FOUND', 404);
+  return listUniverses(repository);
+}

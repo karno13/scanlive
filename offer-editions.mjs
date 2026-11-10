@@ -14,16 +14,26 @@ import { chooseAmongRecords } from './catalog-resolver.mjs';
 import { storeSeriesStatements } from './edition-series.mjs';
 import { normalizePublisher } from './publisher-names.mjs';
 import { storedIsbnRecord } from './isbn-lookups.mjs';
-import { LISTING_UNIVERSE_PATTERNS } from './universes.mjs';
+import { listingUniversePatterns } from './universes.mjs';
 
 const RECHECK_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const RETRY_SOON_MS = 24 * 60 * 60 * 1000;
 const L = '[\\p{L}\\d]';
 const word = (pattern) => new RegExp(`(?<!${L})(?:${pattern})(?!${L})`, 'giu');
-// Universe names and sales words: on every cover and in every listing, never the book's own title.
-const NOISE = word(
-  [
-    ...LISTING_UNIVERSE_PATTERNS,
+// Universe names (from the universes table) and sales words: on every cover and in every listing,
+// never the book's own title.
+let noiseFor = null;
+let noise = null;
+function NOISE_NOW() {
+  const universes = listingUniversePatterns();
+  if (noiseFor !== universes) {
+    noiseFor = universes;
+    noise = word([...universes, ...SALES_NOISE].join('|'));
+  }
+  noise.lastIndex = 0;
+  return noise;
+}
+const SALES_NOISE = [
     'książka',
     'ksiazka',
     'książki',
@@ -37,8 +47,7 @@ const NOISE = word(
     'black library',
     'copernicus',
     'chronicles',
-  ].join('|'),
-);
+];
 
 const clean = (text) =>
   String(text ?? '')
@@ -104,7 +113,7 @@ function authorsInTitle(title, people) {
  */
 function nameSegment(title) {
   for (const segment of String(title).split(/\s[-–—|]\s|,\s/).slice(1)) {
-    const text = clean(segment.replace(NOISE, ' '));
+    const text = clean(segment.replace(NOISE_NOW(), ' '));
     if (/^(?:\p{Lu}[\p{Ll}'’-]+|\p{Lu}\.)(?:\s(?:\p{Lu}[\p{Ll}'’-]+|\p{Lu}\.)){1,2}$/u.test(text)) return text;
   }
   return null;
@@ -126,7 +135,7 @@ function sentenceCase(text) {
 
 /** Title of the book from a listing: no universe names, no author, no sales words. */
 export function titleFromListing(title, authors = []) {
-  let text = String(title ?? '').replace(/#/g, ' ').replace(NOISE, ' ');
+  let text = String(title ?? '').replace(/#/g, ' ').replace(NOISE_NOW(), ' ');
   for (const author of authors) {
     const person = personName(author);
     if (person) text = removeName(text, person);

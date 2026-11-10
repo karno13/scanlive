@@ -3,19 +3,18 @@
 // annotation (which always wins). Display and navigation only — never identification evidence.
 import { fold } from './title-proposals.mjs';
 import { proxiedImage } from './offer-images.mjs';
-import { BRAND_ONLY, SERIES_UNIVERSES } from './universes.mjs';
+import { brandOnlyPattern, seriesUniverses } from './universes.mjs';
 
-// Universe names that appear on covers / in BN series statements, with the label shown.
-const UNIVERSES = SERIES_UNIVERSES;
 // Publisher lines and genre labels: numbered, but not a story cycle.
 export const NOT_A_CYCLE =
   /^(?:wielka kolekcja|kolekcja.*|czarna biblioteka|fantastyka|fantasy|sf|seria.*fantasy|biblioteka.*|blizzard legends|nowa fantastyka|sensacja.*fantastyka|.*fantasy adventure|fantasy adventure)$/i;
 // Brand words that are not a cycle on their own ("Discworld series t. 14" = the universe itself).
-export { BRAND_ONLY };
+export const BRAND_ONLY = { test: (text) => brandOnlyPattern().test(text) };
 
 export function universeOf(text) {
   const folded = fold(text);
-  return UNIVERSES.find(([pattern]) => pattern.test(folded))?.[1] ?? null;
+  // Universe names that appear on covers / in BN series statements, with the label shown.
+  return seriesUniverses().find(([pattern]) => pattern.test(folded))?.[1] ?? null;
 }
 
 /** Cycle and volume from a BN title: "…, Legenda Drizzta ; ks. 7 Forgotten Realms" → {Legenda Drizzta, 7}. */

@@ -3701,3 +3701,8 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
 /* Scan schedule: quick scan of the newest listings (changelog 29) */
 .scan-schedule .quick-scan { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 4px; margin: 10px 0; display: grid; gap: 6px; }
 .scan-schedule .quick-scan legend { font-size: 13px; font-weight: 600; padding: 0 4px; }
+/* Katalog → Wydawcy i serie: universes as data (changelog 30) */
+.universes-list .universe-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; align-items: end; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.universes-list .universe-row .field { margin: 0; }
+.universes-list .universe-row .field span { font-size: 12px; color: var(--muted); }
+.universes-list .universe-actions { display: flex; gap: 10px; align-items: center; min-height: 44px; }

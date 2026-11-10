@@ -2,7 +2,7 @@
 // this every ISBN (every reprint, every publisher) became its own work. The key is deliberately
 // strict - same main title AND same first author - because a wrong merge is worse than a missed one.
 import { fold } from './title-proposals.mjs';
-import { BRAND_ONLY_ORIGINAL, UNIVERSE_PREFIX, UNIVERSE_SUFFIX } from './universes.mjs';
+import { brandOnlyPattern, universePrefix, universeSuffix } from './universes.mjs';
 
 
 /** "Para w ruch / Raising steam, Discworld series ; t. 40" -> "Para w ruch" */
@@ -11,7 +11,7 @@ export function mainTitle(title) {
   // "World of Warcraft: Illidan" and "Illidan / World of Warcraft" are the same work: a universe
   // prefix followed by ":" or "." is cover branding, not the title (the author must still match).
   // A universe in brackets after the title ("Blask fantastyczny (ŚWIAT DYSKU)") is branding too.
-  const unbranded = text.replace(UNIVERSE_PREFIX, '').replace(UNIVERSE_SUFFIX, '');
+  const unbranded = text.replace(universePrefix(), '').replace(universeSuffix(), '');
   return (fold(unbranded.split(' / ')[0]).length >= 3 ? unbranded : text)
     .split(' / ')[0]
     .split(' : ')[0]
@@ -63,7 +63,7 @@ export function originalKey(originalTitle, authors) {
   // The whole title: "World of Warcraft : chronicle. Volume 2" must not join volume 1.
   const name = fold(originalTitle);
   const surname = firstSurname(authors);
-  if (name.length < 4 || surname.length < 2 || BRAND_ONLY_ORIGINAL.test(name)) return null;
+  if (name.length < 4 || surname.length < 2 || brandOnlyPattern().test(name)) return null;
   return `orig:${name}|${surname}`;
 }
 

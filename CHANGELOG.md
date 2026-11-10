@@ -2,6 +2,12 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-10 (30) — Uniwersa w danych zamiast w kodzie
+
+- **Uniwersa do edycji (migracja 126).** Katalog → „Wydawcy i serie” ma sekcję „Uniwersa”: nazwa, inne zapisy (np. „Discworld; Discworld series”), serie wydawnicze związane z uniwersum („Black Library; Czarna Biblioteka”) oraz cykle i postacie, które je wskazują („Herezja Horusa; Drizzt”). Można dodać uniwersum (np. „Wiedźmin; The Witcher”), poprawić je, zmienić mu nazwę albo je usunąć; jeden zapis może należeć tylko do jednego uniwersum. Zmiana obowiązuje od razu dla tytułów czytanych od teraz.
+- Wcześniej nazwy uniwersów były wpisane osobno w 9 modułach, każdy z trochę inną listą. Teraz wszystkie listy powstają z jednej tabeli: usuwanie nazwy uniwersum z tytułu („World of Warcraft: Illidan” = „Illidan”), odróżnianie uniwersum od cyklu w serii z BN, uniwersum w widoku Serie, słowa pomijane przy porównywaniu tytułów i odrzuconych ofert, poszerzanie wyszukiwania („Świat Dysku” znajduje też „Discworld”). Dane początkowe to obecne wartości z kodu, połączone: Świat Dysku, Warcraft, Warhammer, Dragonlance, Forgotten Realms oraz Diablo, StarCraft i Star Wars (dotąd tylko na części list).
+- Na danych z 2026-11-10 różnica względem dotychczasowych list: 19 z 2741 tytułów ma inny tytuł główny (np. „Diablo: Wojna grzechu…” → „Wojna grzechu…”, „Star Wars: Mroczny uczeń…” → „Mroczny uczeń…”, „Warhammer Age of Sigmar: Malign sorcery” → „Malign sorcery”), 49 tytułów dostało uniwersum w widoku Serie (głównie Diablo, Star Wars i „Zapomniane Krainy” → Forgotten Realms), a serie „Diablo” i „Star Wars” z BN są uniwersami zamiast cyklami. Istniejące dzieła nie są przy tym automatycznie łączone.
+
 ## 2026-11-10 (29) — Szybki skan najnowszych ofert
 
 - **Drugi tryb skanu.** W „Automatyczny skan” jest nowa sekcja „Szybki skan najnowszych ofert” z własnym odstępem (1–24 h, domyślnie co 2 h), **domyślnie wyłączona**. Czyta jedną stronę wyników na frazę, posortowaną od najnowszych, tylko w źródłach, które pozwalają tak sortować — sprawdzone na żywej stronie: Vinted (`order=newest_first`; ok. 90 ogłoszeń na stronie). Używa tego samego profilu co pełny skan; gdy oba są do wykonania, pierwszeństwo ma pełny.

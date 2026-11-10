@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { deleteUniverse, listUniverses, saveUniverse } from './universes.mjs';
 import { recentRelistDecisions, undoRelist } from './offer-status.mjs';
 import { readdir, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -243,6 +244,10 @@ export async function tradingRoute({repo,method,path,input}) {
   if(path==='/api/scan-queries/stats'&&method==='GET') return scanQueryStats(repo);
   if(path==='/api/scan-queries/freshness'&&method==='GET') return scanQueryFreshness(repo);
   if(path==='/api/catalog/names'&&method==='GET') return listNames(repo);
+  if(path==='/api/catalog/universes'&&method==='GET') return listUniverses(repo);
+  if(path==='/api/catalog/universes'&&method==='PUT') return saveUniverse(repo,input);
+  const universe=path.match(/^\/api\/catalog\/universes\/([^/]+)$/);
+  if(universe&&method==='DELETE') return deleteUniverse(repo,decodeURIComponent(universe[1]));
   if(path==='/api/catalog/names/merge'&&method==='POST') return mergeNames(repo,input);
   if(path==='/api/catalog/names/unalias'&&method==='POST') return removeNameAlias(repo,input);
   if(path==='/api/scan-language'&&method==='GET') return {polishOnly:getPolishOnly(repo)};

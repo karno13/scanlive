@@ -12,7 +12,8 @@
 | SQLite | `catalog-production.mjs` (start: migracje i naprawy danych przy uruchomieniu), `sqlite-catalog-repository.mjs`, `catalog-api.mjs` (odczyty list, kolejka weryfikacji), `trading-api.mjs` (mniejsze trasy `/api/...`), `offer-sets.mjs` |
 | ISBN / metadane | `catalog-resolver.mjs`, `identification-worker.mjs`, `metadata-lookup.mjs`, `metadata-sources/` (BN → Open Library → e-ISBN → Google Books; `lubimyczytac.mjs` tylko przez `isbn-lookups.mjs` dla nieznanych ISBN), `publisher-names.mjs` + `name-aliases.mjs` (jedna pisownia wydawców i serii) |
 | Weryfikacja (od 2026-11-07) | `title-proposals.mjs` (propozycje po tytule), `offer-enrichment.mjs` + `source-details.mjs` (dane ze strony produktu), `offer-editions.mjs` (wydania z ogłoszeń, gdy nikt nie zna ISBN), `game-material.mjs` (podręczniki do gier i wydania obcojęzyczne), `edition-series.mjs` (cykl i tom z ogłoszeń i e-ISBN), `app/views/review.js` + `review-bulk.js` (zakładki, „Zatwierdź pewne…”, zaznaczanie wielu), `bundle-detection.mjs` (zestawy po słowach i po dwóch tytułach z katalogu), `rejected-offers.mjs` (powtórki odrzuconych ofert) |
-| Katalog: dzieła i duplikaty | `work-grouping.mjs`, `app/views/duplicates.js`, `app/views/catalog-names.js` (wydawcy i serie) |
+| Katalog: dzieła i duplikaty | `work-grouping.mjs`, `app/views/duplicates.js`, `app/views/catalog-names.js` (wydawcy, serie i uniwersa) |
+| Uniwersa | `universes.mjs` — tabela `universes` (nazwy, serie wydawnicze, cykle i postacie); z niej wszystkie listy nazw uniwersów używane przez `bn-marc`, `catalog-series`, `edition-series`, `offer-editions`, `rejected-offers`, `search-policy`, `title-consistency`, `title-proposals`, `work-grouping` |
 | Katalog: wydania i ceny książki | `edition-variants.mjs` (warianty cenowe, „Wydanie nieustalone”, wybór wydania z ogłoszenia), `offer-kinds.mjs` (rodzaj oferty: nowa w sklepie / antykwariat / prywatna), `price-stats.mjs` (statystyki cen w SQL, w groszach), `app/views/work-prices.js` |
 | Historia (narzędzia) | `sqlite-history-read.mjs` (`sqliteHistoryModel`) + `price-analysis.mjs` — tylko eksport „Historia ofert” (`/api/history`), `/api/book` i dawne odpowiedzi `/api/catalog` bez `compact`; nie w ścieżce skanu |
 | Zestawy | `offer-sets.mjs`, `set-descriptions.mjs` (skład z opisu ogłoszenia), `app/views/sets.js` |
@@ -23,7 +24,7 @@
 | Zdjęcia i okładki | `offer-images.mjs` (walidacja URL, proxy `/api/image` z cache, `og:image`), `app/core/bibliography.js` (czyste etykiety BN, okładki) |
 | Pulpit i paleta | `catalog-insights.mjs` (`/api/catalog/insights`), `app/views/dashboard.js`, `app/views/palette.js`, `app/core/preferences.js` |
 | Trwały katalog danych / backup | `catalog-data-location.mjs`, `scripts/backup-catalog.mjs` |
-| Migracje — zachować | `migrations/001_catalog.sql` … `007_offer_sets.sql`, `099`–`125`; nowa migracja = kolejny numer, nigdy edycja istniejącej |
+| Migracje — zachować | `migrations/001_catalog.sql` … `007_offer_sets.sql`, `099`–`126`; nowa migracja = kolejny numer, nigdy edycja istniejącej |
 | Testy Node | `*.test.mjs`, `test/*.test.js`, `scripts/run-tests.mjs`, `.github/workflows/scanner-tests.yml` |
 | Test startu interfejsu | `scripts/browser-smoke.mjs` (włącza tryb handlu w `localStorage`, bo sprawdza kalkulator i cenę docelową), `.github/workflows/browser-smoke.yml` |
 | Publiczne demo | Osobna gałąź `gh-pages` — bez produkcyjnego API |

@@ -45,6 +45,7 @@ import { rejectRepeatsOfRejectedOffers, undoUnconfirmedRepeatRejections } from '
 import { rejectForeignEditions } from './language-policy.mjs';
 import { backfillConditionsFromEnrichment, observationFields, saveRawSnapshot } from './offer-observations.mjs';
 import { saveOfferDescription } from './set-descriptions.mjs';
+import { loadUniverses } from './universes.mjs';
 
 function stableId(prefix, ...values) {
   return `${prefix}_${createHash('sha256').update(JSON.stringify(values)).digest('hex').slice(0, 32)}`;
@@ -72,6 +73,8 @@ export function createProductionCatalog({
   busyTimeout = 10_000,
 } = {}) {
   const repository = new SqliteCatalogRepository(databasePath, { busyTimeout, now });
+  // Universe names and spellings (Katalog → „Wydawcy i serie”) before anything reads titles.
+  loadUniverses(repository);
   // One-time upgrade of existing editions from their stored BN MARC records (no network).
   try {
     const upgrade = upgradeCatalogBibliography(repository, { now });
