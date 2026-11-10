@@ -10,6 +10,9 @@ import { randomUUID } from 'node:crypto';
 import { fold } from './title-proposals.mjs';
 import { normalizePublisher } from './publisher-names.mjs';
 import { isbnKeys } from './isbn-normalization.mjs';
+import { OFFER_KINDS, OFFER_KIND_LABELS, offerKind } from './offer-kinds.mjs';
+import { CONDITION_CLASSES } from './offer-observations.mjs';
+import { groupedPriceStats, vintedSoldStats } from './price-stats.mjs';
 
 const POLISH = /^(?:pol|pl|polski|polish)?$/i;
 // First words that say nothing about which publisher it is ("Dom Wydawniczy Rebis").
@@ -229,29 +232,13 @@ export function editionForWorkAssignment(repository, workId, offerId, options = 
   return { editionId: ensureUnknownEdition(repository, workId, options), reason: chosen.reason, unknown: true };
 }
 
-function median(sorted) {
-  if (!sorted.length) return null;
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
-}
-
-function stats(offers) {
-  const live = offers.filter((item) => !['unavailable', 'sold', 'reserved'].includes(item.availability) && item.currency === 'PLN' && item.price > 0).map((item) => item.price).sort((a, b) => a - b);
-  const sold = offers.filter((item) => item.availability === 'sold' && item.currency === 'PLN' && item.price > 0).map((item) => item.price).sort((a, b) => a - b);
-  return {
-    offers: offers.length,
-    live: live.length,
-    median: median(live),
-    min: live[0] ?? null,
-    max: live.at(-1) ?? null,
-    sold: sold.length,
-    soldMedian: median(sold),
-  };
-}
+const NO_STATS = { offers: 0, live: 0, median: null, min: null, max: null, sold: 0, soldMedian: null, soldMin: null, soldMax: null };
 
 /**
- * Prices of a book: every offer assigned to any of its editions, overall and per variant, with
- * the recorded price observations for a chart. Offer prices, not sale prices.
+ * Prices of a book: every offer assigned to any of its editions, overall, per variant, per kind of
+ * offer (new in a shop / antiquarian / private copy) and per condition class, plus the copies sold
+ * on Vinted as a value of their own; with the recorded price observations for a chart. Statistics
+ * are computed in SQL (price-stats.mjs), in grosze.
  */
 export function workPriceOverview(repository, workId) {
   const db = repository.database;
@@ -264,7 +251,7 @@ export function workPriceOverview(repository, workId) {
   const rows = editions.length
     ? db
         .prepare(
-          `SELECT o.id, o.source, o.original_title, o.current_price, o.currency, o.availability, o.last_seen_at, m.edition_id
+          `SELECT o.id, o.source, o.original_title, o.current_price, o.currency, o.availability, o.last_seen_at, o.seller_name, o.condition_class, m.edition_id
            FROM offer_matches m JOIN offers o ON o.id=m.offer_id
            WHERE m.status='active' AND m.edition_id IN (${editions.map(() => '?').join(',')})
            ORDER BY o.last_seen_at DESC`,
@@ -279,6 +266,8 @@ export function workPriceOverview(repository, workId) {
     currency: row.currency,
     availability: row.availability,
     lastSeenAt: row.last_seen_at,
+    kind: offerKind({ source: row.source, sellerName: row.seller_name }),
+    conditionClass: row.condition_class ?? 'unknown',
     editionId: row.edition_id,
     variant: unknownIds.has(row.edition_id) ? 'unknown' : variantOf.get(row.edition_id) ?? 'unknown',
   }));
@@ -291,12 +280,23 @@ export function workPriceOverview(repository, workId) {
     : [];
   const variantOfOffer = new Map(offers.map((item) => [item.id, item.variant]));
   const currencyOf = new Map(offers.map((item) => [item.id, item.currency]));
+  // The offers of this book with their variant, as an SQL source for the statistics.
+  const groups = Object.fromEntries(editions.map((edition) => [edition.id, unknownIds.has(edition.id) ? 'unknown' : variantOf.get(edition.id) ?? 'unknown']));
+  const selected = `SELECT m.offer_id, v.value AS grp FROM offer_matches m JOIN json_each(?) v ON v.key=m.edition_id WHERE m.status='active'`;
+  const params = [JSON.stringify(groups)];
+  const byGroup = groupedPriceStats(db, selected, params, 'grp');
+  const byKind = groupedPriceStats(db, selected, params, 'kind');
+  const byCondition = groupedPriceStats(db, selected, params, 'condition');
   return {
     workId: work.id,
     title: work.title,
-    overall: stats(offers),
-    variants: variants.map((variant) => ({ ...variant, ...stats(offers.filter((item) => item.variant === variant.key)) })),
-    unknown: { editionIds: [...unknownIds], ...stats(offers.filter((item) => item.variant === 'unknown')) },
+    overall: { ...NO_STATS, ...groupedPriceStats(db, selected, params, 'all').all },
+    // Vinted copies found sold: what this book resells for.
+    vintedSold: vintedSoldStats(db, selected, params),
+    kinds: OFFER_KINDS.map((kind) => ({ kind, label: OFFER_KIND_LABELS[kind], ...NO_STATS, ...byKind[kind] })).filter((row) => row.offers),
+    conditions: CONDITION_CLASSES.map((condition) => ({ condition, ...NO_STATS, ...byCondition[condition] })).filter((row) => row.offers),
+    variants: variants.map((variant) => ({ ...variant, ...NO_STATS, ...byGroup[variant.key] })),
+    unknown: { editionIds: [...unknownIds], ...NO_STATS, ...byGroup.unknown },
     offers,
     points: history
       .filter((point) => currencyOf.get(point.offer_id) === 'PLN')

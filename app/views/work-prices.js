@@ -52,6 +52,22 @@ function statCells(stats, money) {
   return `<td>${stats.live || '–'}</td><td><b>${stats.median != null ? money(stats.median) : '–'}</b></td><td>${stats.min != null ? money(stats.min) : '–'}</td><td>${stats.sold ? `${stats.sold} · ${money(stats.soldMedian)}` : '–'}</td>`;
 }
 
+const CONDITION_LABELS = { new: 'Nowa', very_good: 'Bardzo dobra', good: 'Dobra', satisfactory: 'Zadowalająca', unknown: 'Stan nieznany' };
+
+// Comparable groups: the kind of offer (new in a shop, antiquarian, private copy) and, for copies,
+// their condition. A median over all of them mixed a new Empik book with a worn Vinted copy.
+function comparableMarkup(overview, { money, escapeHtml }) {
+  const sold = overview.vintedSold || { count: 0 };
+  const tiles = [
+    `<div class="wp-sold"><small>Sprzedane na Vinted</small><strong>${sold.count ? money(sold.median) : '–'}</strong><small>${sold.count ? `${sold.count} ${plural(sold.count, 'sprzedaż', 'sprzedaże', 'sprzedaży')}${sold.count > 1 ? ` · ${money(sold.min)}–${money(sold.max)}` : ''}` : 'brak potwierdzonych sprzedaży'}</small></div>`,
+    ...(overview.kinds || []).map((row) => `<div><small>${escapeHtml(row.label)}</small><strong>${row.median != null ? money(row.median) : '–'}</strong><small>${row.live} ${plural(row.live, 'dostępna', 'dostępne', 'dostępnych')}${row.min != null && row.live > 1 ? ` · od ${money(row.min)}` : ''}</small></div>`),
+  ];
+  const kindRows = (overview.kinds || []).map((row) => `<tr><th scope="row">${escapeHtml(row.label)}</th>${statCells(row, money)}</tr>`).join('');
+  const conditionRows = (overview.conditions || []).map((row) => `<tr><th scope="row">${escapeHtml(CONDITION_LABELS[row.condition] || row.condition)}</th>${statCells(row, money)}</tr>`).join('');
+  return `<div class="edition-price-summary wp-comparable">${tiles.join('')}</div>
+    ${kindRows || conditionRows ? `<div class="wp-table-wrap"><table class="wp-table"><thead><tr><th scope="col">Rodzaj oferty / stan</th><th scope="col">Oferty</th><th scope="col">Mediana</th><th scope="col">Najniższa</th><th scope="col">Sprzedane</th></tr></thead><tbody>${kindRows}</tbody>${conditionRows ? `<tbody class="wp-conditions"><tr><th scope="rowgroup" colspan="5">Wg stanu egzemplarza (wszystkie rodzaje)</th></tr>${conditionRows}</tbody>` : ''}</table></div>` : ''}`;
+}
+
 export function workPricesMarkup(overview, { money, escapeHtml }) {
   const slots = colourSlots(overview);
   const { overall } = overview;
@@ -71,11 +87,11 @@ export function workPricesMarkup(overview, { money, escapeHtml }) {
     .map((variant) => `<span><i class="wp-key wp-s${slots.get(variant.key)}"></i>${escapeHtml(variant.label)}</span>`)
     .join('') + (variants.some((variant) => variant.offers && !slots.get(variant.key)) || overview.unknown.offers ? '<span><i class="wp-key wp-s0"></i>pozostałe i nieustalone</span>' : '');
   return `<section class="detail-section work-prices"><h4>Ceny tej książki — wszystkie wydania</h4>
-    ${overall.offers ? `<div class="edition-price-summary"><div><small>Mediana cen ofertowych</small><strong>${overall.median != null ? money(overall.median) : '–'}</strong></div><div><small>Najniższa oferta</small><strong>${overall.min != null ? money(overall.min) : '–'}</strong></div><div><small>Dostępne oferty</small><strong>${overall.live}</strong></div><div><small>Sprzedane</small><strong>${overall.sold ? overall.sold + ' · ' + money(overall.soldMedian) : '0'}</strong></div></div>` : '<p class="inline-note">Brak ofert przypisanych do tej książki.</p>'}
+    ${overall.offers ? comparableMarkup(overview, { money, escapeHtml }) : '<p class="inline-note">Brak ofert przypisanych do tej książki.</p>'}
     ${overall.offers ? chartMarkup(overview, slots, { money, escapeHtml }) : ''}
     ${overall.offers && legend ? `<div class="wp-legend">${legend}</div>` : ''}
     ${rows || unknown ? `<div class="wp-table-wrap"><table class="wp-table"><thead><tr><th scope="col">Wariant cenowy</th><th scope="col">Oferty</th><th scope="col">Mediana</th><th scope="col">Najniższa</th><th scope="col">Sprzedane</th></tr></thead><tbody>${rows}${unknown}</tbody></table></div>` : ''}
-    <p class="inline-note">Warianty łączą wydania o podobnej cenie (ten sam wydawca i oprawa). Mediana wariantu liczy tylko oferty z tym wydaniem; „nieustalone” wchodzą do ceny całej książki. Ceny ofertowe w PLN, bez dostawy i stanu egzemplarza.</p>
+    <p class="inline-note">Warianty łączą wydania o podobnej cenie (ten sam wydawca i oprawa). Mediana wariantu liczy tylko oferty z tym wydaniem; „nieustalone” wchodzą do ceny całej książki. Ceny ofertowe w PLN, bez dostawy; nowe książki ze sklepów, antykwariaty i prywatne egzemplarze liczone osobno.</p>
     ${variants.length > 1 ? variantToolsMarkup(variants, escapeHtml) : ''}
   </section>`;
 }

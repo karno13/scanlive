@@ -2,6 +2,12 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-10 (28) — Ceny porównują porównywalne
+
+- **Rodzaj oferty.** Każda oferta ma rodzaj wynikający ze źródła: nowa w sklepie (Empik, Dedalus, sklepy z Empik Marketplace), antykwariat (Tezeusz, antykwariaty sprzedające przez Empik), prywatny egzemplarz (Vinted, OLX, Allegro Lokalnie). Reguły są w jednym miejscu i działają tak samo w kodzie i w zapytaniach SQL. Na danych z 2026-11-10: 1936 prywatnych, 365 ze sklepów, 77 z antykwariatów. Oferty z Empiku zapisane przed zmianą 26 nie mają nazwy sprzedawcy, więc do najbliższego skanu liczą się jako sklepowe.
+- **Ceny książki osobno dla każdego rodzaju i stanu.** Na stronie książki w Katalogu pierwszy kafelek to **„Sprzedane na Vinted”** (mediana, liczba sprzedaży, zakres) — cena odsprzedaży. Obok mediany dostępnych ofert osobno dla nowych w sklepie, antykwariatów i prywatnych egzemplarzy, a w tabeli także wg stanu egzemplarza (nowa / bardzo dobra / dobra / zadowalająca / nieznany). Wcześniej jedna mediana mieszała nową książkę z Empiku z używanym egzemplarzem z Vinted: na danych z 2026-11-10 67 książek ma dostępne oferty więcej niż jednego rodzaju, a w 22 z nich wspólna mediana różniła się od mediany prywatnych egzemplarzy o ponad 20%.
+- **Statystyki cen liczone w SQL**, w groszach (mediana, najniższa, najwyższa, sprzedane). Zapis skanu nie ocenia już cen modułem historii (`price-analysis.mjs`) — skan zwraca zapisane oferty jednym zapytaniem. Model historii zostaje tylko dla eksportu „Historia ofert” i dawnych odpowiedzi API.
+
 ## 2026-11-10 (27) — Wiarygodny sygnał sprzedaży na Vinted
 
 - **Historia stanów oferty (migracja 125).** Każdy zaobserwowany stan jest zapisywany z datą: pierwsze i ponowne pojawienie się w skanie, brak w pełnym skanie frazy, każde sprawdzenie strony ogłoszenia (dostępna / zarezerwowana / sprzedana / usunięta / nieczytelna). Dzięki temu sprzedaż ma przedział: „między ostatnim widzeniem a sprawdzeniem”. W szczegółach oferty sprzedanej: „Sprzedana między 3.11 a 5.11” oraz rozwijana „Historia stanów”. Z wcześniejszych danych odtworzone: 2378 pierwszych wykryć i 23 zmiany znalezione przy sprawdzaniu (10 sprzedanych, 11 usuniętych, 2 dostępne).

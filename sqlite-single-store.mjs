@@ -4,7 +4,6 @@ import { markUnseenOffers } from './offer-availability.mjs';
 import { normalizedIsbn } from './offer-history.mjs';
 import { sourceOfferId, offerExternalId } from './offer-identity.mjs';
 import { sqliteHistoryModel } from './sqlite-history-read.mjs';
-import { analyzedOffers } from './price-analysis.mjs';
 import { detectRelists } from './offer-status.mjs';
 
 export function storageMode(env = process.env) {
@@ -17,7 +16,17 @@ function bad(code, statusCode = 400) {
   throw Object.assign(Error(code), { statusCode });
 }
 function bookFromProjection(catalog, bookId) {
-  return sqliteHistoryModel(catalog.repository, { bookId, includePriceHistory: false }).books[bookId] || null;
+  const row = catalog.repository.database
+    .prepare(
+      `SELECT e.id, e.title, e.created_at, e.updated_at, w.verification_status,
+         (SELECT normalized_value FROM edition_identifiers i WHERE i.edition_id=e.id AND i.scheme IN ('isbn13','isbn10')
+          ORDER BY CASE i.scheme WHEN 'isbn13' THEN 0 ELSE 1 END, i.id LIMIT 1) AS isbn
+       FROM editions e JOIN works w ON w.id=e.work_id WHERE COALESCE(e.legacy_id,w.legacy_id,'edition:' || e.id)=? ORDER BY e.created_at LIMIT 1`,
+    )
+    .get(bookId);
+  return row
+    ? { id: bookId, title: row.title, isbn: row.isbn ?? null, origin: row.verification_status === 'manual' ? 'manual' : 'detected', firstSeenAt: row.created_at, lastSeenAt: row.updated_at }
+    : null;
 }
 export function createSqliteBook(catalog, { title, isbn = null } = {}) {
   const clean = String(title || '').trim(),
@@ -206,51 +215,21 @@ export function persistSqliteScan(catalog, { offers, searchedAt, errors = [], sc
     return report;
   });
 
-  // Do not materialize the entire catalog (or its complete price-history table).
-  // Price classifications depend only on CURRENT offers for the same edition.
-  const linked = db.prepare(`SELECT COALESCE(e.legacy_id,w.legacy_id,'edition:' || e.id) AS book_id
-    FROM offer_matches m JOIN editions e ON e.id=m.edition_id
-    JOIN works w ON w.id=e.work_id
-    WHERE m.offer_id=? AND m.status='active' LIMIT 1`);
-  const current = db.prepare('SELECT * FROM offers WHERE id=?');
-  const byBook = new Map();
-  const idsByBook = new Map();
-  const unmatched = {version:2, books:{}, offers:{}, priceHistory:[], details:{},lastScan};
-  const ordered = [];
-  for (const id of ids) {
-    const row = current.get(id);
-    if (!row) continue;
-    const link = linked.get(id);
-    if (link?.book_id) {
-      if (!idsByBook.has(link.book_id)) idsByBook.set(link.book_id, []);
-      idsByBook.get(link.book_id).push(id);
-      if (!byBook.has(link.book_id))
-        byBook.set(link.book_id, sqliteHistoryModel(catalog.repository, {
-          bookId: link.book_id, includePriceHistory: false,
-        }));
-      ordered.push({id, bookId: link.book_id});
-    } else {
-      let matchedQueries = [];
-      try { matchedQueries = JSON.parse(row.matched_queries_json || '[]'); }
-      catch {}
-      unmatched.offers[id] = {
-        id, bookId:null, linkMode:null, originalTitle:row.original_title,
-        currentPrice:row.current_price, source:row.source, url:row.normalized_url,
-        firstSeenAt:row.first_seen_at, lastSeenAt:row.last_seen_at,
-        availability:row.availability, matchedQueries:Array.isArray(matchedQueries)?matchedQueries:[],
-        isbn:row.observed_isbn || null, language:row.language || null, seenCount:row.seen_count,
-      };
-      ordered.push({id, bookId:null});
-    }
-  }
-  const unassigned = new Map(analyzedOffers(unmatched).map(item => [item.id,item]));
-  const analyses = new Map();
-  for (const [bookId, model] of byBook) {
-    const relevant = idsByBook.get(bookId);
-    for (const item of analyzedOffers(model, relevant)) analyses.set(item.id,item);
-  }
-  const analyzed = ordered.map(({id,bookId}) => bookId ? analyses.get(id) : unassigned.get(id))
-    .filter(Boolean).map(item => ({...item,title:item.originalTitle}));
+  // The scanned offers as saved, read in one query. Price judgements are not made here any more:
+  // statistics are computed in SQL where they are shown (price-stats.mjs).
+  const rows = ids.length
+    ? db.prepare(`SELECT o.id, o.source, o.normalized_url AS url, o.original_title AS title, o.current_price AS price,
+         o.availability, o.first_seen_at AS firstSeenAt, o.last_seen_at AS lastSeenAt, o.observed_isbn AS isbn,
+         o.language, o.seen_count AS seenCount, o.matched_queries_json,
+         (SELECT COALESCE(e.legacy_id,w.legacy_id,'edition:' || e.id) FROM offer_matches m JOIN editions e ON e.id=m.edition_id
+            JOIN works w ON w.id=e.work_id WHERE m.offer_id=o.id AND m.status='active' LIMIT 1) AS bookId
+       FROM offers o JOIN json_each(?) j ON j.value=o.id ORDER BY j.key`).all(JSON.stringify(ids))
+    : [];
+  const analyzed = rows.map(({ matched_queries_json: queries, ...row }) => {
+    let matchedQueries = [];
+    try { matchedQueries = JSON.parse(queries || '[]'); } catch {}
+    return { ...row, originalTitle: row.title, currentPrice: row.price, matchedQueries: Array.isArray(matchedQueries) ? matchedQueries : [] };
+  });
   return {
     ingest, offers:analyzed, lastScan,
     summary:{newOffers,priceChanges},

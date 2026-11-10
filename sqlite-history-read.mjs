@@ -1,4 +1,6 @@
-// Read-only compatibility adapter for the legacy /api/history contract.
+// Read-only compatibility adapter for the legacy /api/history contract. Only history tools use it
+// (the "Historia ofert" export, /api/book, the full /api/catalog response); scans and price
+// statistics read SQL directly (price-stats.mjs).
 // This does not alter the catalog or infer bibliographic identity without
 // an active edition assignment.
 export function sqliteHistoryModel(repository, { bookId = null, includePriceHistory = true } = {}) {
