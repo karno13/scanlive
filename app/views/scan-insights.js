@@ -1,3 +1,4 @@
+import { problemLabel } from './scan-run.js';
 // Read-only diagnostics for a local scan. Fields come from /api/scan/diagnostics.
 export function createScanInsights({ $, json, escapeHtml }) {
   const safe = value => escapeHtml(String(value ?? ''));
@@ -70,7 +71,7 @@ export function createScanInsights({ $, json, escapeHtml }) {
       const state = data.status || 'idle';
       $('#scanInsightsState').textContent = ({
         running: 'Skan trwa', completed: 'Zakończony', failed: 'Błąd',
-        interrupted: 'Przerwany', idle: 'Gotowy',
+        interrupted: 'Przerwany', cancelled: 'Anulowany', idle: 'Gotowy',
       })[state] || state;
       $('#scanInsightsTasks').textContent = `${progress.completed || 0} / ${progress.total || 0}`;
       $('#scanInsightsOffers').textContent = Number(diagnostics.offersSeen || 0);
@@ -79,13 +80,8 @@ export function createScanInsights({ $, json, escapeHtml }) {
       $('#scanInsightsPercent').textContent = progress.percent == null ? '—' : progress.percent + '%';
       $('#scanInsightsBar').value = progress.percent || 0;
       lastState = state;
-      // Declared before the rows below use it (it used to be after them: every refresh threw).
-      const codeLabels = {
-        SOURCE_HTTP_403: 'Odmowa dostępu (403)', SOURCE_HTTP_429: 'Limit żądań (429)',
-        SOURCE_CAPTCHA: 'Wymagana weryfikacja CAPTCHA', RATE_LIMIT: 'Ograniczenie tempa',
-        PAGINATION_LOOP: 'Powtarzająca się strona', SOURCE_TIMEOUT: 'Przekroczony czas odpowiedzi',
-      };
-      const explain = code => codeLabels[code] || code;
+      // Same wording as the run panel in the Scanner view.
+      const explain = code => (code ? problemLabel(code) : '');
       const rows = Object.entries(diagnostics.sources || {});
       $('#scanInsightsSources').innerHTML = rows.length ? rows.map(([name, row]) =>
         `<div class="scan-insights-row"><strong>${safe(name)}</strong><small>${Number(row.completed || 0)} zadań · ${Number(row.offers || 0)} ofert · ${Number(row.retries || 0)} ponowień</small>

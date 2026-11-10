@@ -44,9 +44,14 @@ export function mountOfferAssignment({ container, offer, currentEditionId = null
     try {
       const data = await json('/api/catalog/works?' + new URLSearchParams({ query, limit: '15' }));
       if (request !== serial) return;
+      // A book with several editions is offered whole too: the edition stays unknown unless the listing names it.
+      const books = data.items.filter((work) => work.editions.length > 1);
       const editions = data.items.flatMap((work) => work.editions.map((edition) => ({ ...edition, workTitle: work.title, authors: work.authors })));
+      const bookButtons = books
+        .map((work) => `<button type="button" class="offer-assignment-option is-work-option" data-work="${escapeHtml(work.id)}"><strong>${escapeHtml(work.title)} — cała książka</strong><small>${escapeHtml([work.authors?.[0], 'wydania w katalogu: ' + work.editions.length, 'wydanie nieustalone, chyba że ogłoszenie je wskazuje'].filter(Boolean).join(' · '))}</small></button>`)
+        .join('');
       results.innerHTML = editions.length
-        ? editions
+        ? bookButtons + editions
             .map(
               (edition) =>
                 `<button type="button" class="offer-assignment-option" data-edition="${escapeHtml(edition.id)}"${edition.id === currentEditionId ? ' disabled' : ''}><strong>${escapeHtml(edition.title)}</strong><small>${escapeHtml(
@@ -55,6 +60,9 @@ export function mountOfferAssignment({ container, offer, currentEditionId = null
             )
             .join('')
         : '<p class="inline-note">Nic nie znaleziono. Jeśli wydania nie ma w katalogu, dodaj je przez weryfikację ISBN.</p>';
+      results.querySelectorAll('[data-work]').forEach((button) =>
+        button.addEventListener('click', () => chooseWork(books.find((work) => work.id === button.dataset.work))),
+      );
       results.querySelectorAll('[data-edition]').forEach((button) =>
         button.addEventListener('click', () => choose(editions.find((edition) => edition.id === button.dataset.edition))),
       );
@@ -83,6 +91,26 @@ export function mountOfferAssignment({ container, offer, currentEditionId = null
       });
       toast('Zmieniono przypisanie oferty.');
       await onChanged({ editionId: edition.id });
+    } catch (error) {
+      toast(error.message === 'OFFER_IS_SET' ? 'To zestaw — skład zmienisz w zakładce Zestawy.' : 'Nie zmieniono przypisania: ' + error.message);
+    }
+  }
+
+  async function chooseWork(work) {
+    if (!work) return;
+    const ok = await confirmDialog(
+      `Przypisać ofertę „${String(offer.title || '').slice(0, 80)}” do książki „${work.title}” bez wskazywania wydania? Jeśli ogłoszenie wskazuje wydanie (ISBN, rok, oprawa, wydawca), zostanie ono wybrane; inaczej oferta trafi do „Wydanie nieustalone”.`,
+      { title: currentEditionId ? 'Zmiana przypisania' : 'Przypisanie oferty', confirmLabel: 'Przypisz' },
+    );
+    if (!ok) return;
+    try {
+      const result = await json('/api/offers/' + encodeURIComponent(offer.id) + '/assignment', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workId: work.id }),
+      });
+      toast('Przypisano do książki.');
+      await onChanged({ editionId: result.editionId });
     } catch (error) {
       toast(error.message === 'OFFER_IS_SET' ? 'To zestaw — skład zmienisz w zakładce Zestawy.' : 'Nie zmieniono przypisania: ' + error.message);
     }

@@ -150,7 +150,7 @@ function surePlanRow(item, index) {
   const facts = (parts) => parts.filter(Boolean).map((part) => escapeHtml(String(part))).join(' · ');
   const target = item.kind === 'edition'
     ? '<b>' + escapeHtml(tidyWorkTitle(item.title)) + '</b> <small>' +
-      facts(['z katalogu', cleanPublisher(item.publisher), item.year, item.isbn && 'ISBN ' + item.isbn, item.editions > 1 && item.editions + ' wydania, wybrano najczęściej używane']) + '</small>'
+      facts(['z katalogu', cleanPublisher(item.publisher), item.year, item.isbn && 'ISBN ' + item.isbn, item.editions > 1 && (item.editionId ? 'wydanie z ogłoszenia' : item.editions + ' wydania, wydanie nieustalone')]) + '</small>'
     : '<b>' + escapeHtml(String(item.title).split(' / ')[0]) + '</b> <small>' +
       facts(['nowe wydanie', 'ISBN ' + item.isbn, item.year, [].concat(item.authors ?? [])[0]]) + '</small>';
   return '<li><label class="rv-sure-row"><input type="checkbox" data-sure-index="' + index + '"' + (item.score >= 0.9 ? ' checked' : '') + '><span><span class="rv-sure-offer">' +
@@ -201,7 +201,7 @@ async function openSurePlan() {
     try {
       const result = await json('/api/identification-jobs/sure-apply', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: items.map(({ jobId, editionId, isbn, kind }) => (kind === 'edition' ? { jobId, editionId } : { jobId, isbn })) }),
+        body: JSON.stringify({ items: items.map(({ jobId, editionId, workId, isbn, kind }) => (kind === 'edition' ? (editionId ? { jobId, editionId } : { jobId, workId }) : { jobId, isbn })) }),
       });
       const failed = result.results.filter((row) => !row.ok).length;
       dialog.close();
@@ -226,12 +226,17 @@ function renderReview() {
   }
   renderTabs();
   const rows = filteredReviewOffers();
-  const pending = state.catalogPages.jobs.total;
+  // The whole queue (menu, header) vs what the open tab, search and filters show.
+  const pending = state.reviewQueueTotal ?? state.catalogPages.jobs.total;
   const covered = rows.reduce((sum, job) => sum + (job.sameIsbnCount || 1), 0);
-  const unfiltered = covered === reviewOffers().filter((job) => !state.skippedReviewIds.has(job.id)).length;
+  const unfiltered =
+    state.catalogPages.jobs.total === pending &&
+    covered === reviewOffers().filter((job) => !state.skippedReviewIds.has(job.id)).length;
+  // Offers with the same ISBN follow one decision: "455 ofert · 417 decyzji".
   $('#reviewCount').textContent = unfiltered
-    ? `${pending} oczekujących${rows.length < covered ? ` · ${rows.length} decyzji` : ''}`
-    : `${covered} pasujących z ${pending} oczekujących`;
+    ? `${pending} ofert${rows.length < covered ? ` · ${rows.length} decyzji` : ''}`
+    : `${covered} z ${pending} ofert`;
+  $('#reviewCount').title = rows.length < covered ? 'Oferty z tym samym ISBN rozstrzyga jedna decyzja (×N przy ofercie).' : '';
   $('#reviewNavCount').textContent = `${pending} do decyzji`;
   if (state.selectedReviewId && !rows.some((row) => row.id === state.selectedReviewId))
     state.selectedReviewId = null;
@@ -395,13 +400,14 @@ function renderReviewDetail() {
         <div class="lean-review-secondary-actions"><button class="button ghost" id="markAsSet" type="button">Zestaw <kbd>Z</kbd></button><button class="button ghost" id="reviewAddEdition" type="button">Dodaj do katalogu</button><button class="button ghost" id="reviewFocusToggle" type="button" aria-pressed="${document.body.classList.contains('review-focus')}">Tryb skupienia <kbd>F</kbd></button></div>
       </footer>
     </div>`;
-  $('#approveReview').disabled = !$('#reviewBookSearch').dataset.editionId;
+  $('#approveReview').disabled = !reviewTargetChosen();
   const chosenEdition = $('#reviewChosenEdition');
   chosenEdition.textContent = suggested ? `Wybrane: ${suggested.work.title} — ${suggested.edition.title}` : 'Nie wybrano wydania.';
   const reviewPosition = filteredReviewOffers().findIndex((row) => row.id === job.id);
   void loadProposals(job);
   $('#reviewBookSearch').addEventListener('input', (event) => {
     event.target.dataset.editionId = '';
+    event.target.dataset.workId = '';
     $('#approveReview').disabled = true;
     $('#reviewChosenEdition').textContent = 'Nie wybrano wydania.';
     $('#reviewBookOptions').classList.add('is-open');
@@ -457,6 +463,7 @@ function renderReviewDetail() {
     );
     if ($('#approveReview').disabled) {
       input.dataset.editionId = '';
+      input.dataset.workId = '';
       input.value = '';
       input.placeholder = 'Konflikt ISBN — wybierz wydanie ręcznie';
       chosenEdition.textContent = 'Konflikt ISBN — wybierz inne wydanie.';
@@ -467,6 +474,7 @@ function renderReviewDetail() {
     pendingIsbn=null;
     pendingRecordId=null;
     $('#reviewBookSearch').dataset.editionId = '';
+    $('#reviewBookSearch').dataset.workId = '';
     $('#reviewChosenEdition').textContent = 'ISBN zmieniony — dopasuj ponownie.';
     $('#approveReview').disabled = true;
     $('#reviewIsbnCheckResult').textContent = 'ISBN zmieniony — dopasuj ponownie przed zatwierdzeniem.';
@@ -506,6 +514,7 @@ function renderReviewDetail() {
           const input = $('#reviewBookSearch');
           input.value = response.candidate.title;
           input.dataset.editionId = response.editionId;
+          input.dataset.workId = '';
           input.setAttribute('aria-expanded', 'false');
           $('#reviewBookOptions').innerHTML = '';
           output.textContent = 'Znaleziono w katalogu: ' + response.candidate.title;
@@ -549,7 +558,7 @@ function renderReviewDetail() {
       controls.forEach((control, index) => {
         if (control.isConnected) control.disabled = previousDisabled[index];
       });
-      $('#approveReview').disabled = !pendingIsbn && !$('#reviewBookSearch').dataset.editionId;
+      $('#approveReview').disabled = !pendingIsbn && !reviewTargetChosen();
     }
   });
   $('#reviewBookSearch').addEventListener('input',()=>{pendingIsbn=null;pendingRecordId=null;});
@@ -619,23 +628,23 @@ function renderReviewDetail() {
 // operator confirms.
 function renderLocalCandidates(box, localBox, items) {
       localBox.innerHTML =
-        `<div class="rv-section-title"><h4>Już w Twoim katalogu</h4><small>wybór wskazuje wydanie, <kbd>Enter</kbd> przypisuje</small></div><ol class="proposal-list rv-cands">` +
+        `<div class="rv-section-title"><h4>Już w Twoim katalogu</h4><small>wybór wskazuje książkę, <kbd>Enter</kbd> przypisuje</small></div><ol class="proposal-list rv-cands">` +
         items
           .map((item) => {
             const title = tidyWorkTitle(item.title);
             const author = parseBnPeople(item.authors.join(' '), item.authors)[0] || '';
-            const facts = [item.publicationYear, cleanPublisher(item.publisher), /^(?:pol|pl|polski)?$/i.test(item.language) ? '' : 'język: ' + item.language, item.offers ? `${item.offers} ${item.offers === 1 ? 'oferta' : [2, 3, 4].includes(item.offers % 10) && ![12, 13, 14].includes(item.offers % 100) ? 'oferty' : 'ofert'}` : '']
+            const facts = [...editionFacts(item), /^(?:pol|pl|polski)?$/i.test(item.language) ? '' : 'język: ' + item.language, item.offers ? `${item.offers} ${item.offers === 1 ? 'oferta' : [2, 3, 4].includes(item.offers % 10) && ![12, 13, 14].includes(item.offers % 100) ? 'oferty' : 'ofert'}` : '']
               .filter(Boolean)
               .map((text) => `<span class="fact">${escapeHtml(String(text))}</span>`)
               .join('');
-            return `<li><button class="rv-cand is-local" type="button" data-proposal-edition="${escapeHtml(item.editionId)}" data-proposal-title="${escapeHtml(title)}" aria-label="Wybierz wydanie z katalogu: ${escapeHtml(title)}"><kbd class="rv-key"></kbd>${coverMarkup(item.cover || isbnCover(item.isbn), title, { size: 'sm', escapeHtml })}<span class="rv-cand-body"><b>${escapeHtml(title)}</b><small>${escapeHtml(author || 'autor nieznany')}</small><span class="rv-facts">${facts}</span><small class="rv-isbn-line">${item.isbn ? 'ISBN ' + escapeHtml(item.isbn) + ' · ' : ''}katalog</small></span><span class="rv-score" data-score="${Math.round(item.score * 10)}"><span class="rv-meter"><i></i></span>${Math.round(item.score * 100)}%</span></button></li>`;
+            return `<li><button class="rv-cand is-local" type="button" data-proposal-edition="${escapeHtml(item.editionId || '')}" data-proposal-work="${escapeHtml(item.workId)}" data-proposal-title="${escapeHtml(title)}" aria-label="Wybierz książkę z katalogu: ${escapeHtml(title)}"><kbd class="rv-key"></kbd>${coverMarkup(item.cover || isbnCover(item.isbn), title, { size: 'sm', escapeHtml })}<span class="rv-cand-body"><b>${escapeHtml(title)}</b><small>${escapeHtml(author || 'autor nieznany')}</small><span class="rv-facts">${facts}</span><small class="rv-isbn-line">${item.isbn ? 'ISBN ' + escapeHtml(item.isbn) + ' · ' : ''}katalog</small></span><span class="rv-score" data-score="${Math.round(item.score * 10)}"><span class="rv-meter"><i></i></span>${Math.round(item.score * 100)}%</span></button></li>`;
           })
           .join('') +
         '</ol>';
-      localBox.querySelectorAll('[data-proposal-edition]').forEach((button) =>
+      localBox.querySelectorAll('[data-proposal-work]').forEach((button) =>
         button.addEventListener('click', () => {
           box.querySelectorAll('.rv-cand').forEach((other) => other.classList.toggle('is-chosen', other === button));
-          chooseCatalogEdition(button.dataset.proposalEdition, button.dataset.proposalTitle);
+          chooseCatalogEdition(button.dataset.proposalEdition, button.dataset.proposalTitle, button.dataset.proposalWork);
         }),
       );
       renumberProposals(box);
@@ -643,7 +652,7 @@ function renderLocalCandidates(box, localBox, items) {
       if (plan.note) localBox.querySelector('.rv-section-title').insertAdjacentHTML('afterend', `<p class="inline-note rv-cand-note${plan.tie ? ' is-tie' : ''}">${escapeHtml(plan.note)}</p>`);
       // One clearly best book: its most used edition is chosen, so Enter alone confirms. Never
       // when the operator typed an ISBN or already picked something.
-      if (plan.preselect && !$('#reviewIsbnCheckInput')?.value && !$('#reviewBookSearch')?.dataset.editionId && !box.querySelector('.rv-cand.is-chosen'))
+      if (plan.preselect && !$('#reviewIsbnCheckInput')?.value && !reviewTargetChosen() && !box.querySelector('.rv-cand.is-chosen'))
         localBox.querySelector('.rv-cand')?.click();
 }
 
@@ -725,6 +734,8 @@ async function renderOfferEdition(job, box, current) {
       <div class="rv-section-title"><h4>BN, Open Library i e-ISBN nie znają tego ISBN — utwórz wydanie z ogłoszenia</h4><small>BN sprawdzi je ponownie za tydzień</small></div>
       <label class="field"><span>Tytuł</span><input name="title" type="text" maxlength="300" required value="${escapeHtml(draft.title)}"></label>
       <label class="field"><span>Autor <small>(kilku: po przecinku)</small></span><input name="authors" type="text" maxlength="250" value="${escapeHtml(draft.authors.join(', '))}" placeholder="np. Dan Abnett"></label>
+      <div class="rv-offer-edition-row"><label class="field"><span>Wydawca</span><input name="publisher" type="text" maxlength="200" value="${escapeHtml(draft.record?.publisher || '')}"></label><label class="field"><span>Rok</span><input name="publicationYear" type="number" min="1400" max="2100" value="${escapeHtml(draft.record?.publicationYear || '')}"></label></div>
+      ${draft.record ? `<p class="inline-note rv-record-note">Dane z <a href="${escapeHtml(draft.record.url || 'https://lubimyczytac.pl')}" target="_blank" rel="noreferrer">lubimyczytac.pl ↗</a> — strona z tym samym ISBN${draft.record.cycle?.name ? ' · cykl ' + escapeHtml(draft.record.cycle.name) + (draft.record.cycle.volume ? ', tom ' + escapeHtml(draft.record.cycle.volume) : '') : ''}${draft.record.pages ? ' · ' + escapeHtml(draft.record.pages) + ' s.' : ''}.</p>` : ''}
       <p class="inline-note">ISBN ${escapeHtml(draft.isbn || '')}${draft.universe ? ' · ' + escapeHtml(draft.universe) : ''}.${escapeHtml(siblings)}</p>
       <div class="offer-assignment-actions"><button class="button primary compact" type="submit">Utwórz wydanie i przypisz</button></div>
     </form>`;
@@ -740,7 +751,13 @@ async function renderOfferEdition(job, box, current) {
     try {
       const result = await json(`/api/identification-jobs/${encodeURIComponent(job.id)}/offer-edition`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, authors: form.elements.authors.value.split(',').map((name) => name.trim()).filter(Boolean), isbn: draft.isbn }),
+        body: JSON.stringify({
+          title,
+          authors: form.elements.authors.value.split(',').map((name) => name.trim()).filter(Boolean),
+          isbn: draft.isbn,
+          publisher: form.elements.publisher.value.trim(),
+          publicationYear: form.elements.publicationYear.value,
+        }),
       });
       toast(result.created
         ? `Utworzono wydanie „${title}”.${draft.siblings ? ' Pozostałe oferty z tym ISBN przypiszą się same.' : ''}`
@@ -842,13 +859,32 @@ function renumberProposals(box) {
   });
 }
 
-function chooseCatalogEdition(editionId, title) {
+/** A catalogue edition, or a book whose edition the server picks from the listing (else unknown). */
+function chooseCatalogEdition(editionId, title, workId = '') {
   const input = $('#reviewBookSearch');
-  if (!input || !editionId) return;
+  if (!input || !(editionId || workId)) return;
   input.value = title;
-  input.dataset.editionId = editionId;
-  $('#reviewChosenEdition').textContent = `Wybrane z katalogu: ${title}`;
+  input.dataset.editionId = editionId || '';
+  input.dataset.workId = editionId ? '' : workId;
+  $('#reviewChosenEdition').textContent = editionId
+    ? `Wybrane z katalogu: ${title}`
+    : `Wybrana książka: ${title} — wydanie nieustalone (uzupełnisz je później w katalogu)`;
   $('#approveReview').disabled = false;
+}
+
+function reviewTargetChosen() {
+  const input = $('#reviewBookSearch');
+  return Boolean(input?.dataset.editionId || input?.dataset.workId);
+}
+
+/** What the candidate says about its edition: named from the listing, the only one, or not yet. */
+function editionFacts(item) {
+  if (item.editionId) {
+    const why = String(item.editionReason || '').startsWith('listing') ? 'wydanie z ogłoszenia' : item.editionReason === 'isbn' ? 'wydanie po ISBN' : '';
+    return [item.publicationYear, cleanPublisher(item.publisher), item.editionCount > 1 ? why : ''];
+  }
+  const count = item.editionCount || 0;
+  return [count + ' ' + (count === 1 ? 'wydanie' : [2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100) ? 'wydania' : 'wydań') + ' · wydanie nieustalone'];
 }
 
 function useProposal(isbn) {
@@ -899,21 +935,26 @@ function renderReviewBookChoices(query = '', works = state.catalogWorks) {
     input = $('#reviewBookSearch');
   if (!list || !input) return;
   const needle = query.trim().toLocaleLowerCase('pl');
+  // A book with several editions comes first as "the book" (edition not named), then its editions.
   const editions = works
-    .flatMap((work) => work.editions.map((edition) => ({ work, edition })))
+    .flatMap((work) => [
+      ...(work.editions.length > 1 ? [{ work, edition: null }] : []),
+      ...work.editions.map((edition) => ({ work, edition })),
+    ])
     .filter(
       ({ work, edition }) =>
         !needle ||
-        `${work.title} ${work.authors.join(' ')} ${edition.identifiers.map((row) => row.value).join(' ')}`
+        `${work.title} ${work.authors.join(' ')} ${(edition ? edition.identifiers : work.editions.flatMap((item) => item.identifiers)).map((row) => row.value).join(' ')}`
           .toLocaleLowerCase('pl')
           .includes(needle),
     )
     .slice(0, 30);
   list.innerHTML = editions.length
     ? editions
-        .map(
-          ({ work, edition }) =>
-            `<button type="button" role="option" data-review-edition-id="${escapeHtml(edition.id)}" data-review-book-title="${escapeHtml(work.title)}"><strong>${escapeHtml(work.title)}</strong><small>${escapeHtml(edition.identifiers.find((row) => row.scheme.startsWith('isbn'))?.value || 'Bez ISBN')} - ${escapeHtml(edition.publisher || 'wydawca nieznany')}</small></button>`,
+        .map(({ work, edition }) =>
+          edition
+            ? `<button type="button" role="option" data-review-edition-id="${escapeHtml(edition.id)}" data-review-book-title="${escapeHtml(work.title)}"><strong>${escapeHtml(work.title)}</strong><small>${escapeHtml(edition.identifiers.find((row) => row.scheme.startsWith('isbn'))?.value || 'Bez ISBN')} - ${escapeHtml([edition.publisher || 'wydawca nieznany', edition.publicationYear].filter(Boolean).join(', '))}</small></button>`
+            : `<button type="button" role="option" class="is-work-option" data-review-edition-id="" data-review-work-id="${escapeHtml(work.id)}" data-review-book-title="${escapeHtml(work.title)}"><strong>${escapeHtml(work.title)}</strong><small>cała książka — ${work.editions.length} ${[2, 3, 4].includes(work.editions.length % 10) && ![12, 13, 14].includes(work.editions.length % 100) ? 'wydania' : 'wydań'}, wydanie nieustalone</small></button>`,
         )
         .join('')
     : '<p>Brak rekordów pasujących do wpisanej frazy.</p>';
@@ -921,7 +962,10 @@ function renderReviewBookChoices(query = '', works = state.catalogWorks) {
     button.addEventListener('click', () => {
       input.value = button.dataset.reviewBookTitle;
       input.dataset.editionId = button.dataset.reviewEditionId;
-      $('#reviewChosenEdition').textContent = `Wybrane ręcznie: ${button.dataset.reviewBookTitle}`;
+      input.dataset.workId = button.dataset.reviewWorkId || '';
+      $('#reviewChosenEdition').textContent = button.dataset.reviewWorkId
+        ? `Wybrana książka: ${button.dataset.reviewBookTitle} — wydanie nieustalone`
+        : `Wybrane ręcznie: ${button.dataset.reviewBookTitle}`;
       input.setAttribute('aria-expanded', 'false');
       list.innerHTML = '';
       list.classList.remove('is-open');
@@ -931,13 +975,13 @@ function renderReviewBookChoices(query = '', works = state.catalogWorks) {
 }
 
 async function approveReview() {
-  const editionId = $('#reviewBookSearch').dataset.editionId;
-  if (!editionId) return;
-  await decideReview('approved', editionId);
+  const { editionId, workId } = $('#reviewBookSearch').dataset;
+  if (editionId) return decideReview('approved', editionId);
+  if (workId) return decideReview('approved', null, null, workId);
 }
 
 let reviewDecisionPending = false;
-async function decideReview(action, editionId = null, reason = null) {
+async function decideReview(action, editionId = null, reason = null, workId = null) {
   const jobId = state.selectedReviewId;
   if (!jobId || reviewDecisionPending) return;
   const position=filteredReviewOffers().findIndex(row=>row.id===jobId);
@@ -951,7 +995,7 @@ async function decideReview(action, editionId = null, reason = null) {
     const saved = await json(`/api/identification-jobs/${encodeURIComponent(jobId)}/decision`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, editionId, reason }),
+      body: JSON.stringify({ action, editionId, reason, ...(workId ? { workId } : {}) }),
     });
     state.selectedReviewId = null;
     state.reviewDetail = null;
@@ -1079,13 +1123,16 @@ export function localPreselection(items = []) {
   if (!first) return { preselect: false, tie: false, note: '' };
   const rivals = items.filter((item) => item.workId !== first.workId);
   const bestRival = rivals.reduce((best, item) => Math.max(best, item.score), 0);
-  const editions = items.filter((item) => item.workId === first.workId).length;
+  // One item per book now (editionCount); older per-edition lists are counted the old way.
+  const editions = first.editionCount ?? items.filter((item) => item.workId === first.workId).length;
   const tie = rivals.length > 0 && first.score - bestRival < 0.03;
   const preselect = !tie && first.score >= 0.85 && first.score - bestRival >= 0.06;
   const note = tie
     ? 'Różne książki z prawie tym samym wynikiem — porównaj okładki, autora i tom ze zdjęciem.'
     : editions > 1
-      ? `${editions} wydania tej samej książki — ${preselect ? 'zaznaczono najczęściej używane; ' : ''}sprawdź wydawcę i okładkę.`
+      ? first.editionCount != null && !first.editionId
+        ? `${editions} wydania tej książki — ogłoszenie nie wskazuje które; przypiszesz książkę, a wydanie uzupełnisz później w katalogu (jeśli zechcesz).`
+        : `${editions} wydania tej samej książki — ${preselect ? (first.editionCount != null ? 'zaznaczono wydanie wskazane przez ogłoszenie; ' : 'zaznaczono najczęściej używane; ') : ''}sprawdź wydawcę i okładkę.`
       : '';
   return { preselect, tie, note };
 }

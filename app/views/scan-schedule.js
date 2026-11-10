@@ -1,14 +1,40 @@
 // Automatic recurring scan of one saved profile. Settings live in SQLite; the server runs the scans
 // while the app is open, using the same endpoint and limits as a manual scan.
+const when = (value) => new Date(value).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/** What the last automatic run did, in words. */
+export function describeResult(schedule) {
+  const result = schedule.lastResult;
+  const problems = schedule.lastProblems || [];
+  const skipped = schedule.lastSkipped || [];
+  const label =
+    result === 'ok' ? 'udany'
+      : result === 'partial' ? 'częściowo udany — błędy: ' + problems.join(', ')
+        : result === 'all-sources-down' ? 'pominięty — żadne źródło profilu nie działało'
+          : result === 'profile-missing' ? 'nie odbył się — profil nie istnieje'
+            : result || 'brak wyniku';
+  return label + (skipped.length ? '; pominięto niedziałające: ' + skipped.join(', ') : '');
+}
+
+/** One line for the folded section header: on/off, interval and the next run. */
+export function scheduleHeadline(schedule) {
+  if (!schedule.enabled) return 'Automatyczny skan: wyłączony';
+  const profile = schedule.profile === '__all__' ? 'wszystkie profile po kolei' : schedule.profile;
+  const next = schedule.nextRunAt ? ' · następny ' + when(Math.max(schedule.nextRunAt, Date.now())) : '';
+  const warn = schedule.lastResult && schedule.lastResult !== 'ok' ? ' · ostatni: ' + (schedule.lastResult === 'partial' ? 'z błędami' : 'nieudany') : '';
+  return `Automatyczny skan: co ${schedule.everyHours} h (${profile})${next}${warn}`;
+}
+
 export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
   if (!panel) return;
   const root = document.createElement('details');
   root.className = 'scan-schedule';
-  root.innerHTML = `<summary>Automatyczny skan</summary>
+  root.innerHTML = `<summary id="scheduleHeadline">Automatyczny skan</summary>
     <div class="scan-schedule-body">
       <label class="field"><span>Profil do skanowania</span><select id="scheduleProfile" aria-label="Profil do automatycznego skanu"></select></label>
       <label class="field"><span>Co ile godzin</span><input id="scheduleHours" type="number" min="1" max="168" step="1" value="24" inputmode="numeric"></label>
       <label class="check"><input id="scheduleEnabled" type="checkbox"> Skanuj automatycznie, gdy aplikacja jest uruchomiona</label>
+      <p class="inline-note">Źródła, które nie działały w ostatnim skanie, są pomijane przez dobę, potem sprawdzane ponownie.</p>
       <button id="scheduleSave" class="button secondary compact" type="button">Zapisz harmonogram</button>
       <p id="scheduleStatus" class="inline-note" role="status" aria-live="polite"></p>
     </div>`;
@@ -17,12 +43,25 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
 
   const describe = (schedule) => {
     if (!schedule.enabled) return 'Automatyczny skan jest wyłączony.';
-    const last = schedule.lastRunAt
-      ? `Ostatni: ${new Date(schedule.lastRunAt).toLocaleString('pl-PL')} (${schedule.lastResult === 'ok' ? 'udany' : schedule.lastResult || 'brak wyniku'}).`
-      : 'Jeszcze się nie odbył.';
+    const last = schedule.lastRunAt ? `Ostatni: ${new Date(schedule.lastRunAt).toLocaleString('pl-PL')} (${describeResult(schedule)}).` : 'Jeszcze się nie odbył.';
     const rotation = schedule.profile === '__all__' && schedule.lastProfile ? ` Ostatni profil: ${schedule.lastProfile}.` : '';
     const next = schedule.nextRunAt ? ` Następny: ${new Date(Math.max(schedule.nextRunAt, Date.now())).toLocaleString('pl-PL')}.` : '';
     return last + rotation + next;
+  };
+  const show = (schedule) => {
+    // Name, then interval and next run in muted text, then a flag when off or when the last run had errors.
+    const meta = schedule.enabled
+      ? 'co ' + schedule.everyHours + ' h' + (schedule.nextRunAt ? ' · następny ' + when(Math.max(schedule.nextRunAt, Date.now())) : '')
+      : '';
+    const flag = !schedule.enabled
+      ? '<span class="schedule-flag is-off">wyłączony</span>'
+      : schedule.lastResult && schedule.lastResult !== 'ok'
+        ? '<span class="schedule-flag">' + (schedule.lastResult === 'partial' ? 'ostatni z błędami' : 'ostatni nieudany') + '</span>'
+        : '';
+    $('#scheduleHeadline').innerHTML = 'Automatyczny skan' + (meta ? ' <span class="schedule-meta">' + escapeHtml(meta) + '</span>' : '') + flag;
+    $('#scheduleHeadline').title = scheduleHeadline(schedule);
+    root.classList.toggle('is-on', schedule.enabled);
+    root.classList.toggle('is-warn', schedule.enabled && Boolean(schedule.lastResult) && schedule.lastResult !== 'ok');
   };
 
   async function load() {
@@ -36,6 +75,7 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
       $('#scheduleProfile').value = schedule.profile || '';
       $('#scheduleHours').value = schedule.everyHours;
       $('#scheduleEnabled').checked = schedule.enabled;
+      show(schedule);
       $('#scheduleStatus').textContent = items.length
         ? describe(schedule)
         : 'Najpierw zapisz profil wyszukiwania, aby móc go skanować automatycznie.';
@@ -58,6 +98,7 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
         }),
       });
       $('#scheduleStatus').textContent = describe(saved);
+      show(saved);
       toast('Zapisano harmonogram skanowania.');
     } catch (error) {
       toast(
@@ -74,4 +115,7 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
   root.addEventListener('toggle', () => {
     if (root.open) void load();
   });
+  // Shown without opening the section; refreshed after each scan (it may have been the scheduled one).
+  for (const name of ['bookflip-scan-complete', 'bookflip-profiles-changed']) document.addEventListener(name, () => void load());
+  await load();
 }

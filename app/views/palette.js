@@ -52,7 +52,7 @@ export function installCommandPalette({ $, json, escapeHtml, money, showView, op
     if (text.length < 2) return;
     try {
       const [offers, works] = await Promise.all([
-        json('/api/offers?' + new URLSearchParams({ query: text, limit: '6' })),
+        json('/api/offers?' + new URLSearchParams({ query: text, limit: '6', status: 'all' })),
         json('/api/catalog/works?' + new URLSearchParams({ query: text, limit: '6' })),
       ]);
       if (request !== serial) return;

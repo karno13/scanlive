@@ -27,7 +27,7 @@ test('złoty inputs and grosze stored prices share an explicit money conversion'
 test('offer lifecycle labels and purchasable filter', async () => {
   const { availabilityLabel, isPurchasable } = await import('./formatters.js');
   assert.equal(availabilityLabel({ availability: 'sold', availabilityChangedAt: '2026-11-07T10:00:00Z' }), 'sprzedana 2026-11-07');
-  assert.equal(availabilityLabel({ availability: 'unconfirmed' }), 'dostępność niepotwierdzona');
+  assert.equal(availabilityLabel({ availability: 'unconfirmed' }), 'w wynikach skanu (strony ogłoszenia nie sprawdzano)');
   assert.equal(isPurchasable({ availability: 'sold' }), false);
   assert.equal(isPurchasable({ availability: 'not_seen' }), true);
 });
@@ -37,7 +37,10 @@ test('listing badge describes the listing, not the identification job', async ()
   const now = Date.parse('2026-11-08T12:00:00Z');
   assert.equal(availabilityBadge({ availability: 'sold' }, now).label, 'Sprzedana');
   assert.equal(availabilityBadge({ availability: 'not_seen' }, now).label, 'Mogła zniknąć');
-  assert.equal(availabilityBadge({ availability: 'unconfirmed', lastSeenAt: '2026-11-08T09:55:51Z' }, now).label, 'Aktywna');
+  // Not checked on the listing page: when the scan saw it, not "Aktywna".
+  assert.equal(availabilityBadge({ availability: 'unconfirmed', lastSeenAt: '2026-11-08T09:55:51Z' }, now).label, 'Widziana dziś');
+  assert.equal(availabilityBadge({ availability: 'unconfirmed', lastSeenAt: '2026-11-06T09:55:51Z' }, now).label, 'Widziana 2 dni temu');
+  assert.equal(availabilityBadge({ availability: 'available' }, now).label, 'Aktywna');
   assert.equal(availabilityBadge({ availability: 'unconfirmed', lastSeenAt: '2026-10-01T09:55:51Z' }, now).label, 'Dawno niewidziana');
 });
 

@@ -1,25 +1,15 @@
 import { json } from '../core/api.js';
-import { escapeHtml } from '../core/formatters.js';
+import { escapeHtml, SOURCE_PROBLEMS, problemLabel } from '../core/formatters.js';
+
+export { SOURCE_PROBLEMS, problemLabel };
 
 // "Przebieg skanu": one panel for the running or last scan, read from the server's diagnostics.
 // It works the same whichever tab, phone or schedule started the scan, and after a reload.
 
-/** What a source error means for the operator, and what to do about it. */
-export const SOURCE_PROBLEMS = {
-  SOURCE_CAPTCHA: ['wymaga CAPTCHA', 'Serwis prosi o potwierdzenie, że to człowiek. BookFlip nie obchodzi takich zabezpieczeń — odznacz źródło i spróbuj za kilka godzin.'],
-  SOURCE_HTTP_403: ['odmowa dostępu (403)', 'Serwis blokuje automatyczne zapytania. Zwykle mija po kilku godzinach; do tego czasu odznacz źródło.'],
-  SOURCE_FORBIDDEN_UNREADABLE: ['odmowa dostępu', 'Serwis zwrócił stronę blokady. Odznacz źródło i spróbuj później.'],
-  SOURCE_HTTP_429: ['za dużo zapytań (429)', 'Serwis ogranicza tempo. Skanuj mniej fraz naraz albo ponów nieudane zadania za kilkanaście minut.'],
-  SOURCE_HTTP_503: ['serwis niedostępny (503)', 'Serwis chwilowo nie odpowiada albo ma przerwę techniczną. Ponów nieudane zadania później.'],
-  SOURCE_HTTP_502: ['błąd serwera (502)', 'Chwilowy błąd po stronie serwisu. Ponów nieudane zadania później.'],
-  SOURCE_HTTP_500: ['błąd serwera (500)', 'Chwilowy błąd po stronie serwisu. Ponów nieudane zadania później.'],
-  SOURCE_HTTP_404: ['strona nie istnieje (404)', 'Serwis zmienił adres wyszukiwania — źródło wymaga poprawki w programie.'],
-  SOURCE_TIMEOUT: ['brak odpowiedzi', 'Serwis odpowiadał za wolno. Ponów nieudane zadania.'],
-  SOURCE_NOT_HTML: ['nieoczekiwana odpowiedź', 'Serwis zwrócił coś innego niż stronę wyników — możliwa zmiana serwisu.'],
-  SOURCE_REQUEST_FAILED: ['błąd połączenia', 'Nie udało się połączyć z serwisem. Sprawdź internet i ponów.'],
-  PAGINATION_LOOP: ['powtarzające się strony', 'Serwis podawał w kółko tę samą stronę wyników; zapisano to, co było przed pętlą.'],
-};
-export const problemLabel = (code) => SOURCE_PROBLEMS[code]?.[0] || (code ? String(code).toLowerCase().replace(/^source_/, '').replace(/_/g, ' ') : 'błąd');
+// Errors that pass by themselves; worth retrying. Bot checks (CAPTCHA, 403) and broken adapters are not.
+export const TRANSIENT_CODES = new Set(['SOURCE_HTTP_429', 'SOURCE_HTTP_500', 'SOURCE_HTTP_502', 'SOURCE_HTTP_503', 'SOURCE_HTTP_504', 'SOURCE_TIMEOUT', 'SOURCE_REQUEST_FAILED']);
+/** One failed task of a saved scan run: should "retry" send it again? */
+export const isRetryableError = (error = {}) => !error.blocked && !error.skipped && error.retryable !== false && TRANSIENT_CODES.has(error.code);
 
 /** One source row: state label and tone from the diagnostics counters. */
 export function sourceState(row = {}) {
@@ -27,6 +17,8 @@ export function sourceState(row = {}) {
   if (row.status === 'running' || row.status === 'retrying') return { label: row.status === 'retrying' ? 'ponawia…' : 'skanuje…', tone: 'warning' };
   if (!row.errors) return { label: 'OK', tone: 'success' };
   if (row.offers > 0) return { label: 'częściowo', tone: 'warning' };
+  // HTTP 429 alone: the source answers, only slower. Amber, not red.
+  if (row.lastError === 'SOURCE_HTTP_429') return { label: 'ogranicza tempo', tone: 'warning' };
   return { label: 'nie działa', tone: 'error' };
 }
 
@@ -39,6 +31,11 @@ export function createScanRun({ $ }) {
   let busy = false;
   let last = null;
   let lastStatus = null;
+  // Seconds one source × phrase task took in the last finished scan (for the estimate before a scan).
+  let perTask = null;
+  try {
+    perTask = Number(globalThis.localStorage?.getItem('bookflip.secondsPerTask')) || null;
+  } catch {}
 
   function render(data) {
     last = data;
@@ -46,8 +43,15 @@ export function createScanRun({ $ }) {
     const diagnostics = data.diagnostics || {};
     const status = data.status || 'idle';
     const entries = Object.entries(diagnostics.sources || {});
-    panel.hidden = !entries.length;
-    if (!entries.length) return;
+    // After a server restart the diagnostics are empty, but the saved run's actions (#scanResults) stay.
+    panel.hidden = !entries.length && $('#scanResults').hidden;
+    for (const part of panel.querySelectorAll?.('.scan-run-totals, .table-wrap, .progress-track, .scan-run-current') || []) part.hidden = !entries.length;
+    if (!entries.length) {
+      $('#scanRunTitle').textContent = 'Ostatni skan';
+      $('#scanRunMeta').textContent = '';
+      $('#scanRunAdvice').innerHTML = '';
+      return;
+    }
     const running = status === 'running';
     const progress = data.progress || {};
     const telemetry = data.telemetry || {};
@@ -57,6 +61,12 @@ export function createScanRun({ $ }) {
     const elapsed = running
       ? telemetry.elapsedSeconds
       : Math.max(0, Math.round((Date.parse(data.finishedAt || '') - Date.parse(data.startedAt || diagnostics.startedAt || '')) / 1000));
+    if (!running && Number.isFinite(elapsed) && elapsed > 0 && progress.total) {
+      perTask = elapsed / progress.total;
+      try {
+        globalThis.localStorage?.setItem('bookflip.secondsPerTask', String(perTask));
+      } catch {}
+    }
     $('#scanRunMeta').textContent = [
       when(data.startedAt || diagnostics.startedAt),
       Number.isFinite(elapsed) ? (running ? 'trwa ' : 'trwał ') + minutes(elapsed) : '',
@@ -94,7 +104,7 @@ export function createScanRun({ $ }) {
     const dead = entries.filter(([, row]) => sourceState(row).label === 'nie działa').map(([name]) => name);
     $('#scanRunAdvice').innerHTML = running || !byCode.size
       ? ''
-      : [...byCode].map(([code, names]) => `<p><b>${escapeHtml(names.join(', '))}:</b> ${escapeHtml(SOURCE_PROBLEMS[code]?.[1] || 'Źródło zgłosiło błąd. Ponów nieudane zadania później.')}</p>`).join('') +
+      : [...byCode].map(([code, names]) => `<p><b>${escapeHtml(names.join(', '))}:</b> ${escapeHtml(SOURCE_PROBLEMS[code]?.[1] || 'Źródło zgłosiło nieznany błąd.')}${TRANSIENT_CODES.has(code) ? '' : ' <small>(„Ponów chwilowe błędy” pomija ten problem)</small>'}</p>`).join('') +
         (dead.length ? `<button type="button" class="button secondary compact" id="scanRunUncheck">Odznacz niedziałające źródła (${escapeHtml(dead.join(', '))})</button>` : '');
     $('#scanRunUncheck')?.addEventListener('click', () => {
       for (const input of document.querySelectorAll('#sourceGrid input'))
@@ -141,5 +151,7 @@ export function createScanRun({ $ }) {
     if (local) $('#scanRun').dataset.local = '1';
     else delete $('#scanRun').dataset.local;
   }
-  return { refresh, refreshSoon, setLocal };
+  /** Seconds per task measured in the last finished scan, or null before the first one. */
+  const secondsPerTask = () => perTask;
+  return { refresh, refreshSoon, setLocal, secondsPerTask };
 }

@@ -105,8 +105,8 @@ function renderOffers() {
               ? { workTitle: bookFor(item.bookId)?.title, method: item.linkMode }
               : null);
           const title = tidyOfferTitle(item.title || item.originalTitle);
-          const status = tradingMode() && item.purchaseStatus ? statusLabel(item.purchaseStatus) : match ? 'W katalogu' : 'Do sprawdzenia';
-          return `<button class="mobile-offer offer-card" data-mobile-offer-id="${escapeHtml(item.id)}" type="button">${coverMarkup(item.image, title, { size: 'sm', escapeHtml })}<span class="mobile-offer-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(item.source)}"></span>${escapeHtml(item.source)} · ${escapeHtml(item.observedIsbn || item.isbn || 'ISBN nieznany')} · wykryta ${escapeHtml(date(item.firstSeenAt || item.lastSeenAt))}${(() => { const badge = availabilityBadge(item); return badge.label === 'Aktywna' ? '' : ' · <b class="offer-gone">' + escapeHtml(badge.label) + '</b>'; })()}</small>${match?.workTitle ? `<small class="offer-match">↳ ${escapeHtml(match.workTitle)}</small>` : ''}</span><span class="mobile-offer-price"><b>${money(item.currentPrice)}</b><small class="status-tag ${match ? 'is-good' : 'is-warn'}">${tradingMode() && item.targetReached ? 'Cena docelowa · ' : ''}${escapeHtml(status)}</small></span></button>`;
+          const status = tradingMode() && item.purchaseStatus ? statusLabel(item.purchaseStatus) : match ? 'W katalogu' : item.rejected ? 'Odrzucona' : 'Do sprawdzenia';
+          return `<button class="mobile-offer offer-card" data-mobile-offer-id="${escapeHtml(item.id)}" type="button">${coverMarkup(item.image, title, { size: 'sm', escapeHtml })}<span class="mobile-offer-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(item.source)}"></span>${escapeHtml(item.source)} · ${escapeHtml(item.observedIsbn || item.isbn || 'ISBN nieznany')} · wykryta ${escapeHtml(date(item.firstSeenAt || item.lastSeenAt))}${(() => { const badge = availabilityBadge(item); return badge.tone === 'success' ? '' : ' · <b class="offer-gone">' + escapeHtml(badge.label) + '</b>'; })()}</small>${match?.workTitle ? `<small class="offer-match">↳ ${escapeHtml(match.workTitle)}</small>` : ''}</span><span class="mobile-offer-price"><b>${money(item.currentPrice)}</b><small class="status-tag ${match ? 'is-good' : item.rejected ? '' : 'is-warn'}">${tradingMode() && item.targetReached ? 'Cena docelowa · ' : ''}${escapeHtml(status)}</small></span></button>`;
         })
         .join('') || '<div class="empty-detail">Brak ofert zgodnych z filtrami.</div>';
     mobile
@@ -229,7 +229,7 @@ async function openOfferDrawer(id) {
     $('#offerDrawerContent .detail-grid').after(workspace);
     const freshness=document.createElement('p');freshness.className='inline-note';
     const age=offer.lastSeenAt ? Math.floor((Date.now()-Date.parse(offer.lastSeenAt))/86400000) : null;
-    freshness.textContent='Stan ogłoszenia: '+availabilityLabel(offer)+(age!==null?' · od ostatniego wykrycia: '+age+' dni':'');
+    freshness.textContent='Stan ogłoszenia: '+availabilityLabel(offer)+(age!==null?' · ostatnio w wynikach: '+(age<=0?'dziś':age===1?'wczoraj':age+' dni temu'):'');
     $('#offerDrawerContent .detail-grid').after(freshness);
     const scenario=$('#offerDrawerContent .scenario-calculator');workspace.after(scenario);
     try {

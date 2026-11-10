@@ -1,5 +1,6 @@
 import { mountOfferAssignment } from './offer-assignment.js';
 import { mountEditionHistory } from './edition-history.js';
+import { mountWorkPrices, editionVariantSelect, wireEditionVariantSelects } from './work-prices.js';
 import { mountEditionBuyback, annotateEditionLines } from './buyback.js';
 import { openDetailView } from '../core/detail-navigation.js';
 import {markDirty,statusLabel,confirmDiscard,watchForm} from '../core/ux.js';
@@ -463,6 +464,14 @@ function renderSeriesSummary() {
   }
 }
 
+// Offers assigned to the book without a named edition; opening it lets the operator name them.
+function unknownEditionLine(row) {
+  const unknown = row.unknownEdition;
+  if (!unknown?.activeOfferCount) return '';
+  const n = unknown.activeOfferCount;
+  return `<div class="edition-line-wrap is-unknown"><button type="button" class="link-button edition-line" data-edition-detail="${escapeHtml(unknown.id)}"><span class="book-spine" aria-hidden="true">?</span><span><strong>Wydanie nieustalone</strong><small>${n} ${n === 1 ? 'oferta' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'oferty' : 'ofert'} przypisane do książki bez wskazania wydania — otwórz, aby wskazać wydanie</small></span><b>${n}</b></button></div>`;
+}
+
 async function openCatalogDetail(id) {
   if(!await confirmDiscard()) return;
   const request = ++detailRequest;
@@ -477,10 +486,13 @@ async function openCatalogDetail(id) {
     if (request !== detailRequest) return;
     renderEditionRail(row);
     detail.scrollTop = 0;
-    detail.innerHTML = `<section class="detail-section"><div class="book-detail-title work-hero">${coverMarkup(workCover(row), tidyWorkTitle(row.title), { size: 'lg', escapeHtml })}<div><span class="status-pill ${['manual', 'verified'].includes(row.verificationStatus) ? 'success' : 'warning'}">${escapeHtml(statusLabel(row.verificationStatus))}</span><h3 title="${escapeHtml(row.title)}">${escapeHtml(tidyWorkTitle(row.title))}</h3><p>${escapeHtml(workAuthors(row) || 'Autor nieznany')}</p></div><strong>${editionsLabel(row.editions.length)}</strong></div></section><section class="detail-section"><h4>Wydania — wybierz, aby zobaczyć oferty i ceny</h4><div class="price-list">${row.editions.map((edition) => `<button type="button" class="link-button edition-line" data-edition-detail="${escapeHtml(edition.id)}">${coverMarkup(edition.cover || isbnCover(firstIsbn([edition])), edition.title, { size: 'xs', escapeHtml })}<span><strong>${escapeHtml(edition.title)}</strong><small>${escapeHtml([edition.publisher, edition.publicationYear, edition.language, edition.binding, (edition.contributors || []).filter((person) => person.role === 'translator').map((person) => 'tł. ' + person.name).join(', '), edition.originalTitle ? 'oryg. ' + edition.originalTitle : ''].filter(Boolean).join(' / ') || 'Brak szczegółów')}</small></span><b>${escapeHtml(edition.identifiers.find((item) => item.scheme.startsWith('isbn'))?.value || 'bez ISBN')}</b></button>`).join('') || '<p>Brak wydań.</p>'}</div></section><details class="detail-section"><summary>Pochodzenie danych bibliograficznych</summary><p class="inline-note">${row.externalRecords.length ? row.externalRecords.map((record) => `${escapeHtml(record.provider)}: ${escapeHtml(record.externalId)}`).join(', ') : 'Brak zewnętrznych rekordów bibliograficznych.'}</p></section>`;
+    detail.innerHTML = `<section class="detail-section"><div class="book-detail-title work-hero">${coverMarkup(workCover(row), tidyWorkTitle(row.title), { size: 'lg', escapeHtml })}<div><span class="status-pill ${['manual', 'verified'].includes(row.verificationStatus) ? 'success' : 'warning'}">${escapeHtml(statusLabel(row.verificationStatus))}</span><h3 title="${escapeHtml(row.title)}">${escapeHtml(tidyWorkTitle(row.title))}</h3><p>${escapeHtml(workAuthors(row) || 'Autor nieznany')}</p></div><strong>${editionsLabel(row.editions.length)}</strong></div></section><section class="detail-section"><h4>Wydania — wybierz, aby zobaczyć oferty i ceny</h4><div class="price-list">${unknownEditionLine(row)}${row.editions.map((edition) => `<div class="edition-line-wrap"><button type="button" class="link-button edition-line" data-edition-detail="${escapeHtml(edition.id)}">${coverMarkup(edition.cover || isbnCover(firstIsbn([edition])), edition.title, { size: 'xs', escapeHtml })}<span><strong>${escapeHtml(edition.title)}</strong><small>${escapeHtml([edition.publisher, edition.publicationYear, edition.language, edition.binding, (edition.contributors || []).filter((person) => person.role === 'translator').map((person) => 'tł. ' + person.name).join(', '), edition.originalTitle ? 'oryg. ' + edition.originalTitle : ''].filter(Boolean).join(' / ') || 'Brak szczegółów')}</small></span><b>${escapeHtml(edition.identifiers.find((item) => item.scheme.startsWith('isbn'))?.value || 'bez ISBN')}</b></button>${row.editions.length > 1 ? editionVariantSelect(edition, row.variants || [], escapeHtml) : ''}</div>`).join('') || '<p>Brak wydań.</p>'}</div></section><details class="detail-section"><summary>Pochodzenie danych bibliograficznych</summary><p class="inline-note">${row.externalRecords.length ? row.externalRecords.map((record) => `${escapeHtml(record.provider)}: ${escapeHtml(record.externalId)}`).join(', ') : 'Brak zewnętrznych rekordów bibliograficznych.'}</p></section>`;
     try { await loadSeries(); } catch (error) { /* Edytor pokaże błąd zapisu, jeśli baza jest niedostępna. */ }
     if (request !== detailRequest) return;
     mountWorkActions(row,detail);
+    const reloadWork = () => { if (state.selectedCatalogId === row.id) void openCatalogDetail(row.id); };
+    wireEditionVariantSelects(detail, { json, toast, reload: reloadWork });
+    void mountWorkPrices({ row, detail, json, money, escapeHtml, toast, reload: reloadWork, isCurrent: () => request === detailRequest });
     mountSeriesEditor(row, detail, renderSeriesSummary, { annotations: sqliteAnnotations || {}, save: saveSeries });
     void mountUniverseEditor(row, detail);
     void annotateEditionLines(row, detail);
@@ -591,6 +603,48 @@ function mountPersonSearch(detail) {
   );
 }
 
+// The book's unknown edition: offers assigned to the book only. Each can be given its edition
+// with one choice; nothing else of an edition record (ISBN, publisher) applies here.
+async function mountUnknownEditionPicker(row, detail, request) {
+  let work;
+  try {
+    work = await json('/api/catalog/works/' + encodeURIComponent(row.workId));
+  } catch {
+    return;
+  }
+  if (request !== detailRequest || !detail.isConnected) return;
+  const heading = detail.querySelector('.edition-identity h3');
+  if (heading) heading.textContent = 'Wydanie nieustalone — ' + tidyWorkTitle(work.title);
+  const note = document.createElement('p');
+  note.className = 'inline-note';
+  note.textContent = 'Te oferty przypisano do książki bez wskazania wydania. Ich ceny liczą się do ceny całej książki. Jeśli na zdjęciu widać wydanie, wskaż je przy ofercie.';
+  detail.querySelector('.detail-section')?.append(note);
+  const options = work.editions
+    .map((edition) => `<option value="${escapeHtml(edition.id)}">${escapeHtml([cleanPublisher(edition.publisher) || 'wydawca nieznany', edition.publicationYear, edition.binding, edition.identifiers.find((item) => item.scheme.startsWith('isbn'))?.value].filter(Boolean).join(' · '))}</option>`)
+    .join('');
+  detail.querySelectorAll('[data-offer-assign]').forEach((slot) => {
+    const offerId = slot.dataset.offerAssign;
+    const label = document.createElement('label');
+    label.className = 'wp-move';
+    label.innerHTML = `<small>Wskaż wydanie:</small><select aria-label="Wydanie tej oferty"><option value="">— wybierz —</option>${options}</select>`;
+    slot.before(label);
+    const select = label.querySelector('select');
+    select.addEventListener('change', async () => {
+      if (!select.value) return;
+      select.disabled = true;
+      try {
+        await json('/api/offers/' + encodeURIComponent(offerId) + '/assignment', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ editionId: select.value, reason: 'Wskazano wydanie oferty przypisanej wcześniej do książki.' }) });
+        toast('Wskazano wydanie.');
+        await loadCatalogData();
+        await openEditionDetail(row.id);
+      } catch (error) {
+        toast('Nie zapisano: ' + error.message);
+        select.disabled = false;
+      }
+    });
+  });
+}
+
 async function openEditionDetail(id) {
   if(!await confirmDiscard())return;
   const request = ++detailRequest;
@@ -638,8 +692,11 @@ async function openEditionDetail(id) {
     );
     const history = mountEditionHistory({ row, target: detail, json, money, openOfferDrawer });
     detail.querySelectorAll('.detail-section')[2].before(history);
-    mountEditionBuyback({ row, target: detail, toast });
-    mountEditionActions(row,detail);
+    if (row.isUnknown) void mountUnknownEditionPicker(row, detail, request);
+    else {
+      mountEditionBuyback({ row, target: detail, toast });
+      mountEditionActions(row,detail);
+    }
     $('#backToWork').addEventListener('click', () => openCatalogDetail(row.workId));
   } catch (error) {
     if (request !== detailRequest) return;

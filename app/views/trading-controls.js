@@ -2,6 +2,7 @@ import { openDetailView } from '../core/detail-navigation.js';
 import { amountInput, readAmount, statusLabel, markDirty,watchForm } from '../core/ux.js';
 import { confirmDialog } from '../core/dialogs.js';
 import { sourceHealthNote } from '../core/formatters.js';
+import { isRetryableError } from './scan-run.js';
 export function installTradingControls({state,$,json,toast,showView,loadCatalogData,loadCatalogStatus,openOfferDrawer,onOfferFilters,onCatalogFilters}) {
   const write=(path,body,method='PUT')=>json(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   let settingsLoaded=false;
@@ -14,33 +15,24 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
     $('#offerQuickViews').querySelectorAll('button').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
     onOfferFilters();
   }));
-  // Presentation only: turns the run summary into scannable tiles and highlights the likely next step.
-  function renderScanResultCard(run, failed) {
-    const tiles = [
-      ['Znalezione oferty', run.found, ''],
-      ['Nowe oferty', run.newOffers, run.newOffers ? 'good' : ''],
-      ['Zmiany cen', run.priceChanges, run.priceChanges ? 'warn' : ''],
-      ['Problemy ze źródłami', failed, failed ? 'bad' : ''],
-    ];
-    const stats = $('#scanResultStats');
-    stats.replaceChildren(...tiles.map(([label, value, tone]) => {
-      const tile = document.createElement('div');
-      tile.className = 'scan-result-tile' + (tone ? ' is-' + tone : '');
-      tile.setAttribute('role', 'listitem');
-      const number = document.createElement('strong');
-      number.textContent = String(value ?? 0);
-      const caption = document.createElement('span');
-      caption.textContent = label;
-      tile.append(number, caption);
-      return tile;
-    }));
-    const prefer = run.newOffers > 0 ? '#scanNewResults' : '#scanAllResults';
-    for (const id of ['#scanAllResults', '#scanNewResults']) {
-      $(id).className = 'button ' + (id === prefer ? 'primary' : 'secondary');
-    }
+  // The run panel's footer: one button per next step, each with its count; the likely one is primary.
+  function renderScanResultCard(run) {
     const queue = state.catalogPages?.jobs?.total;
-    $('#scanReviewResults').textContent = Number.isFinite(queue) && queue > 0 ? 'Do weryfikacji (' + queue + ')' : 'Do weryfikacji';
+    const labels = {
+      '#scanNewResults': ['Nowe oferty', run.newOffers],
+      '#scanPriceResults': ['Zmiany cen', run.priceChanges],
+      '#scanReviewResults': ['Do weryfikacji', Number.isFinite(queue) ? queue : null],
+      '#scanAllResults': ['Wszystkie z tego skanu', run.found],
+    };
+    const prefer = run.newOffers > 0 ? '#scanNewResults' : queue > 0 ? '#scanReviewResults' : '#scanAllResults';
+    for (const [id, [label, count]] of Object.entries(labels)) {
+      $(id).textContent = count == null ? label : label + ' (' + count + ')';
+      $(id).className = 'button ' + (id === prefer ? 'primary' : 'secondary');
+      $(id).disabled = count === 0 && id !== '#scanAllResults';
+    }
   }
+  /** Failed tasks of a saved run that are worth sending again (not bot checks, not skipped ones). */
+  const retryable = (run) => (run?.errors || []).filter(isRetryableError);
   async function refreshRuns() {
     const response=await json('/api/scan-runs'); state.scanRuns=response.items || [];
     const selected=$('#offerScan').value;
@@ -54,10 +46,14 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
     const run=state.scanRuns[0];
     if(run?.indexed) {
       $('#scanResults').hidden=false;
+      $('#scanRun').hidden=false;
       const failed=run.errors?.length||0;
-      $('#scanResultSummary').textContent=`Ostatni zapisany skan: ${run.found} ofert · ${run.newOffers} nowych · ${run.priceChanges} zmian cen${failed?' · '+failed+' zadań z problemami — wyniki mogą być niepełne':''}${run.context?.cancelled?' · skan przerwany: tylko ukończone frazy':''}`;
-      $('#retryFailedScan').hidden=!failed || !run.context;
-      renderScanResultCard(run, failed);
+      const again=retryable(run);
+      const skipped=failed-again.length;
+      $('#scanResultSummary').textContent=new Date(run.at).toLocaleString('pl-PL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+(failed?' · '+failed+' zadań z problemami — wyniki mogą być niepełne':'')+(skipped&&again.length?' · blokad ('+skipped+') nie ponawiamy':'')+(run.context?.cancelled?' · skan przerwany: tylko ukończone frazy':'');
+      $('#retryFailedScan').hidden=!again.length || !run.context;
+      $('#retryFailedScan').textContent='Ponów chwilowe błędy ('+again.length+')';
+      renderScanResultCard(run);
     }
   }
   async function showResults(change='',review=false) {
@@ -94,7 +90,8 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
   // The scanner listens for exact source/query pairs, never a Cartesian retry.
   $('#retryFailedScan').addEventListener('click',()=>{
     const run=state.scanRuns[0];
-    if(run?.errors?.length) document.dispatchEvent(new CustomEvent('bookflip-retry-scan',{detail:run.errors.map(row=>({source:row.source,query:row.query}))}));
+    const again=retryable(run);
+    if(again.length) document.dispatchEvent(new CustomEvent('bookflip-retry-scan',{detail:again.map(row=>({source:row.source,query:row.query}))}));
   });
   document.addEventListener('bookflip-scan-complete',()=>{void refreshRuns().catch(error=>toast(error.message));});
   $('#mobileMore').addEventListener('click',()=>$('#moreDialog').showModal());

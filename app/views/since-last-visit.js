@@ -1,8 +1,8 @@
 import { json } from '../core/api.js';
-import { escapeHtml, sourceHealthNote } from '../core/formatters.js';
+import { escapeHtml } from '../core/formatters.js';
 
 // "Since your last visit" strip at the top of the scanner: new listings, decisions waiting and
-// sources that stopped working — the three things worth a look before starting a new scan.
+// (dead sources are shown in the source list) — the things worth a look before starting a new scan.
 const VISIT_KEY = 'bookflip.lastVisitAt';
 const BASELINE_KEY = 'bookflip.visitBaseline';
 
@@ -45,22 +45,18 @@ export function installSinceLastVisit({ state, showView }) {
   const since = visitBaseline();
 
   async function refresh() {
-    const [offers, health] = await Promise.all([
-      since ? json('/api/offers?' + new URLSearchParams({ since, limit: '1', offset: '0' })).catch(() => null) : null,
-      json('/api/source-health').catch(() => ({ items: [] })),
-    ]);
+    const offers = await (since ? json('/api/offers?' + new URLSearchParams({ since, limit: '1', offset: '0' })).catch(() => null) : null);
     const fresh = Number(offers?.total || 0);
-    const pending = Number(state.catalogPages?.jobs?.total || 0);
-    const broken = (health.items || []).filter((row) => sourceHealthNote(row, { short: true }) === 'nie działa').map((row) => row.source);
+    const pending = Number(state.reviewQueueTotal ?? state.catalogPages?.jobs?.total ?? 0);
     const parts = [];
-    if (since)
+    // Nothing new since the last visit is not worth a sentence: next to "Nowe z ostatniego skanu (35)"
+    // it read as a contradiction (those 35 came before the last visit).
+    if (since && fresh)
       parts.push(
-        fresh
-          ? `<span><b>${fresh}</b> ${plural(fresh, 'nowa oferta', 'nowe oferty', 'nowych ofert')} od ${escapeHtml(new Date(since).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }))} <button type="button" class="link-button" data-since="offers">Pokaż</button></span>`
-          : '<span>Brak nowych ofert od ostatniej wizyty.</span>',
+        `<span><b>${fresh}</b> ${plural(fresh, 'nowa oferta', 'nowe oferty', 'nowych ofert')} od ${escapeHtml(new Date(since).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }))} <button type="button" class="link-button" data-since="offers">Pokaż</button></span>`,
       );
     if (pending) parts.push(`<span><b>${pending}</b> do decyzji <button type="button" class="link-button" data-since="review">Weryfikuj</button></span>`);
-    if (broken.length) parts.push(`<span class="since-warn">Nie działa: ${escapeHtml(broken.join(', '))}</span>`);
+    // Dead sources are shown in the source list of the form (grouped, with when they last worked).
     strip.hidden = !parts.length;
     strip.innerHTML = parts.join('');
     strip.querySelector('[data-since="review"]')?.addEventListener('click', () => showView('review'));

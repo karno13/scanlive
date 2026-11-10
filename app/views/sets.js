@@ -97,7 +97,8 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
   function editionCard(item, { action, member = false }) {
     const title = tidyWorkTitle(item.workTitle || item.title);
     const author = parseBnPeople([].concat(item.authors || []).join(' '), [].concat(item.authors || []))[0] || '';
-    const facts = [item.cycle ? item.cycle + (item.volume ? ' · t. ' + item.volume : '') : '', item.publicationYear, cleanPublisher(item.publisher || ''), item.isbn ? 'ISBN ' + item.isbn : '']
+    // Why it is proposed: the ISBN the seller filled in (often one volume of the set), a cycle volume.
+    const facts = [item.fromIsbn ? 'ISBN podany w ogłoszeniu' : '', item.cycle ? item.cycle + (item.volume ? ' · t. ' + item.volume : '') : '', item.publicationYear, cleanPublisher(item.publisher || ''), item.isbn ? 'ISBN ' + item.isbn : '']
       .filter(Boolean).map((text) => `<span class="fact">${safe(text)}</span>`).join('');
     return `<li class="sets-card${member ? ' is-member' : ''}">${coverMarkup(item.cover || isbnCover(item.isbn), title, { size: 'sm', escapeHtml })}
       <span class="rv-cand-body"><b>${safe(title)}</b>${author ? `<small>${safe(author)}</small>` : ''}<span class="rv-facts">${facts}</span></span>${action}</li>`;
@@ -225,6 +226,7 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
     mount.innerHTML = `<div class="rv-section-title"><h4>Nie ma w katalogu</h4><small>opisz książkę, której nie da się znaleźć</small></div>
       ${(set.unknownItems || []).map((item) => `<div class="sets-unknown-row"><span>${safe(item.title)} · ${safe(item.quantity)} szt.</span><button type="button" class="link-button danger-text" data-unknown-remove="${safe(item.id)}">Usuń</button></div>`).join('')}
       <form class="set-unknown-form"><input name="title" maxlength="300" required placeholder="Np. Gotrek i Felix: Zabójca demonów" aria-label="Opis nierozpoznanej książki"><input name="quantity" type="number" min="1" max="10000" step="1" value="1" aria-label="Liczba egzemplarzy"><button type="submit" class="button secondary compact">Dodaj</button></form>
+      ${set.composedFromDescriptionAt && !set.compositionConfirmed && set.editions.length ? '<p class="inline-note">Książki dodane automatycznie z opisu ogłoszenia — porównaj ze zdjęciem, usuń nadmiarowe, dopisz brakujące.</p>' : ''}
       <label class="sets-confirm"><input type="checkbox" data-set-confirm ${set.compositionConfirmed ? 'checked' : ''} ${canConfirm || set.compositionConfirmed ? '' : 'disabled'}> Skład sprawdzony z ogłoszeniem — kompletny</label>
       ${canConfirm || set.compositionConfirmed ? '' : `<p class="inline-note">${set.editions.length ? 'Najpierw rozpoznaj albo usuń pozycje spoza katalogu.' : 'Dodaj książki, aby potwierdzić skład.'}</p>`}`;
     mount.querySelectorAll('[data-unknown-remove]').forEach((button) => button.addEventListener('click', async () => {

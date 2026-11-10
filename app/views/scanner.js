@@ -20,6 +20,18 @@ export async function requestScanCancellation({ $, toast }) {
 // the "Przebieg skanu" panel (scan-run.js), read from the server, so they are right whichever tab
 // or schedule started the scan; the stream only makes this tab's panel update without delay.
 export function createScannerView({ state, $, escapeHtml, shortTime, readQueries, selectedSources, toast, loadHistory, loadCatalogStatus, loadCatalogData, scanRun = null, storage = globalThis.localStorage }) {
+// A scan takes minutes: when the tab is in the background, say that it finished.
+function askToNotify() {
+  try {
+    if (globalThis.Notification?.permission === 'default') void Notification.requestPermission().catch(() => {});
+  } catch {}
+}
+function notifyDone(text) {
+  try {
+    if (typeof document !== 'undefined' && document.hidden && globalThis.Notification?.permission === 'granted') new Notification('BookFlip', { body: text, tag: 'bookflip-scan' });
+  } catch {}
+}
+
 function resetScanUi(queries, sources, tasks = null) {
   state.scan.total = tasks?.length || queries.length * sources.length;
   state.scan.completed = 0;
@@ -56,7 +68,6 @@ function scheduleLiveRefresh() {
 function updateProgress(event) {
   if (event.type === 'offers-saved') {
     $('#progressDetail').textContent = `zapisano ${event.saved} ofert (${event.newOffers || 0} nowych)`;
-    $('#goToOffers').disabled = false;
     scheduleLiveRefresh();
   }
   if (event.type === 'source-start' || event.type === 'page-start') {
@@ -82,7 +93,8 @@ async function startSearch(options = {}) {
   if (!sources.length) return toast('Wybierz przynajmniej jedno źródło.');
   const fingerprint = JSON.stringify({ queries, sources: [...sources].sort() });
   if (state.scan.fingerprint === fingerprint && Date.now() - state.scan.lastStart < 5000)
-    return toast('Ten sam skan został przed chwila uruchomiony.');
+    return toast('Ten sam skan został przed chwilą uruchomiony.');
+  askToNotify();
   state.scan.running = true;
   state.scan.fingerprint = fingerprint;
   state.scan.lastStart = Date.now();
@@ -120,9 +132,9 @@ async function startSearch(options = {}) {
     document.dispatchEvent(new CustomEvent('bookflip-scan-complete'));
     $('#scanStateBadge').textContent = problems ? 'Zakończony z problemami' : 'Zakończony';
     $('#scanStateBadge').className = problems ? 'state-badge warning' : 'state-badge neutral';
-    $('#goToOffers').disabled = false;
     await Promise.all([loadHistory(), loadCatalogStatus(), loadCatalogData()]);
     toast(`Skan zakończony: ${summary.offers || 0} ofert.`);
+    notifyDone(`Skan zakończony: ${summary.offers || 0} ofert` + (summary.newOffers != null ? `, ${summary.newOffers} nowych` : "") + (problems ? `, ${problems} zadań z problemami.` : "."));
   } catch (error) {
     if (error.message === 'SCAN_CANCELLED') {
       $('#progressMessage').textContent = 'Skan anulowany';
@@ -137,7 +149,7 @@ async function startSearch(options = {}) {
     $('#progressDetail').textContent = error.message;
     $('#scanStateBadge').textContent = 'Błąd';
     $('#scanStateBadge').className = 'state-badge warning';
-    toast(`Nie udało się wykonac skanu: ${error.message}`);
+    toast(`Nie udało się wykonać skanu: ${error.message}`);
   } finally {
     scanRun?.setLocal(false);
     void scanRun?.refresh();
@@ -145,7 +157,7 @@ async function startSearch(options = {}) {
     state.scan.running = false;
     $('#cancelSearch').hidden = true;
     $('#startSearch').disabled = false;
-    $('#startSearch').innerHTML = '<span aria-hidden="true">◎</span> Rozpocznij skan <span aria-hidden="true">→</span>';
+    $('#startSearch').innerHTML = 'Skanuj <span aria-hidden="true">→</span>';
     $('#progressElapsed').textContent = '';
     $('#scanGuardMessage').textContent = '';
   }

@@ -12,10 +12,12 @@ import { createSetsView } from './views/sets.js';
 import { createReviewView } from './views/review.js';
 import { createCatalogView } from './views/catalog.js';
 import { mountDuplicates } from './views/duplicates.js';
+import { mountCatalogNames } from './views/catalog-names.js';
 import { mountCatalogSeeds } from './views/catalog-seeds.js';
 import { mountTitleConflicts } from './views/title-conflicts.js';
 import { mountScanSchedule } from './views/scan-schedule.js';
 import { createOffersView } from './views/offers.js';
+import { installOfferGroups } from './views/offer-groups.js';
 import { json } from './core/api.js';
 import { escapeHtml, money, date, shortTime, sourceHealthNote } from './core/formatters.js';
 import { createSettingsView } from './views/settings.js';
@@ -104,7 +106,7 @@ function readQueries() {
   return [
     ...new Set(
       $('#queries')
-        .value.split(/\n|,/)
+        .value.split(/\n/)
         .map((value) => value.trim())
         .filter(Boolean),
     ),
@@ -147,9 +149,13 @@ function renderScannerOffers() {
     .sort((a, b) => String(b.firstSeenAt || b.lastSeenAt || '').localeCompare(String(a.firstSeenAt || a.lastSeenAt || '')));
   const offers = filtered.slice(0, 12);
   $('#scannerOfferCount').textContent =
-    `Pokazano ${offers.length} z ${state.scannerTotal} pasujących ofert`;
+    `Pokazano ${offers.length} z ${state.scannerTotal} ${state.scannerScope === 'new' ? 'nowych' : 'pasujących'} ofert`;
+  const scanned = state.scannerRun ? new Date(state.scannerRun.at).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  $('#scannerDiscoverTitle').textContent = state.scannerScope === 'new' ? 'Nowe z ostatniego skanu' : 'Ostatnio wykryte oferty';
   $('#scannerDiscoverSummary').textContent =
-    'Ostatnio zapisane oferty SQLite. Nie są to wyniki bieżącego skanu.';
+    state.scannerScope === 'new'
+      ? 'Oferty wykryte po raz pierwszy w skanie z ' + scanned + '.'
+      : 'Ostatni skan nie przyniósł nowych ofert — poniżej najnowsze zapisane. Nie są to wyniki bieżącego skanu.';
   mount.innerHTML = offers.length
     ? offers
         .map((item) => {
@@ -199,6 +205,7 @@ async function restoreItem(view, id) {
 let firstViewRender = true;
 // Returns true when the view was switched, false when the user kept unsaved changes.
 // options.fromHistory: called by popstate, the URL is already correct and must not be touched.
+const viewScroll = new Map();
 function showView(name, options = {}) {
   if (!['scanner', 'review', 'catalog', 'sets', 'offers', 'settings'].includes(name)) name = 'scanner';
   if (hasUnsavedChanges()) {
@@ -206,11 +213,16 @@ function showView(name, options = {}) {
     void confirmDiscard().then((ok) => { if (ok) showView(name, options); });
     return false;
   }
+  // Each tab keeps its own scroll position: a new tab opens at its top, not halfway down the
+  // previous tab's list; coming back to a tab returns to where it was left.
+  const previous = state.activeView;
+  if (previous && previous !== name) viewScroll.set(previous, window.scrollY);
   state.activeView = name;
   $$('.view').forEach((view) => {
     view.hidden = view.id !== `view-${name}`;
     view.classList.toggle('active', !view.hidden);
   });
+  if (previous !== name) window.scrollTo({ top: viewScroll.get(name) || 0, behavior: 'instant' });
   $$('.nav-item, .mobile-nav-item').forEach((button) => {
     const active = button.dataset.view === name;
     button.classList.toggle('active', active);
@@ -257,25 +269,89 @@ window.addEventListener('popstate', () => {
   void restoreItem(target, idFromSearch(location.search));
 });
 
+const daysAgo = (value) => {
+  // Calendar days: yesterday 20:30 is "wczoraj" this morning, not "dziś".
+  const midnight = (time) => new Date(time).setHours(0, 0, 0, 0);
+  const days = Math.round((midnight(Date.now()) - midnight(Date.parse(value))) / 86_400_000);
+  return days <= 0 ? 'dziś' : days === 1 ? 'wczoraj' : days + ' dni temu';
+};
+// "Tylko polskie wydania": stored on the server, so scheduled and phone scans follow it too.
+void json('/api/scan-language').then((data) => { $('#scanPolishOnly').checked = data.polishOnly !== false; }).catch(() => {});
+$('#scanPolishOnly')?.addEventListener('change', async (event) => {
+  const polishOnly = event.target.checked;
+  try {
+    const result = await json('/api/scan-language', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ polishOnly }) });
+    toast(polishOnly
+      ? 'Tylko polskie wydania' + (result.rejected ? ` — odrzucono ${result.rejected} obcojęzycznych z weryfikacji.` : '.')
+      : 'Skan zachowa też wydania obcojęzyczne.');
+    if (result.rejected) void reloadReview();
+  } catch {
+    event.target.checked = !polishOnly;
+    toast('Nie udało się zapisać ustawienia języka.');
+  }
+});
+
 async function loadSources() {
   const [data, health] = await Promise.all([json('/api/sources'), json('/api/source-health').catch(() => ({ items: [] }))]);
   state.sources = data.sources || [];
   const blocked = data.blocked || {};
-  const healthNote = (source) => sourceHealthNote(health.items?.find((row) => row.source === source), { short: true });
+  const row = (source) => health.items?.find((item) => item.source === source);
+  const healthNote = (source) => sourceHealthNote(row(source), { short: true });
   const blockLabel = (code) => (code === 'SOURCE_CAPTCHA' ? 'blokuje odczyt (CAPTCHA)' : 'blokuje odczyt (HTTP 403)');
-  // Sources that refused every recent scan start unchecked unless the operator saved them.
-  const chosen = new Set(savedSearch?.sources || state.sources.filter((source) => !blocked[source] && healthNote(source) !== 'nie działa'));
-  $('#sourceGrid').innerHTML =
-    state.sources
-      .map(
-        (source) =>
-          `<label class="source-option"${blocked[source] ? ' title="Ten portal odrzucał automatyczne zapytania w ostatnich skanach. BookFlip nie obchodzi takich blokad."' : ''}><input type="checkbox" value="${escapeHtml(source)}" ${chosen.has(source) ? 'checked' : ''}><span>${escapeHtml(source)}${blocked[source] ? ' <small class="source-blocked">' + escapeHtml(blockLabel(blocked[source])) + '</small>' : healthNote(source) ? ' <small class="source-blocked">' + escapeHtml(healthNote(source)) + '</small>' : ''}</span></label>`,
-      )
-      .join('') || '<span class="loading-copy">Brak aktywnych adapterow.</span>';
+  const isDead = (source) => Boolean(blocked[source]) || healthNote(source) === 'nie działa';
+  state.deadSources = new Set(state.sources.filter(isDead));
+  // When it last worked: tells "blocked for an hour" apart from "has not worked for a week".
+  const lastWorked = (source) => (row(source)?.last_success_at ? 'ostatnio działał ' + daysAgo(row(source).last_success_at) : 'nigdy nie zadziałał');
+  const note = (source) =>
+    blocked[source] ? blockLabel(blocked[source]) + ' · ' + lastWorked(source) : isDead(source) ? lastWorked(source) : healthNote(source);
+  // Sources that refused the last scan start unchecked, also when the previous search had them on.
+  const wanted = savedSearch?.sources || state.sources;
+  state.autoUnchecked = (savedSearch?.sources || []).filter((source) => state.sources.includes(source) && isDead(source));
+  const chosen = new Set(wanted.filter((source) => !isDead(source)));
+  // Sources are toggle chips; the dot tells working (green), partly failing (amber) and dead (red).
+  const tone = (source) => (isDead(source) ? 'dead' : healthNote(source) ? 'partial' : 'ok');
+  const option = (source) =>
+    `<label class="source-option is-${tone(source)}" title="${escapeHtml(note(source) || 'Działał w ostatnim skanie')}"><input type="checkbox" value="${escapeHtml(source)}" ${chosen.has(source) ? 'checked' : ''}><i class="source-dot-state" aria-hidden="true"></i><span>${escapeHtml(source)}</span>${tone(source) === 'ok' ? '' : '<small class="sr-only">' + escapeHtml(note(source)) + '</small>'}</label>`;
+  const working = state.sources.filter((source) => !isDead(source));
+  const dead = state.sources.filter(isDead);
+  $('#sourceGrid').innerHTML = [...working, ...dead].map(option).join('') || '<span class="loading-copy">Brak aktywnych adapterów.</span>';
+  // One sentence for all dead sources instead of a note under each.
+  const byNote = new Map();
+  for (const source of dead) byNote.set(lastWorked(source), [...(byNote.get(lastWorked(source)) || []), source]);
+  $('#sourceDeadNote').hidden = !dead.length;
+  $('#sourceDeadNote').innerHTML = dead.length
+    ? '<i class="source-dot-state" aria-hidden="true"></i> Nie działały w ostatnim skanie: ' +
+      [...byNote].map(([text, names]) => '<b>' + escapeHtml(names.join(', ')) + '</b> (' + escapeHtml(text) + ')').join(', ') +
+      '. Zaznacz, jeśli chcesz spróbować.'
+    : '';
   $('#settingsSources').innerHTML = state.sources
-    .map((source) => `<span><b>${escapeHtml(source)}</b><small>${blocked[source] ? escapeHtml(blockLabel(blocked[source])) + ' w ostatnich skanach' : 'Dostępny w programie · brak potwierdzenia działania'}</small></span>`)
+    // Same text as Ustawienia's own refresh (it may run first when the page opens on Ustawienia).
+    .map((source) => `<span><b>${escapeHtml(source)}</b><small>${escapeHtml(sourceHealthNote(row(source)))}</small></span>`)
     .join('');
   fillSourceFilters();
+  updateScanPlan();
+}
+
+const polishPlural = (n, one, few, many) => (n === 1 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many);
+// Before the scan: how big it is, how long it should take and what will not work.
+function updateScanPlan() {
+  const plan = $('#scanPlan');
+  if (!plan) return;
+  const queries = readQueries();
+  const sources = selectedSources();
+  const parts = [];
+  if (queries.length > 10) parts.push(`<b class="is-warn">${queries.length} fraz — maksymalnie 10</b>`);
+  if (queries.length && sources.length) {
+    const tasks = queries.length * sources.length;
+    const perTask = scanRun?.secondsPerTask?.();
+    const minutes = perTask ? Math.max(1, Math.round((tasks * perTask) / 60)) : null;
+    parts.push(`<b>${tasks} ${polishPlural(tasks, 'zapytanie', 'zapytania', 'zapytań')}</b><span class="scan-plan-detail">${queries.length} ${polishPlural(queries.length, 'fraza', 'frazy', 'fraz')} × ${sources.length} ${polishPlural(sources.length, 'źródło', 'źródła', 'źródeł')}${minutes ? ' · ok. ' + minutes + ' min' : ''}</span>`);
+  }
+  const dead = sources.filter((source) => state.deadSources?.has(source));
+  if (dead.length) parts.push(`<span class="is-warn">${escapeHtml(dead.join(', '))} nie ${dead.length === 1 ? 'działało' : 'działały'} w ostatnim skanie</span>`);
+  if (!queries.length) parts.push('<span class="scan-plan-detail">Wpisz frazy albo wybierz profil.</span>');
+  else if (!sources.length) parts.push('<span class="is-warn">Zaznacz przynajmniej jedno źródło.</span>');
+  plan.innerHTML = parts.join(' ');
 }
 
 function fillSourceFilters() {
@@ -293,7 +369,7 @@ function fillSourceFilters() {
 async function loadHistory() {
   state.history = await json('/api/history/brief');
   $('#offersNavCount').textContent = `${allOffers().length} zapisanych`;
-  $('#reviewNavCount').textContent = `${state.catalogPages.jobs.total} do decyzji`;
+  $('#reviewNavCount').textContent = `${state.reviewQueueTotal ?? state.catalogPages.jobs.total} do decyzji`;
   renderReview();
   renderCatalog();
   renderOffers();
@@ -304,9 +380,13 @@ let scannerSearchSerial=0;
 async function refreshScannerOffers() {
   const serial=++scannerSearchSerial;
   try {
-    const data=await json('/api/offers?'+new URLSearchParams({limit:'12',query:$('#scannerOfferSearch').value.trim(),source:$('#scannerOfferSource').value}));
+    const filters={limit:'12',query:$('#scannerOfferSearch').value.trim(),source:$('#scannerOfferSource').value};
+    const run=(state.scanRuns||[]).find(item=>item.indexed);
+    let data=run?.newOffers?await json('/api/offers?'+new URLSearchParams({...filters,scan:run.at,scanChange:'new',sort:'newest'})):null;
+    state.scannerScope=data?'new':'recent';
+    if(!data) data=await json('/api/offers?'+new URLSearchParams({...filters,sort:'newest'}));
     if(serial!==scannerSearchSerial)return;
-    state.scannerOffers=data.items;state.scannerTotal=data.total;renderScannerOffers();
+    state.scannerOffers=data.items;state.scannerTotal=data.total;state.scannerRun=run||null;renderScannerOffers();
   }catch(error){$('#scannerOfferCount').textContent='Nie udało się pobrać ofert. Spróbuj odświeżyć.';}
 }
 
@@ -390,7 +470,11 @@ async function loadCatalogPage(kind, { reset = false, pageNumber = null } = {}) 
     // decided by the resolver): take the new total and skip rows already loaded.
     if (!reset && kind !== 'offers' && kind !== 'jobs' && data.total !== page.total) throw Error('CATALOG_CHANGED_DURING_PAGINATION');
     if (data.items.length === 0 && offset < data.total && !(kind === 'jobs' && !reset)) throw Error('INCOMPLETE_CATALOG_PAGE');
-    if (kind === 'jobs') state.reviewBuckets = data.buckets || null;
+    if (kind === 'jobs') {
+      state.reviewBuckets = data.buckets || null;
+      // The menu counts the whole queue, not the open tab or search.
+      state.reviewQueueTotal = data.queueTotal ?? data.total;
+    }
     if (reset || kind === 'offers') {
       state[source.stateKey] = data.items;
       if (kind === 'works' || kind === 'jobs') state.visibleRows[kind] = 100;
@@ -502,7 +586,7 @@ async function loadCatalogData() {
     ]);
     if (loaded.some((value) => value !== true)) throw Error('CATALOG_PAGE_LOAD_IN_PROGRESS');
     $('#offersNavCount').textContent = `${state.catalogPages.offers.total} zapisanych`;
-    $('#reviewNavCount').textContent = `${state.catalogPages.jobs.total} do decyzji`;
+    $('#reviewNavCount').textContent = `${state.reviewQueueTotal ?? state.catalogPages.jobs.total} do decyzji`;
     renderReview();
     renderCatalog();
     renderOffers();
@@ -635,7 +719,12 @@ function renderReview(...args) { const result = reviewView.renderReview(...args)
 function renderCatalog(...args) { const result = catalogView.renderCatalog(...args); syncItemUrl(); return result; }
 function priceStats(...args) { return catalogView.priceStats(...args); }
 
-function renderOffers(...args) { return offersView.renderOffers(...args); }
+function renderOffers(...args) {
+  const result = offersView.renderOffers(...args);
+  // "Wg książki" reads the same filters: refresh the edition cards with the list.
+  if (state.activeView === 'offers') state.offerGroups?.refresh();
+  return result;
+}
 function openOfferDrawer(...args) { return offersView.openOfferDrawer(...args); }
 
 function setCatalogMode(mode) {
@@ -831,10 +920,16 @@ $('#toggleSources').addEventListener('click', () => {
   boxes.forEach((box) => {
     box.checked = !all;
   });
+  updateScanPlan();
 });
 $('#startSearch').addEventListener('click', startSearch);
 $('#cancelSearch').addEventListener('click', () => requestScanCancellation({ $, toast }));
-$('#goToOffers').addEventListener('click', () => showView('offers'));
+$('#queries').addEventListener('input', updateScanPlan);
+$('#sourceGrid').addEventListener('change', updateScanPlan);
+document.addEventListener('bookflip-scan-complete', () => {
+  void scanRun.refresh().then(updateScanPlan);
+  void tradingControls.refreshRuns().then(refreshScannerOffers).catch(() => {});
+});
 for (const selector of ['#reviewSource', '#reviewIsbn', '#reviewSort'])
   $(selector).addEventListener('change', () => scheduleGlobalCatalogSearch('jobs'));
 $('#reviewSearch').addEventListener('input', () => scheduleGlobalCatalogSearch('jobs'));
@@ -884,6 +979,7 @@ $('#identificationStop').addEventListener('click', () => void controlIdentificat
 $('#offerPrev').addEventListener('click', () => changeOfferPage(state.offerPage-1));
 $('#offerNext').addEventListener('click', () => changeOfferPage(state.offerPage+1));
 $('#closeOfferDrawer').addEventListener('click', () => offersView.closeOfferDrawer());
+$('#view-catalog [data-go-review]')?.addEventListener('click', () => showView('review'));
 $('#openCatalogForm').addEventListener('click', () => {
   state.catalogReturnToReview = null;
   $('#catalogDialog').showModal();
@@ -960,11 +1056,13 @@ const reloadReview = () => scheduleGlobalCatalogSearch('jobs');
 const reviewView = createReviewView({ state, $, $$, json, toast, money, date, escapeHtml, reviewOffers, loadCatalogData, renderCatalog, openCatalogForReview, loadAllReviewRows, reloadReview });
 const catalogView = createCatalogView({ state, $, $$, json, money, escapeHtml, visibleCatalogRows, openOfferDrawer, loadCatalogData, toast, showView });
 mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData });
+mountCatalogNames({ $, json, escapeHtml, toast, loadCatalogData });
 mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogData });
 mountCatalogSeeds({ $, json, escapeHtml, toast, loadCatalogData });
 const onFiltersChange = () => void changeOfferPage(state.offerPage);
 const onAssignmentChanged = () => loadCatalogData();
 const offersView = createOffersView({ state, $, $$, json, money, date, escapeHtml, allOffers, bookFor, showView, priceStats, onFiltersChange, toast, onAssignmentChanged });
+state.offerGroups = installOfferGroups({ $, $$, json, money, escapeHtml, filters: () => catalogFilters('offers'), openOfferDrawer: (id) => offersView.openOfferDrawer(id) });
 
 async function changeOfferPage(page) {
   if(page<1 || page>Math.max(1,Math.ceil(state.catalogPages.offers.total/state.pageSize))) return;
@@ -978,7 +1076,7 @@ const refreshSinceVisit = installSinceLastVisit({ state, showView });
 const startupView = viewFromSearch(location.search);
 const startupItem = idFromSearch(location.search);
 showView(startupView);
-Promise.all([loadSources().then(() => installScanProfiles({ queriesInput: $('#queries'), sourceGrid: $('#sourceGrid'), panel: $('.scanner-form-panel'), toast, json }).then(() => mountScanSchedule({ panel: $('.scanner-form-panel'), json, toast, escapeHtml }))), loadHistory(), loadCatalogStatus(), loadCatalogData(), restoreLastScanStatus(), tradingControls.refreshRuns()]).catch(
+Promise.all([loadSources().then(() => installScanProfiles({ queriesInput: $('#queries'), sourceGrid: $('#sourceGrid'), panel: $('.scanner-form-panel'), toast, json, deadSources: () => state.deadSources, startScan: () => startSearch() }).then(() => mountScanSchedule({ panel: $('.scanner-form-panel'), json, toast, escapeHtml }))), loadHistory(), loadCatalogStatus(), loadCatalogData(), restoreLastScanStatus(), tradingControls.refreshRuns().then(refreshScannerOffers)]).catch(
   (error) => {
     $('#connectionLabel').textContent = 'Błąd połączenia';
     toast(`Nie udało się wczytać aplikacji: ${error.message}`);
@@ -1011,10 +1109,13 @@ setInterval(async () => {
 }, 4000);
 
 // Live diagnostics are read-only and do not interfere with scan streaming.
-void scanInsights.refresh();
+const scanInsightsOpen = () => state.activeView === 'settings' && $('#scanInsightsFold')?.open;
+$('#scanInsightsFold')?.addEventListener('toggle', () => {
+  if (scanInsightsOpen()) void scanInsights.refresh();
+});
 setInterval(() => {
   if (document.hidden) return;
-  void scanInsights.refresh();
+  if (scanInsightsOpen()) void scanInsights.refresh();
   // A scan started by the schedule or another device: the run panel picks it up within seconds.
   if (!state.scan.running && state.activeView === 'scanner' && $('#scanRun').dataset.state !== 'running') void scanRun.refresh();
 }, 3000);

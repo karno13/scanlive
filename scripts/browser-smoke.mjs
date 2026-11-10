@@ -54,6 +54,8 @@ try {
   assert.ok(online, 'Server did not start: ' + logs);
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
+  // The purchase scenario and target price live in trading mode (off by default).
+  await page.addInitScript(() => localStorage.setItem('bookflip.tradingMode', '1'));
   const errors = [];
   const diagnostics = [];
   page.on('pageerror', error => errors.push(error.stack || error.message));
