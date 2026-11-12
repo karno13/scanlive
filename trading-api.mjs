@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { backupCatalog } from './scripts/backup-catalog.mjs';
 
 import { findDuplicateWorkGroups } from './work-grouping.mjs';
+import { listDistinctDecisions, markDistinct, undoDistinct } from './distinct-works.mjs';
 import { findTitleConflicts, resolveTitleConflict } from './title-consistency.mjs';
 import {
   applyRejectionRules,
@@ -536,6 +537,16 @@ export const tradingRoutes = createRouter()
     return { ...s, nextRunAt: nextRunAt(s), nextQuickRunAt: nextQuickRunAt(s) };
   })
   .add('GET', '/api/catalog/work-duplicates', ({ repo }) => listWorkDuplicates(repo))
+  // "To różne książki" (migration 130): reversible, listed with the other decisions.
+  .add('POST', '/api/catalog/work-duplicates/distinct', ({ repo, input }) =>
+    markDistinct(repo, input?.workIds),
+  )
+  .add('GET', '/api/catalog/work-duplicates/distinct', ({ repo }) => ({
+    items: listDistinctDecisions(repo),
+  }))
+  .add('POST', '/api/catalog/work-duplicates/distinct/:id/undo', ({ repo, params }) =>
+    undoDistinct(repo, params.id),
+  )
   .add('GET', '/api/queue/summary', ({ repo }) => queueSummary(repo))
   .add('GET', '/api/catalog/works/:id/sets', ({ repo, params }) => ({
     items: workSets(repo, params.id),

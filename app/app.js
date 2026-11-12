@@ -675,7 +675,7 @@ async function loadCatalogStatus() {
       : scheduler.stopping ? 'Zatrzymywanie — kończę rozpoczętą partię'
       : active ? 'Identyfikacja w toku'
       : paused ? 'Zatrzymano'
-      : !progress.pending && total ? `Zakończono · ${state.catalog.reviewQueue?.decisions ?? 0} do decyzji · ${progress.failed} błędów`
+      : !progress.pending && total ? progress.failed ? `Zakończono · ${progress.failed} błędów` : 'Zakończono'
       : running ? 'Oczekuje na zadania' : 'Gotowe do uruchomienia';
 
     // Nothing running: the panel shrinks to one line so the queue gets the screen.

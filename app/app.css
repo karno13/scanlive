@@ -4394,3 +4394,53 @@ body.density-compact #view-catalog#view-catalog #catalogList:not(.is-grid):not(.
 #view-scanner > .sources-status { margin: 0 0 16px; }
 #view-scanner > .sources-status .panel-heading { margin-bottom: 6px; }
 #view-scanner > .sources-status .panel-heading p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+
+/* Kolejka, Weryfikacja: one toolbar row — idle identification line, type tabs, search, one menu. */
+#view-review .review-toolbar { flex-wrap: nowrap; gap: 8px; align-items: center; }
+#view-review .review-toolbar > .identification-dashboard { flex: 0 0 auto; max-width: 300px; }
+#view-review .review-toolbar > #reviewTabs { flex: 1 1 0; min-width: 0; margin: 0; overflow-x: auto; scrollbar-width: none; }
+#view-review .review-toolbar > .filterbar { flex: 0 1 220px; min-width: 120px; }
+#view-review .review-menu { position: relative; }
+#view-review .review-menu > summary { display: inline-flex; align-items: center; gap: 4px; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); cursor: pointer; font-weight: 600; list-style: none; }
+#view-review .review-menu > summary::-webkit-details-marker { display: none; }
+#view-review .review-menu[open] > summary { background: var(--surface-2); }
+#view-review .review-menu[open] > .review-menu-panel { position: absolute; top: 100%; right: 0; z-index: 20; display: grid; gap: 6px; width: min(380px, 90vw); max-height: min(560px, 70vh); margin-top: 4px; padding: 8px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-pop); }
+#view-review .review-menu-panel > * { width: 100%; }
+#view-review .review-menu-panel :is(.shortcut-help, .compact-filters, .review-history) { display: block; }
+#view-review .review-menu-panel :is(.shortcut-help, .compact-filters, .review-history)[open] > :is(p, div) { position: static; width: auto; max-height: none; margin-top: 6px; padding: 0; border: 0; box-shadow: none; background: transparent; }
+#view-review .review-menu-panel .shortcut-hint { display: grid; gap: 4px; font-size: 13px; }
+#view-review .review-menu-panel .filterbar { display: grid; gap: 6px; }
+#view-review .review-menu-panel #reviewSelectToggle { justify-content: flex-start; }
+@media (max-width: 900px) {
+  #view-review .review-toolbar { flex-wrap: wrap; }
+  #view-review .review-toolbar > .identification-dashboard { flex: 1 1 100%; max-width: none; }
+  #view-review .review-toolbar > #reviewTabs { flex: 1 1 100%; order: 3; }
+  #view-review .review-toolbar > .filterbar { flex: 1 1 0; }
+  #view-review .review-menu > summary { min-height: 44px; min-width: 44px; justify-content: center; }
+  #view-review .review-menu-label { display: none; }
+  #view-review .review-menu-panel .shortcut-help { display: none; }
+}
+.queue-types .queue-keys { display: none; }
+/* Kolejka on desktop: the three rows above the list stay under 170 px. */
+@media (min-width: 901px) {
+  :is(#view-review, #view-sets, #view-checks) { padding-top: 12px; }
+  .queue-types { margin-bottom: 6px; }
+  #view-review .review-toolbar { min-height: 0; }
+  #view-review .review-toolbar > .filterbar { margin: 0; }
+  #view-review .review-toolbar .search-field input { min-height: 36px; padding-block: 2px; }
+  #view-review .review-menu > summary { min-height: 36px; }
+  #view-review .review-toolbar > .identification-dashboard.is-idle { padding-block: 0; }
+  #view-review .review-toolbar > .identification-dashboard.is-idle .identification-controls .button { min-height: 30px; }
+  #view-review .review-toolbar > #reviewTabs { margin: 0; }
+}
+#view-review .review-toolbar > .identification-dashboard { max-width: 360px; }
+#view-review .review-toolbar .identification-dashboard-heading { flex: 0 1 auto; }
+/* Tryb wsadowy: compact horizontal cards, so at least two full rows fit at 1440×900. */
+@media (min-width: 901px) {
+  #reviewDetail .rv-batch-body { padding: 8px 14px; }
+  #reviewDetail .rv-batch-grid { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 8px; }
+  #reviewDetail .rv-batch-card { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 10px; height: auto; padding: 8px 40px 8px 8px; }
+  #reviewDetail .rv-batch-pair { align-items: flex-start; }
+  #reviewDetail .rv-batch-pair .cover { width: 56px; }
+  #reviewDetail .rv-batch-head .inline-note { font-size: 13px; margin: 2px 0 0; }
+}

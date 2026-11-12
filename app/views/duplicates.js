@@ -21,7 +21,7 @@ export function mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData })
       .join('');
     return `<article class="duplicate-group"><ul>${rows}</ul><button class="button secondary" type="button" data-merge-group="${index}" aria-label="Połącz ${group.works.length} dzieł w „${escapeHtml(
       target.title.split(' / ')[0],
-    )}”">Połącz w jedno</button></article>`;
+    )}”">Połącz w jedno</button><button class="button secondary" type="button" data-distinct-group="${index}" title="Te dzieła to różne książki — nie proponuj ich więcej. Cofniesz to w „Ostatnich decyzjach”.">To różne książki</button></article>`;
   };
 
   async function refresh() {
@@ -41,8 +41,44 @@ export function mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData })
       body.querySelectorAll('[data-merge-group]').forEach((button) =>
         button.addEventListener('click', () => merge(groups[Number(button.dataset.mergeGroup)], button)),
       );
+      body.querySelectorAll('[data-distinct-group]').forEach((button) =>
+        button.addEventListener('click', () => markDistinct(groups[Number(button.dataset.distinctGroup)], button)),
+      );
     } catch (error) {
       body.innerHTML = `<p class="inline-note">Nie udało się wczytać duplikatów: ${escapeHtml(error.message)}</p>`;
+    }
+  }
+
+  // Reversible, so no confirmation: the toast offers "Cofnij", and "Ostatnie decyzje" lists it too.
+  async function markDistinct(group, button) {
+    if (busy) return;
+    busy = true;
+    button.disabled = true;
+    try {
+      const result = await json('/api/catalog/work-duplicates/distinct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workIds: group.works.map((work) => work.id) }),
+      });
+      toast('Oznaczono jako różne książki.', {
+        label: 'Cofnij',
+        onClick: async () => {
+          await json('/api/catalog/work-duplicates/distinct/' + encodeURIComponent(result.decisionId) + '/undo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+          });
+          await refresh();
+        },
+        onError: (error) => toast('Nie cofnięto: ' + error.message),
+      });
+      await loadCatalogData();
+      await refresh();
+    } catch (error) {
+      toast('Nie udało się zapisać decyzji: ' + error.message);
+      button.disabled = false;
+    } finally {
+      busy = false;
     }
   }
 

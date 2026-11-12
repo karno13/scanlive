@@ -2,6 +2,7 @@
 // this every ISBN (every reprint, every publisher) became its own work. The key is deliberately
 // strict - same main title AND same first author - because a wrong merge is worse than a missed one.
 import { fold } from './title-proposals.mjs';
+import { allPairsDistinct, distinctPairs } from './distinct-works.mjs';
 import {
   brandOnlyPattern,
   universePrefix,
@@ -221,19 +222,34 @@ export function findDuplicateWorkGroups(repository) {
       keys: workKeys.get(work.id),
     });
   }
-  return [...groups.values()]
-    .filter((list) => list.length > 1)
-    .map((list) => {
-      // Keep the work that already carries the most offers, then editions, then the oldest.
-      const ranked = [...list].sort(
-        (a, b) =>
-          (b.authors.length > 0) - (a.authors.length > 0) ||
-          b.offers - a.offers ||
-          b.editions - a.editions ||
-          String(a.createdAt).localeCompare(String(b.createdAt)),
-      );
-      const key = ranked[0].keys.find((entry) => !entry.startsWith('orig:')) ?? ranked[0].keys[0];
-      return { key, targetId: ranked[0].id, works: ranked.map(({ keys: _keys, ...work }) => work) };
-    })
-    .sort((a, b) => b.works.length - a.works.length || a.key.localeCompare(b.key));
+  const distinct = distinctPairs(repository);
+  return (
+    [...groups.values()]
+      .filter((list) => list.length > 1)
+      // "To różne książki": a group whose every pair the operator marked as different is not offered.
+      .filter(
+        (list) =>
+          !allPairsDistinct(
+            list.map((work) => work.id),
+            distinct,
+          ),
+      )
+      .map((list) => {
+        // Keep the work that already carries the most offers, then editions, then the oldest.
+        const ranked = [...list].sort(
+          (a, b) =>
+            (b.authors.length > 0) - (a.authors.length > 0) ||
+            b.offers - a.offers ||
+            b.editions - a.editions ||
+            String(a.createdAt).localeCompare(String(b.createdAt)),
+        );
+        const key = ranked[0].keys.find((entry) => !entry.startsWith('orig:')) ?? ranked[0].keys[0];
+        return {
+          key,
+          targetId: ranked[0].id,
+          works: ranked.map(({ keys: _keys, ...work }) => work),
+        };
+      })
+      .sort((a, b) => b.works.length - a.works.length || a.key.localeCompare(b.key))
+  );
 }

@@ -2,6 +2,17 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-12 (53) — Kolejka: mniej pięter nad listą
+
+- **Układ Weryfikacji:** nad listą były trzy piętra nawigacji (258 px z 900 przy 1440×900, 376 px przy 390×844), teraz jest jeden wiersz zakładek rodzajów i jeden wiersz narzędzi: **160 px** (telefon: 290 px).
+  - „Zaznacz wiele”, „Skróty”, „Filtry weryfikacji” i „Ostatnie decyzje” są w jednym menu „Więcej”;
+  - zakładki „Wszystkie / Szybkie / Do dodania…” stoją w jednym wierszu z wyszukiwarką i ramką identyfikacji;
+  - podpowiedź skrótów z paska zakładek jest tylko w menu („Skróty”).
+- **Ramka identyfikacji w stanie bezczynnym** to jedna linia („Zakończono” albo „Zakończono · N błędów”) bez licznika decyzji. Liczba decyzji jest widoczna w dwóch miejscach: na aktywnej zakładce „Weryfikacja” i przy tytule widoku.
+- **Tryb wsadowy:** karty są poziome i niższe (222 px zamiast 332 px), przy 1440×900 mieszczą się **dwa pełne rzędy** (było jeden).
+- **Duplikaty:** obok „Połącz w jedno” jest „To różne książki”. Decyzja jest odwracalna („Cofnij” w komunikacie i w „Ostatnich decyzjach”, wiersz „Różne książki: A ≠ B”), a grupa przestaje być proponowana — także przez jednorazowe automatyczne łączenie przy starcie. Gdy do grupy dojdzie trzecie dzieło o tym samym kluczu, grupa wraca. Migracja **130** (`distinct_work_pairs`).
+- Cele dotykowe poniżej 44 px przy 390 px: 0 (20 zrzutów, oba motywy), bez przepełnienia strony.
+
 ## 2026-11-11 (52) — Stanowisko decyzyjne 2: jedna kolejka i mniej decyzji
 
 - **Kolejka** zastępuje w nawigacji „Do weryfikacji” i „Zestawy”. To jeden widok z zakładkami typów; na kopii danych:

@@ -156,7 +156,15 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
   }
   async function refreshDecisions() {
     try {
-      const [response,batches]=await Promise.all([json('/api/review-decisions'),json('/api/review-batches').catch(()=>({items:[]}))]);const parent=$('#reviewDecisionHistory');parent.replaceChildren();
+      const [response,batches,distinct]=await Promise.all([json('/api/review-decisions'),json('/api/review-batches').catch(()=>({items:[]})),json('/api/catalog/work-duplicates/distinct').catch(()=>({items:[]}))]);const parent=$('#reviewDecisionHistory');parent.replaceChildren();
+      // "To różne książki" (Kolejka → Możliwe duplikaty): one row per decision, "Cofnij" proposes the group again.
+      for(const decision of distinct.items.filter(item=>!item.undone)) {
+        const item=document.createElement('div');item.className='decision-history-row is-distinct';
+        const label=document.createElement('span');label.textContent='Różne książki: '+decision.works.map(work=>work.title).join(' ≠ ')+' · '+new Date(decision.createdAt).toLocaleString('pl-PL');
+        const undo=document.createElement('button');undo.type='button';undo.className='button secondary';undo.textContent='Cofnij';
+        undo.addEventListener('click',async()=>{undo.disabled=true;try{await write('/api/catalog/work-duplicates/distinct/'+encodeURIComponent(decision.id)+'/undo',{},'POST');await refreshDecisions();}catch(error){undo.disabled=false;toast('Nie cofnięto: '+error.message);}});
+        item.append(label,undo);parent.append(item);
+      }
       // Batch approvals (review 11.2026, stage 2): one row per batch, "Cofnij całą partię".
       for(const batch of batches.items.filter(item=>item.open>0)) {
         const item=document.createElement('div');item.className='decision-history-row is-batch';
@@ -190,7 +198,7 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
           catch(error){reopen.disabled=false;toast('Nie można poprawić tej decyzji: istnieje nowsza zmiana lub zadanie jest w toku.');}
         });item.append(label,reopen);parent.append(item);
       }
-      if(!response.items.length) parent.textContent='Nie podjęto jeszcze ręcznych decyzji.';
+      if(!response.items.length && !parent.children.length) parent.textContent='Nie podjęto jeszcze ręcznych decyzji.';
     }catch(error){$('#reviewDecisionHistory').textContent='Nie udało się odczytać historii decyzji.';}
   }
   $('#reviewDecisionHistory').closest('details').addEventListener('toggle',event=>{if(event.currentTarget.open) void refreshDecisions();});

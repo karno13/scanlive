@@ -24,7 +24,7 @@ Full table: `docs/REPOSITORY-MAP.md`. The short version:
 
 ## Rules
 
-- **Migrations are immutable** (`migrations/NNN_*.sql`, checksums stored in user DBs). New schema = next number (currently 129 is the last).
+- **Migrations are immutable** (`migrations/NNN_*.sql`, checksums stored in user DBs). New schema = next number (currently 130 is the last).
 - Automatic decisions must be reversible and visible in „Ostatnie decyzje” (write a `review_decisions` row with a `created_by` marker); manual assignments and sets always win over automation.
 - Never touch the user's DB (`%LOCALAPPDATA%\BookFlip\data`). To measure on real data, copy it: `node scripts/backup-catalog.mjs <scratch>/copy.sqlite`.
 - Trading UI is hidden unless `body.trading-mode` (localStorage `bookflip.tradingMode=1`).
