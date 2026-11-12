@@ -4444,3 +4444,13 @@ body.density-compact #view-catalog#view-catalog #catalogList:not(.is-grid):not(.
   #reviewDetail .rv-batch-pair .cover { width: 56px; }
   #reviewDetail .rv-batch-head .inline-note { font-size: 13px; margin: 2px 0 0; }
 }
+
+/* Książki: "Braki w katalogu" next to the counts (replaces the empty detail panel). */
+#view-catalog .catalog-gaps { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+#view-catalog .catalog-gaps .link-button.is-active { font-weight: 700; text-decoration: underline; }
+#view-catalog .catalog-gaps .gaps-complete { color: var(--muted); }
+@media (max-width: 900px) {
+  /* The gaps row runs under the "Dodaj książkę" button, so it may use the full width. */
+  #view-catalog .catalog-gaps { flex: 1 1 100%; margin-right: -130px; gap: 0 10px; }
+  #view-catalog .catalog-gaps b { align-self: center; }
+}

@@ -110,6 +110,7 @@ import {
   createEditionFromOffer,
   recheckOfferEditions,
 } from './offer-editions.mjs';
+import { fillEditionGaps } from './edition-gaps.mjs';
 import { inferListingSeries } from './edition-series.mjs';
 import { analyzedOffers, bookHistory, allBookStatistics } from './price-analysis.mjs';
 import { sqliteHistoryModel } from './sqlite-history-read.mjs';
@@ -909,6 +910,35 @@ function scheduleLifecycleCheck(catalogStore) {
     });
 }
 
+// Editions without publisher or year: e-ISBN is asked about a few per ten minutes (paced by its
+// own limiter); empty fields only, never a hand-edited edition, undone as a batch.
+let runningEditionGaps = null;
+let editionGapsNextAt = 0;
+function scheduleEditionGaps(catalogStore) {
+  if (
+    runningEditionGaps ||
+    Date.now() < editionGapsNextAt ||
+    String(process.env.BOOKFLIP_EDITION_GAPS ?? '1') === '0' ||
+    typeof catalogStore.lookupGapRecords !== 'function' ||
+    !catalogStore.repository?.database
+  )
+    return;
+  editionGapsNextAt = Date.now() + 10 * 60_000;
+  runningEditionGaps = fillEditionGaps(catalogStore, { limit: 6 })
+    .then((report) => {
+      if (report.checked) recordProgress({ type: 'edition_gaps', ...report });
+    })
+    .catch((error) =>
+      recordProgress({
+        type: 'edition_gaps_error',
+        code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'EDITION_GAPS_ERROR',
+      }),
+    )
+    .finally(() => {
+      runningEditionGaps = null;
+    });
+}
+
 // Cycle and volume read from listing titles, recomputed every ten minutes (local SQL only).
 let listingSeriesNextAt = 0;
 function scheduleListingSeries(catalogStore) {
@@ -995,6 +1025,7 @@ function scheduleCatalogResolution(catalogStore) {
       scheduleIsbnLookups(catalogStore);
       scheduleOfferEditionRecheck(catalogStore);
       scheduleListingSeries(catalogStore);
+      scheduleEditionGaps(catalogStore);
     });
   return runningCatalogResolution;
 }

@@ -147,6 +147,17 @@ function editionBibliography(database, row) {
   };
 }
 
+/**
+ * Works with a gap, by the "gap" filter of the works list and the counts of "Braki w katalogu":
+ * a real edition (not "Wydanie nieustalone") without publisher or year, or an unsettled edition.
+ */
+export const WORK_GAP_SQL = {
+  publisher:
+    "EXISTS (SELECT 1 FROM editions ge WHERE ge.work_id=w.id AND ge.is_unknown=0 AND coalesce(trim(ge.publisher),'')='')",
+  year: 'EXISTS (SELECT 1 FROM editions ge WHERE ge.work_id=w.id AND ge.is_unknown=0 AND ge.publication_year IS NULL)',
+  unknown: 'EXISTS (SELECT 1 FROM editions ge WHERE ge.work_id=w.id AND ge.is_unknown=1)',
+};
+
 export function listCatalogWorks(repository, options = {}) {
   const { database } = repository,
     { limit, offset, query } = page(options),
@@ -172,6 +183,7 @@ export function listCatalogWorks(repository, options = {}) {
     );
     params.push(String(options.person));
   }
+  if (options.gap && WORK_GAP_SQL[options.gap]) conditions.push(WORK_GAP_SQL[options.gap]);
   const editionFilters = [];
   for (const [key, column] of [
     ['language', 'language'],

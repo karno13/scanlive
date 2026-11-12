@@ -2,6 +2,18 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-12 (54) — Katalog: braki wydań uzupełniane ze źródeł
+
+Pomiar na kopii bazy (550 prawdziwych wydań, bez 93 „Wydań nieustalonych”, które z założenia nie mają wydawcy ani roku):
+
+- **Kompletne wydania (wydawca i rok): 471 → 493 z 550, czyli 85,6% → 89,6%.** Bez wydawcy 76 → 57, bez roku 25 → 18. Cel 90% nie jest osiągnięty: pozostałe 57 to głównie starsze książki z Vinted, których nie ma w BN, Open Library ani e-ISBN.
+- **Uzupełnianie braków** (`edition-gaps.mjs`, migracja **131**): zwykłe wyszukiwanie ISBN zatrzymuje się na pierwszym źródle, które zna ISBN (np. Open Library bez wydawcy), więc e-ISBN i Google Books (z kluczem) nigdy nie były pytane. Teraz co 10 minut po 6 wydań są pytane wprost, a oprócz tego brane są wydawca i rok ze strony produktu oferty z tym samym ISBN (Tezeusz, Allegro Lokalnie).
+  - 78 wydań sprawdzonych, 24 uzupełnione (26 pól): e-ISBN 5 wydawców, strony sklepów 14 wydawców i 4 lata, Google Books 3 lata.
+  - Tylko puste pola i nigdy wydanie ręczne (`manual`); wartość ze źródła przechodzi przez tę samą normalizację nazw wydawców, „n/a” i lata spoza 1400–bieżący+1 są odrzucane.
+  - Odwracalne: „Uzupełniono dane wydań: N pól…” w „Ostatnich decyzjach” z przyciskiem „Cofnij”; pole zmienione w międzyczasie ręcznie zostaje. Wydanie bez wyniku jest pytane ponownie po 30 dniach, po błędzie sieci po dobie. Wyłączanie: `BOOKFLIP_EDITION_GAPS=0`.
+- **Książki → „Braki”:** obok liczników dzieł i wydań są trzy odnośniki: „51 bez wydawcy”, „18 bez roku”, „93 wydanie nieustalone” (+ „89,6% kompletnych wydań”). Kliknięcie filtruje listę po stronie serwera (liczba na liście = liczba w odnośniku), „Pokaż wszystkie” czyści filtr. Pusty panel „Wybierz dzieło” w tej wersji już nie istnieje (lista zajmuje całą szerokość), więc braki są tam, gdzie wcześniej szukało się statusu.
+- Lista dzieł pokazuje okładki z `/api/cover` w wariancie miniatury, a inicjały tylko wtedy, gdy obrazek się nie wczyta lub go nie ma — to było już tak (sprawdzone: 0 samych inicjałów w pierwszych 100 dziełach), bez zmian.
+
 ## 2026-11-12 (53) — Kolejka: mniej pięter nad listą
 
 - **Układ Weryfikacji:** nad listą były trzy piętra nawigacji (258 px z 900 przy 1440×900, 376 px przy 390×844), teraz jest jeden wiersz zakładek rodzajów i jeden wiersz narzędzi: **160 px** (telefon: 290 px).

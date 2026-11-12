@@ -9,6 +9,8 @@ import { dirname, join } from 'node:path';
 import { backupCatalog } from './scripts/backup-catalog.mjs';
 
 import { findDuplicateWorkGroups } from './work-grouping.mjs';
+import { catalogGaps } from './catalog-insights.mjs';
+import { listGapFillBatches, undoGapFills } from './edition-gaps.mjs';
 import { listDistinctDecisions, markDistinct, undoDistinct } from './distinct-works.mjs';
 import { findTitleConflicts, resolveTitleConflict } from './title-consistency.mjs';
 import {
@@ -547,6 +549,12 @@ export const tradingRoutes = createRouter()
   .add('POST', '/api/catalog/work-duplicates/distinct/:id/undo', ({ repo, params }) =>
     undoDistinct(repo, params.id),
   )
+  // Publisher / year filled from the sources (edition-gaps.mjs): batches and their undo.
+  .add('GET', '/api/catalog/edition-fills', ({ repo }) => ({ items: listGapFillBatches(repo) }))
+  .add('POST', '/api/catalog/edition-fills/:id/undo', ({ repo, params }) =>
+    undoGapFills(repo, params.id),
+  )
+  .add('GET', '/api/catalog/gaps', ({ repo }) => catalogGaps(repo))
   .add('GET', '/api/queue/summary', ({ repo }) => queueSummary(repo))
   .add('GET', '/api/catalog/works/:id/sets', ({ repo, params }) => ({
     items: workSets(repo, params.id),

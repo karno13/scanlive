@@ -156,7 +156,15 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
   }
   async function refreshDecisions() {
     try {
-      const [response,batches,distinct]=await Promise.all([json('/api/review-decisions'),json('/api/review-batches').catch(()=>({items:[]})),json('/api/catalog/work-duplicates/distinct').catch(()=>({items:[]}))]);const parent=$('#reviewDecisionHistory');parent.replaceChildren();
+      const [response,batches,distinct,fills]=await Promise.all([json('/api/review-decisions'),json('/api/review-batches').catch(()=>({items:[]})),json('/api/catalog/work-duplicates/distinct').catch(()=>({items:[]})),json('/api/catalog/edition-fills').catch(()=>({items:[]}))]);const parent=$('#reviewDecisionHistory');parent.replaceChildren();
+      // Publisher / year filled from the sources (one batch = one row, "Cofnij" empties them again).
+      for(const fill of fills.items.filter(item=>item.open>0)) {
+        const item=document.createElement('div');item.className='decision-history-row is-fill';
+        const label=document.createElement('span');label.textContent='Uzupełniono dane wydań: '+fill.open+' pól w '+fill.editions+' wydaniach · '+new Date(fill.createdAt).toLocaleString('pl-PL');
+        const undo=document.createElement('button');undo.type='button';undo.className='button secondary';undo.textContent='Cofnij';
+        undo.addEventListener('click',async()=>{undo.disabled=true;try{const result=await write('/api/catalog/edition-fills/'+encodeURIComponent(fill.id)+'/undo',{},'POST');toast('Cofnięto '+result.reopened+' pól'+(result.kept?'; '+result.kept+' zmienione ręcznie zostaje.':'.'));await refreshDecisions();}catch(error){undo.disabled=false;toast('Nie cofnięto: '+error.message);}});
+        item.append(label,undo);parent.append(item);
+      }
       // "To różne książki" (Kolejka → Możliwe duplikaty): one row per decision, "Cofnij" proposes the group again.
       for(const decision of distinct.items.filter(item=>!item.undone)) {
         const item=document.createElement('div');item.className='decision-history-row is-distinct';

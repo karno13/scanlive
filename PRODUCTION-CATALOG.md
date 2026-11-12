@@ -69,3 +69,5 @@ Log serwera: `%LOCALAPPDATA%\BookFlip\data\local-app.log`. Uruchom `npm test`, `
 - Propozycje po tytule (tabela `title_proposals`) nigdy nie przypisują oferty same; służą do wypełnienia pola ISBN i uruchomienia zwykłego podglądu.
 - Nowe wydanie o tym samym tytule i pierwszym autorze co istniejące dzieło trafia do tego dzieła (powód `same_title_and_author_work`). Niejednoznaczny klucz (kilka takich dzieł) nie jest łączony automatycznie.
 - Ceny ≥ 10 000 zł są traktowane jako nieznane (`MAX_PLAUSIBLE_PRICE_GROSZE`).
+
+`BOOKFLIP_EDITION_GAPS=0` wyłącza uzupełnianie wydawcy i roku wydań ze źródeł metadanych (`edition-gaps.mjs`, co 10 minut po 6 wydań).

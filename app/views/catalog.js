@@ -118,11 +118,41 @@ function closeBookPage({ fromHistory = false } = {}) {
 }
 
 function queryEmptyMarkup() {
-  const filtered=['#catalogSearch','#catalogLanguage','#catalogPublisher','#catalogYear','#catalogBinding'].some(id=>$(id)?.value.trim());
+  const filtered=['#catalogSearch','#catalogLanguage','#catalogPublisher','#catalogYear','#catalogBinding'].some(id=>$(id)?.value.trim())||Boolean(state.catalogGap);
   return filtered ? '<div class="empty-detail"><h3>Brak pasujących książek</h3><p>Zmień frazę lub usuń filtry wydań.</p></div>' : '<div class="empty-detail"><h3>Katalog jest pusty</h3><p>Zeskanuj oferty lub dodaj pierwszą książkę.</p></div>';
 }
+// "Braki w katalogu": what the empty detail panel used to be. Counts come from SQL (/api/catalog/gaps);
+// a click filters the works list by that gap (server side, so the list total equals the count).
+const GAP_LABELS = { publisher: 'bez wydawcy', year: 'bez roku', unknown: 'wydanie nieustalone' };
+let gapsRequest = null;
+let gapsAt = 0;
+async function refreshGaps(force = false) {
+  const mount = $('#catalogGaps');
+  if (!mount || (!force && Date.now() - gapsAt < 10_000)) return;
+  gapsAt = Date.now();
+  gapsRequest ??= json('/api/catalog/gaps').finally(() => { gapsRequest = null; });
+  try {
+    const gaps = await gapsRequest;
+    const counts = { publisher: gaps.withoutPublisher, year: gaps.withoutYear, unknown: gaps.unknown };
+    mount.innerHTML = '<b>Braki:</b> ' + Object.entries(GAP_LABELS)
+      .map(([key, label]) => `<button type="button" class="link-button${state.catalogGap === key ? ' is-active' : ''}" data-catalog-gap="${key}" aria-pressed="${state.catalogGap === key}">${counts[key]} ${label}</button>`)
+      .join('') + (state.catalogGap ? ' <button type="button" class="link-button" data-catalog-gap="">Pokaż wszystkie</button>' : '') +
+      ` <span class="gaps-complete" title="Wydania z wydawcą i rokiem (bez „Wydanie nieustalone”)">${gaps.completePct.toLocaleString('pl-PL')}% kompletnych wydań</span>`;
+  } catch {
+    mount.textContent = '';
+  }
+}
+$('#catalogGaps')?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-catalog-gap]');
+  if (!button) return;
+  state.catalogGap = button.dataset.catalogGap === state.catalogGap ? '' : button.dataset.catalogGap;
+  void refreshGaps(true);
+  // The same path as typing in the search field: reloads the works list from the server.
+  $('#catalogSort').dispatchEvent(new Event('change'));
+});
 function renderCatalog() {
   if (!state.history) return;
+  void refreshGaps();
   renderSeriesSummary();
   if (sqliteAnnotations === null && !seriesRequest) void loadSeries().catch(() => {});
   const seriesMode = document.body.dataset.catalogView === 'series';

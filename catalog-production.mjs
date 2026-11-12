@@ -122,6 +122,21 @@ export function createProductionCatalog({
         requestOpenLibrary: titleOlRequest,
       });
     },
+    /** Direct asks to the sources that the normal lookup skips once BN / Open Library know the ISBN. */
+    async lookupGapRecords(isbn) {
+      const answers = [];
+      for (const adapter of [eIsbnAdapter, googleBooksAdapter])
+        if (adapter?.enabled) answers.push(await adapter.lookup(isbn));
+      const records = answers.flatMap((answer) =>
+        (answer.records ?? []).map((record) => ({
+          source: answer.source,
+          publisher: record.publisher,
+          publicationYear: record.publicationYear,
+        })),
+      );
+      const failed = answers.every((answer) => answer.status === 'temporary_error');
+      return { error: !records.length && failed, records };
+    },
     lookupIsbn(isbn) {
       return lookupISBN(isbn, {
         bnAdapter,

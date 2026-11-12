@@ -1,7 +1,7 @@
 // Read-only overview of how complete the collected data is: the offer → ISBN → catalog funnel,
 // data quality per source, completeness of catalog editions and progress per scan phrase.
 
-import { reviewQueueSummary } from './catalog-api.mjs';
+import { reviewQueueSummary, WORK_GAP_SQL } from './catalog-api.mjs';
 
 const pct = (part, total) => (total ? Math.round((part / total) * 1000) / 10 : 0);
 
@@ -146,4 +146,36 @@ export function catalogInsights(repository) {
       }
     : null;
   return { funnel, sources, completeness, series, outage, generatedAt: new Date().toISOString() };
+}
+
+/**
+ * "Braki w katalogu": works with a real edition lacking publisher / year, works with an unsettled
+ * edition, and the share of complete editions (publisher and year; "Wydanie nieustalone" does not
+ * count, it has neither by design). The counts equal the totals of the works list with `gap=`.
+ */
+export function catalogGaps(repository) {
+  const db = repository.database;
+  const live = 'NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id)';
+  const count = (gap) =>
+    Number(
+      db.prepare(`SELECT count(*) AS c FROM works w WHERE ${live} AND ${WORK_GAP_SQL[gap]}`).get()
+        .c,
+    );
+  const editions = db
+    .prepare(
+      `SELECT count(*) AS real,
+         sum(CASE WHEN coalesce(trim(publisher),'')<>'' AND publication_year IS NOT NULL THEN 1 ELSE 0 END) AS complete
+       FROM editions WHERE is_unknown=0`,
+    )
+    .get();
+  const real = Number(editions.real || 0);
+  const complete = Number(editions.complete || 0);
+  return {
+    withoutPublisher: count('publisher'),
+    withoutYear: count('year'),
+    unknown: count('unknown'),
+    editions: real,
+    completeEditions: complete,
+    completePct: pct(complete, real),
+  };
 }
