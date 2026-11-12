@@ -2,6 +2,14 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-12 (57) — Sprawdzanie ofert, które zniknęły ze skanów: sprawiedliwa kolejność
+
+Aplikacja działa krótko, raz dziennie, a kolejka sprawdzania sortowała należne oferty po cenie malejąco — przy limicie 20 na rundę tanie książki nigdy nie doczekiwały się sprawdzenia, więc nie wiedzieliśmy, czy się sprzedały.
+
+- Progi cenowe (12/24/48 h) nadal tylko decydują, czy oferta jest już **należna**. Kolejność: najpierw nigdy niesprawdzone, potem najdawniej sprawdzone; cena rozstrzyga tylko remis.
+- Gdy po rundzie zostają należne oferty z tej kolejki, następna runda rusza po **2 minutach** zamiast 10 (limit 20 na rundę, pauzy po blokadzie źródła i tempo bramki bez zmian). Oferty wciąż widoczne w skanach dalej dostają tylko resztę budżetu.
+- Wartości na kopii bazy: należnych **392** (≥100 zł: 256, 40–100 zł: 132, <40 zł: 4), z czego nigdy niesprawdzonych **251** (119 / 132 / 0). W pierwszej rundzie 20 ofert: przed — 3 nigdy niesprawdzone, po — 20. Pierwsza tania (<40 zł) oferta była przed na pozycji 389 w kolejce, teraz na 256; całą zaległość (392) nadrobi ok. 20 rund (~40 min).
+
 ## 2026-11-12 (56) — Dziś: cztery miary z trendem
 
 Pod kafelkami „Dziś” są cztery liczby liczone w SQL (`catalog-measures.mjs`, `GET /api/today` → `measures`). Wartości na kopii bazy:

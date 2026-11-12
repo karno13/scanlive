@@ -89,6 +89,58 @@ test('offers missing from scans are checked once and their sale is dated', async
   }
 });
 
+test('fair order: a cheap never-checked offer goes before an expensive already-checked one', async () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    for (const [id, price] of [
+      ['cheap-new', 500],
+      ['dear-new', 20000],
+      ['dear-checked', 20000],
+    ])
+      repository.upsertOffer({
+        id,
+        source: 'Vinted',
+        normalizedUrl: `https://www.vinted.pl/items/${id.length}${price}-x`,
+        originalTitle: id,
+        currentPrice: price,
+      });
+    repository.database.prepare("UPDATE offers SET last_seen_at='2026-10-01T00:00:00.000Z'").run();
+    repository.database
+      .prepare("UPDATE offers SET availability_checked_at='2026-10-05T00:00:00.000Z' WHERE id=?")
+      .run('dear-checked');
+    const now = () => new Date('2026-11-07T00:00:00.000Z');
+    assert.deepEqual(
+      pendingLifecycleChecks(repository, { now }).map((row) => row.id),
+      ['dear-new', 'cheap-new', 'dear-checked'],
+      'never checked first (price breaks the tie), then the longest unchecked',
+    );
+  } finally {
+    repository.close();
+  }
+});
+
+test('report.backlog is set only when due offers remain after the round', async () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    for (const id of ['1', '2', '3'])
+      repository.upsertOffer({
+        id,
+        source: 'Vinted',
+        normalizedUrl: `https://www.vinted.pl/items/${id}-x`,
+        originalTitle: id,
+      });
+    repository.database.prepare("UPDATE offers SET last_seen_at='2026-10-01T00:00:00.000Z'").run();
+    const options = {
+      now: () => new Date('2026-11-07T00:00:00.000Z'),
+      fetchHtml: async (url) => livePage(url.split('/items/')[1].split('-')[0]),
+    };
+    assert.equal((await checkOfferLifecycle(repository, { ...options, limit: 2 })).backlog, true);
+    assert.equal((await checkOfferLifecycle(repository, { ...options, limit: 2 })).backlog, false);
+  } finally {
+    repository.close();
+  }
+});
+
 test('a blocked source is left alone for the rest of the round', async () => {
   const repository = new SqliteCatalogRepository(':memory:');
   try {

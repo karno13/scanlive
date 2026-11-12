@@ -121,8 +121,9 @@ export function pendingLifecycleChecks(
 ) {
   const at = now().getTime();
   const marks = sources.map(() => '?').join(',');
-  // Price tiers (CHECK_TIERS): expensive listings are checked sooner after they leave the scans and
-  // again more often; within the due ones the most expensive go first, never-checked before rechecks.
+  // Price tiers (CHECK_TIERS) only decide whether an offer is due yet (expensive listings sooner and
+  // more often). Among the due ones the order is fair: never checked first, then the longest
+  // unchecked; price merely breaks ties. Otherwise a small daily budget would never reach cheap books.
   const tier = () =>
     'CASE ' +
     CHECK_TIERS.slice(0, -1)
@@ -135,7 +136,7 @@ export function pendingLifecycleChecks(
       `SELECT id, source, normalized_url AS url, availability, current_price AS price FROM offers
        WHERE source IN (${marks}) AND availability IN ('unconfirmed','not_seen','available','reserved','hidden')
          AND last_seen_at < ${tier()} AND (availability_checked_at IS NULL OR availability_checked_at < ${tier()})
-       ORDER BY coalesce(current_price,0) DESC, availability_checked_at IS NOT NULL, availability_checked_at, last_seen_at LIMIT ?`,
+       ORDER BY availability_checked_at IS NOT NULL, availability_checked_at, coalesce(current_price,0) DESC, last_seen_at LIMIT ?`,
     )
     .all(
       ...sources,
@@ -240,6 +241,12 @@ export async function checkOfferLifecycle(
   }
   // A listing found gone may have been put up again by its seller.
   if (report.removed) report.relisted = detectRelists(repository, { now }).linked;
+  // Offers of this queue still due (sources that just refused are left out: they stay paused).
+  // The caller may start the next round sooner to catch up; the per-round limit is unchanged.
+  const open = sources.filter((source) => !blocked.has(source));
+  report.backlog = open.length
+    ? pendingLifecycleChecks(repository, { limit: 1, now, sources: open }).length > 0
+    : false;
   return report;
 }
 

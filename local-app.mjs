@@ -910,6 +910,8 @@ function scheduleLifecycleCheck(catalogStore) {
     .then((report) => {
       for (const source of report.blockedSources ?? [])
         lifecyclePausedUntil.set(source, Date.now() + 30 * 60_000);
+      // Catch up on a backlog of due "left the scans" offers: next round in 2 minutes, not 10.
+      if (report.backlog) lifecycleNextAt = Math.min(lifecycleNextAt, Date.now() + 2 * 60_000);
       if (report.checked || report.errors || report.listingConfirmed)
         recordProgress({ type: 'offer_lifecycle', ...report });
     })
