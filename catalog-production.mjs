@@ -177,6 +177,15 @@ export function createProductionCatalog({
     },
     status({ runStartedAt = null } = {}) {
       const counts = repository.counts();
+      // Offers rejected in review stay saved but are out of every list (catalog-api.mjs): the
+      // top bar and the menu show offers without them, with the rejected ones named separately.
+      counts.offers_rejected = Number(
+        repository.database
+          .prepare(
+            "SELECT count(*) AS count FROM identification_jobs WHERE status='completed' AND json_valid(result_json) AND json_extract(result_json,'$.manualDecision') IN ('excluded','not_book')",
+          )
+          .get().count,
+      );
       const cache = Number(
         repository.database.prepare('SELECT count(*) AS count FROM metadata_lookup_cache').get()
           .count,

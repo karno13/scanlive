@@ -1,9 +1,23 @@
+import { assignEmpikReferences } from './empik-references.mjs';
 import { tailscaleAccessFromEnv, validateBookflipRequest } from './tailscale-access.mjs';
 import { tradingRoutes } from './trading-api.mjs';
 import { createRouter } from './router.mjs';
 import { listScanProfiles, putScanProfile, deleteScanProfile } from './scan-profiles-api.mjs';
 import { createSqliteVintedDetailCache } from './vinted-detail-sqlite-cache.mjs';
 import { publicAssetPath } from './static-asset-path.mjs';
+import { sendStaticFile } from './static-files.mjs';
+import { createLiveEvents } from './live-events.mjs';
+import { todaySummary } from './today.mjs';
+import { sourceStatus } from './source-status.mjs';
+import { applyRejectionRules } from './rejection-rules.mjs';
+import {
+  addBatchPlan,
+  applyAddBatch,
+  applyQuickBatch,
+  quickBatchPlan,
+  recentBatches,
+  undoBatch,
+} from './review-batches.mjs';
 import { retryIdentificationJobs } from './identification-retry.mjs';
 import { enrichOffers } from './offer-enrichment.mjs';
 import { DETAIL_SOURCES } from './source-details.mjs';
@@ -52,7 +66,7 @@ import {
   cycleVolumeEditions,
 } from './offer-sets.mjs';
 import { defaultCatalogPath } from './catalog-data-location.mjs';
-import { normalizeISBN } from './isbn-normalization.mjs';
+import { isbnKeys, normalizeISBN } from './isbn-normalization.mjs';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import {
@@ -83,10 +97,13 @@ import {
   listCatalogOfferGroups,
   listCatalogWorks,
   listIdentificationJobs,
+  reviewQueueSummary,
   matchIdentificationJobByIsbn,
   localWorkCandidates,
   sureReviewPlan,
   applySureReviewPlan,
+  approveJobAsBook,
+  updateReviewSkipped,
 } from './catalog-api.mjs';
 import {
   offerEditionDraft,
@@ -110,6 +127,9 @@ import { createSkupksiazekClient } from './buyback-skupksiazek.mjs';
 import {
   createImageBackfill,
   fetchCachedImage,
+  fetchImageVariant,
+  NO_COVER_GIF,
+  offerCoverForIsbn,
   offerImageUrl,
   proxiedImage,
 } from './offer-images.mjs';
@@ -614,14 +634,17 @@ export async function readJson(request) {
     throw Object.assign(Error('INVALID_JSON'), { statusCode: 400 });
   }
 }
+const securityHeaders = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Content-Security-Policy':
+    "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: https://covers.openlibrary.org; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+};
 function send(response, status, body, type = 'application/json; charset=utf-8') {
   response.writeHead(status, {
     'Content-Type': type,
     'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'no-referrer',
-    'Content-Security-Policy':
-      "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: https://covers.openlibrary.org; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+    ...securityHeaders,
   });
   response.end(body);
 }
@@ -938,7 +961,12 @@ function scheduleCatalogResolution(catalogStore) {
     .then(() => catalogStore.processQueued())
     .then((result) => {
       // Foreign editions found by this pass leave review at once while "Tylko polskie wydania" is on.
-      if (catalogStore.repository?.database) rejectForeignEditions(catalogStore.repository);
+      if (catalogStore.repository?.database) {
+        rejectForeignEditions(catalogStore.repository);
+        // "Odrzucaj takie zawsze" rules (rejection-rules.mjs), on the offers this pass left in review.
+        applyRejectionRules(catalogStore.repository);
+        assignEmpikReferences(catalogStore.repository);
+      }
       return result;
     })
     .then((result) => {
@@ -1096,12 +1124,49 @@ export function createLocalAppServer({
   let scanInFlight = false;
   let scanAbortController = null;
   let currentScan = null;
+  // Live updates (/api/events): scan state, review queue and sources, checked while a tab listens.
+  const liveEvents = createLiveEvents({
+    headers: securityHeaders,
+    probes: {
+      scan: () => {
+        const scan = currentScan;
+        if (!scan) return { status: 'idle' };
+        return {
+          status: scan.status,
+          startedAt: scan.startedAt,
+          finishedAt: scan.finishedAt || null,
+          progress: scanProgress(scan.diagnostics),
+        };
+      },
+      queue: () => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return null;
+        const scheduler = identificationControl?.status() ?? { available: false };
+        return {
+          ...reviewQueueSummary(catalog.repository),
+          identification: catalog.status({ runStartedAt: scheduler.runStartedAt }).identification,
+          active: scheduler.active === true,
+          paused: scheduler.paused === true,
+        };
+      },
+      source: () => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return null;
+        return sourceStatus(catalog.repository, Object.keys(localSourceHosts)).map((row) => [
+          row.source,
+          row.state,
+          row.downSince,
+        ]);
+      },
+    },
+  });
   // Every route of the local server, in the order they are tried (router.mjs). Handlers get the
   // request, the response, the parsed URL and the URL-decoded path parameters.
   const localRoutes = createRouter()
     .add('GET', '/api/image', async ({ request, response, url, params }) => {
       try {
-        const image = await fetchCachedImage(url.searchParams.get('u'), {
+        const image = await fetchImageVariant(url.searchParams.get('u'), {
+          size: url.searchParams.get('thumb') === '1' ? 'thumb' : null,
           cacheDirectory: join(runtimeDataDirectory, 'image-cache'),
         });
         response.writeHead(200, {
@@ -1116,12 +1181,58 @@ export function createLocalAppServer({
         return send(response, error.statusCode || 502, JSON.stringify({ error: error.message }));
       }
     })
+    // Cover for an ISBN: a photo of a stored offer of that book, else Open Library. Open Library has
+    // no cover for most Polish editions; then a 1x1 transparent GIF (200, X-BookFlip-Cover: none)
+    // instead of a 404, so the page shows its placeholder without an error in the console.
+    .add('GET', '/api/cover', async ({ request, response, url, params }) => {
+      const keys = isbnKeys(url.searchParams.get('isbn'));
+      const size = ['S', 'M', 'L'].includes(url.searchParams.get('size'))
+        ? url.searchParams.get('size')
+        : 'M';
+      const cacheDirectory = join(runtimeDataDirectory, 'image-cache');
+      const catalog = getProductionCatalog();
+      const candidates = [];
+      if (keys.length) {
+        const offerImage = catalog ? offerCoverForIsbn(catalog.repository.database, keys) : null;
+        if (offerImage) candidates.push(offerImage);
+        candidates.push(
+          `https://covers.openlibrary.org/b/isbn/${keys[0]}-${size}.jpg?default=false`,
+        );
+      }
+      for (const candidate of candidates) {
+        try {
+          // The offer photo may have a small CDN variant; Open Library sizes come from size=S/M/L.
+          const image = await fetchImageVariant(candidate, {
+            size: url.searchParams.get('thumb') === '1' ? 'thumb' : null,
+            cacheDirectory,
+          });
+          response.writeHead(200, {
+            'Content-Type': image.type,
+            'Cache-Control': 'private, max-age=86400',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "default-src 'none'",
+          });
+          return response.end(image.body);
+        } catch {}
+      }
+      // Short cache: an offer of this book may be saved or assigned later.
+      response.writeHead(200, {
+        'Content-Type': 'image/gif',
+        'Cache-Control': 'private, max-age=3600',
+        'X-BookFlip-Cover': 'none',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      return response.end(NO_COVER_GIF);
+    })
     .add('GET', '/api/offers/:id/image', async ({ request, response, url, params }) => {
       const catalog = getProductionCatalog();
       if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
       const imageUrl = await offerImageUrl(catalog.repository, params.id);
       if (!imageUrl) return send(response, 404, JSON.stringify({ error: 'IMAGE_NOT_FOUND' }));
-      response.writeHead(302, { Location: proxiedImage(imageUrl), 'Cache-Control': 'no-store' });
+      response.writeHead(302, {
+        Location: proxiedImage(imageUrl, url.searchParams.get('thumb') === '1' ? 'thumb' : null),
+        'Cache-Control': 'no-store',
+      });
       return response.end();
     })
     .add('*', '/api/buyback/*', async ({ request, response, url, params }) => {
@@ -1186,6 +1297,96 @@ export function createLocalAppServer({
           progress: scanProgress(scan.diagnostics),
           telemetry: scanTelemetry(scan.diagnostics, { running: scan.status === 'running' }),
         }),
+      );
+    })
+    // One event stream per tab: scan, queue and source changes (live-events.mjs).
+    .add('GET', '/api/events', async ({ request, response }) => {
+      liveEvents.handle(request, response);
+      // The stream stays open: tell the router it is handled.
+      return true;
+    })
+    // The "Dziś" start view: changes since the previous visit, queue, sources, last and next scan.
+    .add('GET', '/api/today', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(
+        response,
+        200,
+        JSON.stringify({
+          ...todaySummary(catalog.repository, {
+            since: url.searchParams.get('since'),
+            sources: Object.keys(localSourceHosts),
+          }),
+          scan: currentScan
+            ? {
+                status: currentScan.status,
+                startedAt: currentScan.startedAt,
+                finishedAt: currentScan.finishedAt || null,
+              }
+            : await readScanStatus().then((value) => ({
+                status: value.status,
+                startedAt: value.startedAt || null,
+                finishedAt: value.finishedAt || null,
+              })),
+        }),
+      );
+    })
+    // Batch approval in the queue ("Szybkie", "Do dodania") and undoing a whole batch.
+    .add('POST', '/api/review-batches/:kind/plan', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      const jobIds = Array.isArray(input.jobIds) ? input.jobIds.map(String).slice(0, 500) : null;
+      if (!['quick', 'add'].includes(params.kind))
+        return send(response, 404, JSON.stringify({ error: 'UNKNOWN_BATCH' }));
+      const plan =
+        params.kind === 'quick'
+          ? quickBatchPlan(catalog.repository, { jobIds })
+          : addBatchPlan(catalog.repository, { jobIds });
+      return send(response, 200, JSON.stringify(plan));
+    })
+    .add('POST', '/api/review-batches/:kind/apply', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = await readJson(request);
+      if (params.kind === 'quick')
+        return send(
+          response,
+          200,
+          JSON.stringify(
+            await applyQuickBatch(catalog, Array.isArray(input.items) ? input.items : []),
+          ),
+        );
+      if (params.kind === 'add')
+        return send(
+          response,
+          200,
+          JSON.stringify(
+            applyAddBatch(
+              catalog.repository,
+              Array.isArray(input.jobIds) ? input.jobIds.map(String) : [],
+            ),
+          ),
+        );
+      return send(response, 404, JSON.stringify({ error: 'UNKNOWN_BATCH' }));
+    })
+    .add('GET', '/api/review-batches', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify({ items: recentBatches(catalog.repository) }));
+    })
+    .add('POST', '/api/review-batches/:id/undo', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(response, 200, JSON.stringify(undoBatch(catalog.repository, params.id)));
+    })
+    .add('GET', '/api/source-status', async ({ request, response, url, params }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      return send(
+        response,
+        200,
+        JSON.stringify({ items: sourceStatus(catalog.repository, Object.keys(localSourceHosts)) }),
       );
     })
     .add('GET', '/api/scan/status', async ({ request, response, url, params }) => {
@@ -1399,7 +1600,11 @@ export function createLocalAppServer({
         200,
         JSON.stringify(
           catalog
-            ? { ...catalog.status({ runStartedAt: scheduler.runStartedAt }), scheduler }
+            ? {
+                ...catalog.status({ runStartedAt: scheduler.runStartedAt }),
+                scheduler,
+                reviewQueue: reviewQueueSummary(catalog.repository),
+              }
             : { enabled: false },
         ),
       );
@@ -1665,6 +1870,20 @@ export function createLocalAppServer({
         ),
       );
     })
+    // Offers skipped in review ("Pomiń"): { add: [jobId…] } or { clear: true }.
+    .add('POST', '/api/review/skipped', async ({ request, response }) => {
+      const catalog = getProductionCatalog();
+      if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
+      const input = (await readJson(request)) || {};
+      const add = Array.isArray(input.add) ? input.add.slice(0, 500) : [];
+      return send(
+        response,
+        200,
+        JSON.stringify(
+          updateReviewSkipped(catalog.repository, { add, clear: input.clear === true }),
+        ),
+      );
+    })
     // "Szybkie" tab: the sure decisions to look through, then apply the ones the operator kept.
     .add(
       'POST',
@@ -1724,7 +1943,11 @@ export function createLocalAppServer({
           id = params.id;
         if (!catalog) return send(response, 503, JSON.stringify({ error: 'CATALOG_DISABLED' }));
         const input = await readJson(request);
-        const result = decideIdentificationJob(catalog.repository, id, input);
+        // "This book, edition not settled" from a title proposal: the book is named by an ISBN.
+        const result =
+          input.action === 'approved' && input.bookIsbn && !input.editionId && !input.workId
+            ? await approveJobAsBook(catalog, id, { isbn: input.bookIsbn })
+            : decideIdentificationJob(catalog.repository, id, input);
         if (input.action === 'requeued' && identificationControl) {
           identificationControl.start();
           void identificationControl.tick();
@@ -2024,9 +2247,14 @@ export function createLocalAppServer({
       }
       if (!requested.startsWith(root + sep))
         return send(response, 404, 'Nie znaleziono', 'text/plain; charset=utf-8');
-      const body = await readFile(requested);
-      return send(response, 200, body, contentTypes[extname(file)] || 'application/octet-stream');
+      await sendStaticFile(request, response, requested, {
+        type: contentTypes[extname(file)] || 'application/octet-stream',
+        headers: securityHeaders,
+      });
+      return;
     } catch (error) {
+      // A stream (scan progress, events) already started: end it instead of a second header.
+      if (response.headersSent) return response.end();
       send(
         response,
         error.statusCode || 500,
@@ -2036,6 +2264,12 @@ export function createLocalAppServer({
       );
     }
   });
+  // Event streams never end on their own: end them first, or close() would wait for them.
+  const closeServer = server.close.bind(server);
+  server.close = (callback) => {
+    liveEvents.close();
+    return closeServer(callback);
+  };
   server.on('close', () => {
     if (productionCatalog) {
       productionCatalog.close();

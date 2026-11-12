@@ -44,10 +44,47 @@ export function safeImageUrl(value) {
   return url.href;
 }
 
-/** Local URL the frontend uses to show an image. */
-export function proxiedImage(url) {
+/** Local URL the frontend uses to show an image; size 'thumb' asks for the small variant. */
+export function proxiedImage(url, size = null) {
   const safe = safeImageUrl(url);
-  return safe ? '/api/image?u=' + encodeURIComponent(safe) : null;
+  if (!safe) return null;
+  return '/api/image?u=' + encodeURIComponent(safe) + (size === 'thumb' ? '&thumb=1' : '');
+}
+
+// Smaller variants the CDNs serve themselves, checked on real catalogue URLs (11.11.2026):
+// Allegro original 2.96 MB -> s180 12.9 KB (webp); Tezeusz product_show ~115 KB -> product_thumb
+// ~12 KB. Vinted URLs are signed (another size gives 404), Dedalus redirects other sizes to a
+// placeholder and Empik photos are already ~10 KB, so those keep the original.
+const THUMBNAIL_RULES = [
+  [/^([a-z0-9-]+\.)*allegroimg\.com$/, /^\/original\//, '/s180/'],
+  [/^static\d*\.tezeusz\.pl$/, /^\/(?:product_show|recommended_big)\//, '/product_thumb/'],
+];
+
+/** URL of the small variant of an allowed image, or null when the source has none. */
+export function thumbnailImageUrl(value) {
+  const safe = safeImageUrl(value);
+  if (!safe) return null;
+  const url = new URL(safe);
+  for (const [host, path, replacement] of THUMBNAIL_RULES) {
+    if (!host.test(url.hostname) || !path.test(url.pathname)) continue;
+    url.pathname = url.pathname.replace(path, replacement);
+    return url.href;
+  }
+  return null;
+}
+
+/**
+ * Image for /api/image: the small variant when asked and available, else the original. A variant
+ * that fails (404, wrong type, network) falls back to the original; both go through the same cache.
+ */
+export async function fetchImageVariant(raw, { size = null, cacheDirectory, fetcher } = {}) {
+  const thumb = size === 'thumb' ? thumbnailImageUrl(raw) : null;
+  if (thumb) {
+    try {
+      return await fetchCachedImage(thumb, { cacheDirectory, fetcher });
+    } catch {}
+  }
+  return fetchCachedImage(raw, { cacheDirectory, fetcher });
 }
 
 /** First image found in Open Graph / JSON-LD data of a product detail page. */
@@ -168,6 +205,42 @@ export async function offerImageUrl(repository, offerId, { readHtml, now = Date.
     return null;
   }
 }
+
+/**
+ * Photo of a stored offer for an ISBN cover: an offer assigned to an edition with this ISBN
+ * (bookstore photos first, they are clean covers), else an offer whose listing showed the ISBN.
+ * Open Library has no covers for most Polish editions, so this comes before it (see /api/cover).
+ * @param {{ prepare: Function }} database
+ * @param {string[]} keys ISBN-13 and ISBN-10 forms of one ISBN
+ * @returns {string | null}
+ */
+export function offerCoverForIsbn(database, keys) {
+  if (!keys.length) return null;
+  const marks = keys.map(() => '?').join(',');
+  const order =
+    "ORDER BY CASE o.source WHEN 'Empik' THEN 0 WHEN 'Tezeusz.pl' THEN 1 WHEN 'Dedalus.pl' THEN 2 ELSE 3 END, o.last_seen_at DESC LIMIT 1";
+  const assigned = database
+    .prepare(
+      `SELECT o.image_url FROM edition_identifiers i
+       JOIN offer_matches m ON m.edition_id=i.edition_id AND m.status='active'
+       JOIN offers o ON o.id=m.offer_id
+       WHERE i.scheme IN ('isbn13','isbn10') AND i.normalized_value IN (${marks}) AND o.image_url IS NOT NULL ${order}`,
+    )
+    .get(...keys);
+  if (assigned) return assigned.image_url;
+  const listed = database
+    .prepare(
+      `SELECT o.image_url FROM offers o WHERE o.observed_isbn IN (${marks}) AND o.image_url IS NOT NULL ${order}`,
+    )
+    .get(...keys);
+  return listed ? listed.image_url : null;
+}
+
+/** 1×1 transparent GIF: "no cover" without an HTTP error (the page shows the placeholder). */
+export const NO_COVER_GIF = Buffer.from(
+  'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  'base64',
+);
 
 const abortableWait = (ms, signal) =>
   new Promise((resolve) => {

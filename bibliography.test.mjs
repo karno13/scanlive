@@ -58,9 +58,6 @@ test('offer title noise and ISBN cover URL', () => {
     tidyOfferTitle('Wolni Ciut Ludzie T. 39 OPIS UNIKAT KRK'),
     'Wolni Ciut Ludzie T. 39 OPIS KRK',
   );
-  assert.match(
-    isbnCover('978-83-8391-392-6'),
-    /^\/api\/image\?u=https%3A%2F%2Fcovers\.openlibrary\.org%2Fb%2Fisbn%2F9788383913926-M\.jpg/,
-  );
+  assert.match(isbnCover('978-83-8391-392-6'), /^\/api\/cover\?isbn=9788383913926&size=M$/);
   assert.equal(isbnCover('123'), null);
 });

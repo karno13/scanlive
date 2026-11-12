@@ -13,7 +13,7 @@ export function listOfferSets(repository) {
     o.current_price AS currentPrice, o.currency, o.normalized_url AS url, o.image_url AS imageUrl,
     o.observed_isbn AS observedIsbn, o.availability, o.last_seen_at AS lastSeenAt,
     s.composition_confirmed AS compositionConfirmed, s.created_at AS createdAt,
-    s.composed_from_description_at AS composedFromDescriptionAt
+    s.composed_from_description_at AS composedFromDescriptionAt, s.dismissed_at AS dismissedAt
     FROM offer_sets s JOIN offers o ON o.id=s.offer_id ORDER BY s.updated_at DESC`,
     )
     .all();
@@ -87,6 +87,23 @@ export function updateSetEdition(repository, offerId, editionId, include) {
     db.prepare('UPDATE offer_sets SET composition_confirmed=0 WHERE offer_id=?').run(offerId);
     return { offerId, editionId, included: include };
   });
+}
+
+/**
+ * "Nie interesuje mnie" from the sets list: the set leaves the work lists (kept, with its books);
+ * dismissed=false brings it back. Reversible, no decision about its books is taken.
+ */
+export function dismissOfferSet(
+  repository,
+  offerId,
+  dismissed = true,
+  { now = () => new Date() } = {},
+) {
+  const result = repository.database
+    .prepare('UPDATE offer_sets SET dismissed_at=?, updated_at=? WHERE offer_id=?')
+    .run(dismissed ? now().toISOString() : null, now().toISOString(), String(offerId));
+  if (!result.changes) throw Object.assign(Error('SET_NOT_FOUND'), { statusCode: 404 });
+  return { offerId, dismissed: Boolean(dismissed) };
 }
 
 export function unmarkOfferSet(repository, offerId) {

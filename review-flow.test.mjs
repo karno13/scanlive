@@ -371,14 +371,26 @@ test('queue tabs cover the whole queue and the sure plan only takes unambiguous 
     );
     review(repo, offerId(repo, 'https://www.vinted.pl/items/22-y'), 'possible_bundle');
     const all = listIdentificationJobs(repo, { status: 'review_required' });
-    assert.deepEqual(all.buckets, { quick: 1, add: 1, noisbn: 1, bundle: 1, games: 0, other: 0 });
+    assert.deepEqual(all.buckets, {
+      quick: 0,
+      add: 1,
+      noisbn: 0,
+      bundle: 1,
+      games: 0,
+      other: 0,
+      reference: 2,
+    });
     const tab = listIdentificationJobs(repo, { status: 'review_required', bucket: 'quick' });
     assert.deepEqual(
       tab.items.map((item) => item.id),
-      [quick],
+      [],
     );
     assert.equal(
-      listIdentificationJobs(repo, { status: 'review_required', isbn: 'catalog' }).total,
+      listIdentificationJobs(repo, {
+        status: 'review_required',
+        isbn: 'catalog',
+        bucket: 'reference',
+      }).total,
       1,
     );
     const plan = sureReviewPlan(repo);
@@ -419,7 +431,7 @@ test('game rulebooks and foreign editions get their own review reason, Polish RP
     });
     assert.deepEqual([result.decision, result.reason], ['review_required', ['game_rulebook']]);
     review(repo, offerId(repo, 'https://www.empik.com/codex,p9,ksiazka-p'), 'game_rulebook');
-    assert.equal(listIdentificationJobs(repo, { status: 'review_required' }).buckets.games, 1);
+    assert.equal(listIdentificationJobs(repo, { status: 'review_required' }).buckets.reference, 1);
   } finally {
     catalog.close();
   }

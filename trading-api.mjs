@@ -10,6 +10,14 @@ import { backupCatalog } from './scripts/backup-catalog.mjs';
 
 import { findDuplicateWorkGroups } from './work-grouping.mjs';
 import { findTitleConflicts, resolveTitleConflict } from './title-consistency.mjs';
+import {
+  applyRejectionRules,
+  createRejectionRule,
+  deleteRejectionRule,
+  listRejectionRules,
+} from './rejection-rules.mjs';
+import { dismissOfferSet } from './offer-sets.mjs';
+import { reviewQueueSummary } from './catalog-api.mjs';
 import { getScanSchedule, saveScanSchedule, nextRunAt, nextQuickRunAt } from './scan-schedule.mjs';
 import { getPolishOnly, setPolishOnly } from './language-policy.mjs';
 import { listNames, mergeNames, removeNameAlias } from './name-aliases.mjs';
@@ -528,6 +536,22 @@ export const tradingRoutes = createRouter()
     return { ...s, nextRunAt: nextRunAt(s), nextQuickRunAt: nextQuickRunAt(s) };
   })
   .add('GET', '/api/catalog/work-duplicates', ({ repo }) => listWorkDuplicates(repo))
+  .add('GET', '/api/queue/summary', ({ repo }) => queueSummary(repo))
+  .add('GET', '/api/catalog/works/:id/sets', ({ repo, params }) => ({
+    items: workSets(repo, params.id),
+  }))
+  // Rejection rules ("odrzucaj takie zawsze"): a new rule rejects matching queue offers at once.
+  .add('GET', '/api/rejection-rules', ({ repo }) => ({ items: listRejectionRules(repo) }))
+  .add('POST', '/api/rejection-rules', ({ repo, input }) => {
+    const rule = createRejectionRule(repo, input || {});
+    return { ...rule, ...applyRejectionRules(repo, { ruleIds: [rule.id] }) };
+  })
+  .add('DELETE', '/api/rejection-rules/:id', ({ repo, params }) =>
+    deleteRejectionRule(repo, params.id),
+  )
+  .add('POST', '/api/sets/:offerId/dismiss', ({ repo, input, params }) =>
+    dismissOfferSet(repo, params.offerId, input?.dismissed !== false),
+  )
   .add('POST', '/api/catalog/work-duplicates/merge', ({ repo, input }) =>
     mergeWorkGroup(repo, input?.targetId, input?.sourceIds),
   )
@@ -553,6 +577,44 @@ export const tradingRoutes = createRouter()
       ...(await dataOverview(repo)),
     };
   });
+
+/**
+ * Counts of the "Kolejka" tabs: review decisions, sets waiting for their composition, suspect
+ * title assignments and possible duplicate works.
+ */
+/** Sets that contain an edition of this book (the book page). */
+export function workSets(repo, workId) {
+  return repo.database
+    .prepare(
+      `SELECT s.offer_id AS offerId, o.original_title AS title, o.source, o.current_price AS currentPrice,
+         s.composition_confirmed AS confirmed, s.dismissed_at AS dismissedAt,
+         (SELECT count(*) FROM offer_set_editions x WHERE x.offer_id=s.offer_id) AS books
+       FROM offer_sets s JOIN offers o ON o.id=s.offer_id
+       WHERE EXISTS (SELECT 1 FROM offer_set_editions se JOIN editions e ON e.id=se.edition_id
+                     WHERE se.offer_id=s.offer_id AND e.work_id=?)
+       ORDER BY s.dismissed_at IS NOT NULL, o.current_price DESC`,
+    )
+    .all(String(workId))
+    .map((row) => ({ ...row, confirmed: Boolean(row.confirmed), books: Number(row.books) }));
+}
+
+export function queueSummary(repo) {
+  const sets = repo.database
+    .prepare(
+      `SELECT count(*) AS open,
+         sum(CASE WHEN NOT EXISTS (SELECT 1 FROM offer_set_editions e WHERE e.offer_id=s.offer_id)
+                   AND NOT EXISTS (SELECT 1 FROM offer_set_unknown_items u WHERE u.offer_id=s.offer_id) THEN 1 ELSE 0 END) AS empty
+       FROM offer_sets s WHERE s.composition_confirmed=0 AND s.dismissed_at IS NULL`,
+    )
+    .get();
+  return {
+    review: reviewQueueSummary(repo).decisions,
+    sets: Number(sets.open || 0),
+    setsEmpty: Number(sets.empty || 0),
+    conflicts: findTitleConflicts(repo).length,
+    duplicates: listWorkDuplicates(repo).groups.length,
+  };
+}
 
 export async function tradingRoute({ repo, method, path, input }) {
   const found = tradingRoutes.match(method, path);

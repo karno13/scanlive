@@ -16,8 +16,10 @@ test('review decision handles errors, double submissions, and refresh failure', 
   assert.match(decision, /finally/);
 });
 
-test('manual catalog review metric counts review_required only', () => {
-  assert.ok(shell.includes('statuses.review_required || 0'));
-  // One line under the catalogue title: '455 ofert do decyzji'.
-  assert.match(html, /id="catalogIncomplete">0<\/b> ofert do decyzji/);
+test('manual catalog review metric uses the shared decision queue', () => {
+  assert.ok(
+    shell.includes("$('#catalogIncomplete').textContent = state.catalog.reviewQueue?.decisions"),
+  );
+  // The catalogue names decisions, not offers or reference enrichment jobs.
+  assert.match(html, /id="catalogIncomplete">0<\/b> do decyzji/);
 });

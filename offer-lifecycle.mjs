@@ -4,19 +4,15 @@
 import { readSourceHtml } from './marketplaces.mjs';
 import { CHECK_TIERS, detectRelists, recordOfferStatus } from './offer-status.mjs';
 
-export const LIFECYCLE_SOURCES = new Set([
-  'Vinted',
-  'Allegro Lokalnie',
-  'Tezeusz.pl',
-  'Dedalus.pl',
-  'Empik',
-]);
+// Only sources with a status parser consume the periodic check budget.
+// All marketplace scan adapters remain enabled and unchanged.
+export const LIFECYCLE_SOURCES = new Set(['Vinted']);
 
 /** 'sold' | 'reserved' | 'hidden' | 'available' | null (cannot tell) from a Vinted item page. */
 export function parseVintedStatus(html, itemId) {
   const text = String(html ?? '').replace(/\\"/g, '"');
-  const id = String(itemId ?? '').replace(/D/g, '');
-  if (!id) return null;
+  const id = String(itemId ?? '');
+  if (!/^\d+$/.test(id)) return null;
   // Sidebar plugins: {"data":{...},"exposures":[],"name":"buyer_item_status"} — read the data object
   // that precedes the plugin name, and only when it belongs to this item.
   const plugin = (name) => {
@@ -37,7 +33,7 @@ export function parseVintedStatus(html, itemId) {
     const title = status.match(/"title":"([^"]{1,60})"/)?.[1] ?? '';
     if (/sprzedan|sold/i.test(title)) return 'sold';
     if (/zarezerw|reserved/i.test(title)) return 'reserved';
-    return 'hidden';
+    return /ukryt|hidden/i.test(title) ? 'hidden' : null;
   }
   const seller = plugin('ask_seller');
   if (!seller) return null;
@@ -109,6 +105,7 @@ export async function checkOfferLifecycle(
     unknown: 0,
     errors: 0,
     stopped: null,
+    unresolved: { unrecognizedPage: 0, blocked: 0, redirect: 0, transport: 0 },
   };
   const blocked = new Set();
   for (const offer of pendingLifecycleChecks(repository, { limit, now })) {
@@ -126,6 +123,9 @@ export async function checkOfferLifecycle(
         continue;
       }
       report.errors += 1;
+      if (error?.blocked || [403, 429].includes(error?.status)) report.unresolved.blocked++;
+      else if (/REDIRECT/.test(String(error?.message))) report.unresolved.redirect++;
+      else report.unresolved.transport++;
       // A challenge or rate limit applies to the whole source: leave it alone this round.
       if (error?.blocked || error?.status === 429 || error?.status === 403) {
         blocked.add(offer.source);
@@ -139,7 +139,10 @@ export async function checkOfferLifecycle(
     else if (status === 'reserved') report.reserved += 1;
     else if (status === 'hidden') report.removed += 1;
     else if (status === 'available') report.available += 1;
-    else report.unknown += 1;
+    else {
+      report.unknown += 1;
+      report.unresolved.unrecognizedPage++;
+    }
     save(repository, offer, status === 'hidden' ? 'unavailable' : status, at);
   }
   // A listing found gone may have been put up again by its seller.

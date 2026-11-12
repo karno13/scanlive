@@ -428,6 +428,18 @@ function offerQueryParts(options) {
     conditions.push('o.first_seen_at>?');
     params.push(new Date(String(options.since)).toISOString());
   }
+  // Offers of every edition of one book (the book page). Merged works resolve to their target.
+  if (options.workId) {
+    conditions.push('w.id=?');
+    params.push(String(options.workId));
+  }
+  // Listings whose price changed in a scan after a moment (the "Dziś" view links here).
+  if (options.priceChangedSince && !Number.isNaN(Date.parse(String(options.priceChangedSince)))) {
+    conditions.push(
+      'EXISTS (SELECT 1 FROM scan_offer_results sr WHERE sr.offer_id=o.id AND sr.price_changed=1 AND sr.scanned_at>?)',
+    );
+    params.push(new Date(String(options.priceChangedSince)).toISOString());
+  }
   if (options.watched === '1') conditions.push('ow.watched=1');
   if (options.target === '1')
     conditions.push(
@@ -472,6 +484,16 @@ function offerQueryParts(options) {
   return { from, where, params, conditions };
 }
 
+/** How many offers the Oferty list shows for these filters (same conditions, no rows). */
+export function countCatalogOffers(repository, options = {}) {
+  const { from, where, params } = offerQueryParts(options);
+  return Number(
+    repository.database
+      .prepare(`SELECT count(DISTINCT o.id) AS count ${from} ${where}`)
+      .get(...params).count,
+  );
+}
+
 export function listCatalogOffers(repository, options = {}) {
   const { database } = repository,
     { limit, offset } = page(options),
@@ -493,7 +515,7 @@ export function listCatalogOffers(repository, options = {}) {
   const orderBy = offerSort[String(options.sort || 'newest')] || offerSort.newest;
   const rows = database
     .prepare(
-      `SELECT o.*,ow.purchase_status,ow.watched,ow.target_price,scenario.actual_purchase,m.id AS match_id,m.method,e.id AS edition_id,e.title AS edition_title,w.title AS work_title,j.id AS job_id,j.status AS job_status,
+      `SELECT o.*,ow.purchase_status,ow.watched,ow.target_price,scenario.actual_purchase,m.id AS match_id,m.method,e.id AS edition_id,e.title AS edition_title,w.title AS work_title,w.id AS match_work_id,j.id AS job_id,j.status AS job_status,
       CASE WHEN j.status='completed' AND json_valid(j.result_json) THEN json_extract(j.result_json,'$.manualDecision') END AS manual_decision
     ${from} ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
     )
@@ -522,6 +544,7 @@ export function listCatalogOffers(repository, options = {}) {
             editionId: row.edition_id,
             editionTitle: row.edition_title,
             workTitle: row.work_title,
+            workId: row.match_work_id,
           }
         : null,
       identification: row.job_id ? { jobId: row.job_id, status: row.job_status } : null,
@@ -612,7 +635,7 @@ export function getCatalogOffer(repository, offerId) {
     .all(row.id);
   const matches = database
     .prepare(
-      `SELECT m.*,e.title AS edition_title,w.title AS work_title FROM offer_matches m JOIN editions e ON e.id=m.edition_id JOIN works w ON w.id=e.work_id WHERE m.offer_id=? ORDER BY m.valid_from,m.id`,
+      `SELECT m.*,e.title AS edition_title,w.title AS work_title,w.id AS work_id FROM offer_matches m JOIN editions e ON e.id=m.edition_id JOIN works w ON w.id=e.work_id WHERE m.offer_id=? ORDER BY m.valid_from,m.id`,
     )
     .all(row.id);
   const job =
@@ -648,6 +671,7 @@ export function getCatalogOffer(repository, offerId) {
       editionId: item.edition_id,
       editionTitle: item.edition_title,
       workTitle: item.work_title,
+      workId: item.work_id,
       method: item.method,
       status: item.status,
       reason: json(item.reason, item.reason),
@@ -679,14 +703,77 @@ export function getCatalogOffer(repository, offerId) {
 // Queue tabs of "Do weryfikacji". Disjoint: an offer without ISBN is "quick" (it is in the
 // catalogue or has a sure title proposal) or "noisbn"; an offer with ISBN is "add" (no source
 // knows the ISBN / it has several records), "bundle" or "other".
-export const REVIEW_BUCKETS = ['quick', 'add', 'noisbn', 'bundle', 'games', 'other'];
+export const REVIEW_BUCKETS = ['quick', 'add', 'noisbn', 'bundle', 'games', 'other', 'reference'];
 export const GAME_REASONS = ['game_rulebook', 'foreign_edition'];
 export const ADD_REASONS = ['isbn_not_found_in_metadata_sources', 'multiple_metadata_records'];
 const REASON_SQL =
   "json_extract(CASE WHEN json_valid(j.result_json) THEN j.result_json ELSE '{}' END,'$.reason[0]')";
+// Review reasons that are about the ISBN itself: every offer with that ISBN follows one decision.
+export const FOLLOWS_SAME_ISBN = [
+  'isbn_not_found_in_metadata_sources',
+  'multiple_metadata_records',
+  'metadata_invalid_or_incomplete',
+  'metadata_isbn_mismatch',
+];
+
+// The global manual queue counts decisions, including temporarily skipped offers.
+// Empik jobs belong to reference enrichment, not to the operator's queue.
+export function reviewQueueSummary(repository) {
+  const row = repository.database
+    .prepare(
+      `SELECT count(*) AS offers,
+    count(DISTINCT CASE WHEN coalesce(o.observed_isbn,'')<>'' AND ${REASON_SQL} IN (${FOLLOWS_SAME_ISBN.map((reason) => `'${reason}'`).join(',')})
+      THEN 'isbn:'||replace(replace(upper(o.observed_isbn),'-',''),' ','') ELSE 'job:'||j.id END) AS decisions
+    FROM identification_jobs j JOIN offers o ON o.id=j.offer_id
+    WHERE j.status='review_required' AND o.source<>'Empik'`,
+    )
+    .get();
+  return { decisions: Number(row.decisions), offers: Number(row.offers) };
+}
+
+// Offers the operator skipped ("Pomiń", key S): out of the review list until restored. Kept in the
+// database, not the browser, so the list can be paged on the server (and the phone sees them too).
+const SKIPPED_KEY = 'review_skipped';
+const SKIPPED_LIMIT = 500;
+/** @returns {string[]} */
+export function reviewSkippedIds(repository) {
+  const row = repository.database
+    .prepare('SELECT value_json FROM app_preferences WHERE key=?')
+    .get(SKIPPED_KEY);
+  const ids = row ? json(row.value_json, []) : [];
+  return Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [];
+}
+
+/**
+ * Adds skipped offers (review job ids) or clears the list. Ids no longer waiting for a decision are
+ * dropped, and the list keeps the newest 500.
+ */
+export function updateReviewSkipped(
+  repository,
+  { add = [], clear = false } = {},
+  { now = () => new Date() } = {},
+) {
+  const database = repository.database;
+  const wanted = clear ? [] : [...reviewSkippedIds(repository), ...[].concat(add).map(String)];
+  const pending = new Set(
+    database
+      .prepare(
+        "SELECT id FROM identification_jobs WHERE status='review_required' AND id IN (SELECT value FROM json_each(?))",
+      )
+      .all(JSON.stringify(wanted))
+      .map((row) => row.id),
+  );
+  const ids = [...new Set(wanted.filter((id) => pending.has(id)))].slice(-SKIPPED_LIMIT);
+  database
+    .prepare(
+      'INSERT INTO app_preferences(key,value_json,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at',
+    )
+    .run(SKIPPED_KEY, JSON.stringify(ids), now().toISOString());
+  return { skippedCount: ids.length };
+}
 // One placeholder: the JSON list of "quick" job ids.
 // Parameters: the bundle job ids, then the quick job ids (both JSON arrays from reviewGroups).
-const BUCKET_SQL = `(CASE WHEN ${REASON_SQL} IN ('game_rulebook','foreign_edition') THEN 'games'
+const BUCKET_SQL = `(CASE WHEN o.source='Empik' THEN 'reference' WHEN ${REASON_SQL} IN ('game_rulebook','foreign_edition') THEN 'games'
   WHEN j.id IN (SELECT value FROM json_each(?)) THEN 'bundle'
   WHEN coalesce(o.observed_isbn,'')='' THEN
     (CASE WHEN j.id IN (SELECT value FROM json_each(?)) THEN 'quick' ELSE 'noisbn' END)
@@ -800,6 +887,40 @@ export function sureReviewPlan(repository, { jobIds = null } = {}) {
   return { items, skipped };
 }
 
+/**
+ * "This book, edition not settled" for a title proposal that names the book by an ISBN (often
+ * several editions differ only by year): the book is found in the catalogue by that ISBN, or its
+ * edition is created from BN / Open Library first, and the offer goes to the book's unknown edition
+ * (or the edition the listing itself points at) — one decision in the history, like choosing a
+ * catalogue book without an edition.
+ */
+export async function approveJobAsBook(catalog, jobId, { isbn, reason } = {}) {
+  const repository = catalog.repository;
+  const clean = normalizeISBN(String(isbn ?? ''));
+  if (!clean) throw Object.assign(Error('INVALID_ISBN'), { statusCode: 400 });
+  const job = repository.database
+    .prepare('SELECT status FROM identification_jobs WHERE id=?')
+    .get(String(jobId));
+  if (!job) throw Object.assign(Error('IDENTIFICATION_JOB_NOT_FOUND'), { statusCode: 404 });
+  if (job.status !== 'review_required')
+    throw Object.assign(Error('REVIEW_JOB_NOT_PENDING'), { statusCode: 409 });
+  let edition = repository.findEditionByISBN(clean);
+  if (!edition) {
+    const result = await catalog.resolveIsbn(clean);
+    if (
+      !['created_edition', 'created_work_and_edition', 'matched_existing'].includes(result.decision)
+    )
+      throw Object.assign(Error('ISBN_NOT_RESOLVED'), { statusCode: 409 });
+    edition = repository.findEditionByISBN(clean);
+  }
+  if (!edition) throw Object.assign(Error('EDITION_NOT_FOUND'), { statusCode: 404 });
+  return decideIdentificationJob(repository, jobId, {
+    action: 'approved',
+    workId: edition.work_id,
+    reason: reason ?? 'Ta książka, wydanie nieustalone (z propozycji po tytule).',
+  });
+}
+
 /** Applies the items the operator kept from sureReviewPlan, one offer at a time. */
 export async function applySureReviewPlan(catalog, items = []) {
   const results = [];
@@ -877,6 +998,14 @@ export function listIdentificationJobs(repository, options = {}) {
   let matcherInstance = null;
   const lazyMatcher = () => (matcherInstance ||= createLocalWorkMatcher(repository));
   const groups = status === 'review_required' ? reviewGroups(repository, lazyMatcher) : null;
+  // List view of "Do weryfikacji" (view=list): offers the operator skipped stay out of the list
+  // and of the tab counts; pages count decisions (offers with one ISBN are one row, see below).
+  const listView = options.view === 'list';
+  const skippedIds = listView ? reviewSkippedIds(repository) : [];
+  if (skippedIds.length) {
+    conditions.push('j.id NOT IN (SELECT value FROM json_each(?))');
+    params.push(JSON.stringify(skippedIds));
+  }
   // "Pasuje do katalogu" is decided on the server, so it covers the whole queue, not the loaded page.
   if (isbn === 'catalog') {
     conditions.push('j.id IN (SELECT value FROM json_each(?))');
@@ -885,7 +1014,7 @@ export function listIdentificationJobs(repository, options = {}) {
   // Queue tabs: their counts follow every other filter, the list follows the chosen tab.
   let buckets = null;
   if (groups) {
-    buckets = { quick: 0, add: 0, noisbn: 0, bundle: 0, games: 0, other: 0 };
+    buckets = { quick: 0, add: 0, noisbn: 0, bundle: 0, games: 0, other: 0, reference: 0 };
     for (const row of database
       .prepare(
         `SELECT ${BUCKET_SQL} AS bucket, count(*) AS count FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE ${conditions.join(' AND ')} GROUP BY bucket`,
@@ -901,6 +1030,7 @@ export function listIdentificationJobs(repository, options = {}) {
       );
     }
   }
+  if (groups && !options.bucket) conditions.push("o.source<>'Empik'");
   const where = `WHERE ${conditions.join(' AND ')}`;
   const total = Number(
     database
@@ -909,31 +1039,76 @@ export function listIdentificationJobs(repository, options = {}) {
       )
       .get(...params).count,
   );
-  const orderBy =
+  // Quickest decisions first: a catalogue title match, then sure, possible, weak title proposals.
+  const confidenceRank =
+    "CASE p.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END";
+  const rank = groups
+    ? `CASE WHEN j.id IN (SELECT value FROM json_each(?)) THEN -1 ELSE ${confidenceRank} END`
+    : confidenceRank;
+  const rankParams = groups ? [JSON.stringify(groups.catalog)] : [];
+  const [orderBy, orderParams] =
     // By the offer's price, either way; offers without a price last.
     options.sort === 'price'
-      ? 'o.current_price IS NULL,o.current_price ASC,j.id'
+      ? ['o.current_price IS NULL,o.current_price ASC,j.id', []]
       : options.sort === 'price-desc'
-        ? 'o.current_price IS NULL,o.current_price DESC,j.id'
+        ? ['o.current_price IS NULL,o.current_price DESC,j.id', []]
         : options.sort === 'group'
-          ? "bookflip_fold(COALESCE(json_extract(o.matched_queries_json,'$[0]'),'~')),CASE p.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,bookflip_fold(o.original_title),j.id"
+          ? [
+              `bookflip_fold(COALESCE(json_extract(o.matched_queries_json,'$[0]'),'~')),${rank},bookflip_fold(o.original_title),j.id`,
+              rankParams,
+            ]
           : options.sort === 'proposal'
-            ? "CASE p.confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,p.best_score DESC,j.id"
-            : "CASE j.status WHEN 'review_required' THEN 0 WHEN 'failed' THEN 1 ELSE 2 END,j.updated_at DESC,j.id";
-  const rows = database
-    .prepare(
-      `SELECT j.*,o.source,o.original_title,o.current_price,o.currency,o.normalized_url,o.observed_isbn,o.last_seen_at,o.availability,o.image_url,o.matched_queries_json,o.first_seen_at,
-      p.confidence AS proposal_confidence,p.best_isbn AS proposal_isbn,p.best_score AS proposal_score
-    FROM identification_jobs j JOIN offers o ON o.id=j.offer_id LEFT JOIN title_proposals p ON p.job_id=j.id
-    ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
-    )
-    .all(...params, limit, offset);
+            ? [`${rank},p.best_score DESC,j.id`, rankParams]
+            : options.sort === 'newest'
+              ? ['coalesce(o.first_seen_at,o.last_seen_at) DESC,j.id', []]
+              : [
+                  "CASE j.status WHEN 'review_required' THEN 0 WHEN 'failed' THEN 1 ELSE 2 END,j.updated_at DESC,j.id",
+                  [],
+                ];
+  const columns = `j.*,o.source,o.original_title,o.current_price,o.currency,o.normalized_url,o.observed_isbn,o.last_seen_at,o.availability,o.image_url,o.matched_queries_json,o.first_seen_at,
+      p.confidence AS proposal_confidence,p.best_isbn AS proposal_isbn,p.best_score AS proposal_score`;
+  const from =
+    'FROM identification_jobs j JOIN offers o ON o.id=j.offer_id LEFT JOIN title_proposals p ON p.job_id=j.id';
+  let rows;
+  let decisions = total;
+  let groupSizes = null;
+  if (listView) {
+    // Offers with one ISBN whose decision is about the ISBN (no source knows it, several records)
+    // follow one decision: one row, the first in the chosen order, with sameIsbnCount.
+    const ranked = `WITH base AS (
+      SELECT ${columns},
+        CASE WHEN coalesce(o.observed_isbn,'')<>'' AND ${REASON_SQL} IN (${FOLLOWS_SAME_ISBN.map((reason) => `'${reason}'`).join(',')})
+          THEN 'isbn:'||replace(replace(upper(o.observed_isbn),'-',''),' ','') ELSE 'job:'||j.id END AS decision_key,
+        ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS ord
+      ${from} ${where}
+    ), ranked AS (
+      SELECT base.*, ROW_NUMBER() OVER (PARTITION BY decision_key ORDER BY ord) AS rn,
+        count(*) OVER (PARTITION BY decision_key) AS same_isbn_count
+      FROM base
+    )`;
+    const rankedParams = [...orderParams, ...params];
+    rows = database
+      .prepare(`${ranked} SELECT * FROM ranked WHERE rn=1 ORDER BY ord LIMIT ? OFFSET ?`)
+      .all(...rankedParams, limit, offset);
+    // Decisions per scan phrase (group headers of the list), and in total.
+    const perPhrase = database
+      .prepare(
+        `${ranked} SELECT json_extract(matched_queries_json,'$[0]') AS phrase, count(*) AS count FROM ranked WHERE rn=1 GROUP BY phrase`,
+      )
+      .all(...rankedParams);
+    decisions = perPhrase.reduce((sum, row) => sum + Number(row.count), 0);
+    if (options.sort === 'group')
+      groupSizes = perPhrase.map((row) => [row.phrase ?? '', Number(row.count)]);
+  } else
+    rows = database
+      .prepare(`SELECT ${columns} ${from} ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
+      .all(...orderParams, ...params, limit, offset);
   const matcher = rows.some((row) => !row.observed_isbn) ? lazyMatcher() : null;
   // The whole queue, whatever tab, search or source filter is on: for the menu and page counters.
   const queueTotal = Number(
     database
       .prepare(
-        `SELECT count(*) AS count FROM identification_jobs j WHERE ${
+        `SELECT count(*) AS count FROM identification_jobs j JOIN offers o ON o.id=j.offer_id WHERE o.source<>'Empik' AND ${
           status
             ? 'j.status=?'
             : "j.status IN ('queued','running','retry_wait','review_required','failed')"
@@ -942,14 +1117,32 @@ export function listIdentificationJobs(repository, options = {}) {
       .get(...(status ? [status] : [])).count,
   );
   return {
-    total,
+    // In the list view: decisions (rows); offersTotal counts the offers they cover.
+    total: decisions,
+    ...(listView
+      ? {
+          offersTotal: total,
+          groupSizes,
+          skippedCount: skippedIds.length
+            ? Number(
+                database
+                  .prepare(
+                    "SELECT count(*) AS count FROM identification_jobs WHERE status='review_required' AND id IN (SELECT value FROM json_each(?))",
+                  )
+                  .get(JSON.stringify(skippedIds)).count,
+              )
+            : 0,
+        }
+      : {}),
     queueTotal,
+    queueDecisions: reviewQueueSummary(repository).decisions,
     limit,
     offset,
     ...(buckets ? { buckets } : {}),
     items: rows.map((row) => ({
       id: row.id,
       offerId: row.offer_id,
+      ...(listView ? { sameIsbnCount: Number(row.same_isbn_count) } : {}),
       catalogMatch: (() => {
         if (row.observed_isbn || row.status !== 'review_required' || !matcher) return null;
         const best = matcher(row.original_title, { limit: 1 })[0];

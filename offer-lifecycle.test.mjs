@@ -110,3 +110,44 @@ test('a blocked source is left alone for the rest of the round', async () => {
     repository.close();
   }
 });
+
+test('sources without a status parser do not consume the eight-check budget', async () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    for (const [id, source] of [
+      ['v', 'Vinted'],
+      ['e', 'Empik'],
+      ['t', 'Tezeusz.pl'],
+      ['a', 'Allegro Lokalnie'],
+    ]) {
+      repository.upsertOffer({
+        id,
+        source,
+        normalizedUrl: `https://example.test/items/123-${id}`,
+        originalTitle: id,
+        currentPrice: source === 'Vinted' ? 1000 : 100000,
+      });
+    }
+    repository.database.exec("UPDATE offers SET last_seen_at='2026-01-01',availability='not_seen'");
+    const calls = [];
+    const report = await checkOfferLifecycle(repository, {
+      now: () => new Date('2026-11-11'),
+      fetchHtml: async (url, source) => {
+        calls.push(source);
+        return livePage('123');
+      },
+    });
+    assert.deepEqual(calls, ['Vinted']);
+    assert.equal(report.available, 1);
+    assert.equal(repository.database.prepare('SELECT count(*) n FROM offers').get().n, 4);
+  } finally {
+    repository.close();
+  }
+});
+
+test('an unfamiliar status title and a malformed item id cannot declare removal or sale', () => {
+  const page =
+    '{"data":{"item_id":"123","title":"Sprawdź ponownie"},"exposures":[],"name":"buyer_item_status"}';
+  assert.equal(parseVintedStatus(page, '123'), null);
+  assert.equal(parseVintedStatus(soldPage('123'), '123D'), null);
+});

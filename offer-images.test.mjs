@@ -10,6 +10,8 @@ import {
   fetchCachedImage,
   offerImageUrl,
   createImageBackfill,
+  offerCoverForIsbn,
+  NO_COVER_GIF,
 } from './offer-images.mjs';
 import { parseMarketplace } from './marketplaces.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
@@ -207,5 +209,43 @@ test('backfill waits on HTTP 429 and retries the same offer instead of skipping 
     assert.deepEqual(status.skippedSources, []);
   } finally {
     repository.close?.();
+  }
+});
+
+test('ISBN cover: photo of an assigned offer first, then a listing that showed the ISBN', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'bookflip-isbn-cover-'));
+  const repo = new SqliteCatalogRepository(join(directory, 'catalog.sqlite'));
+  try {
+    const work = repo.createWork({ title: 'Sojusznicy', authors: ['Christie Golden'] });
+    const edition = repo.createEdition({ workId: work.id, title: 'Sojusznicy' });
+    repo.attachIdentifier(edition.id, 'isbn13', '9788324156887', { source: 'test' });
+    const keys = ['9788324156887', '8324156887'];
+    assert.equal(offerCoverForIsbn(repo.database, keys), null);
+    repo.upsertOffer({
+      source: 'Vinted',
+      normalizedUrl: 'https://www.vinted.pl/items/1',
+      originalTitle: 'Sojusznicy Golden',
+      currentPrice: 2000,
+      observedIsbn: '9788324156887',
+      imageUrl: 'https://images1.vinted.net/t/listed.webp',
+    });
+    assert.equal(
+      offerCoverForIsbn(repo.database, keys),
+      'https://images1.vinted.net/t/listed.webp',
+    );
+    const assigned = repo.upsertOffer({
+      source: 'Empik',
+      normalizedUrl: 'https://www.empik.com/sojusznicy',
+      originalTitle: 'Sojusznicy',
+      currentPrice: 3000,
+      imageUrl: 'https://ecsmedia.pl/c/assigned.jpg',
+    });
+    repo.assignOfferToEdition(assigned.id, edition.id, { method: 'manual' });
+    assert.equal(offerCoverForIsbn(repo.database, keys), 'https://ecsmedia.pl/c/assigned.jpg');
+    assert.equal(offerCoverForIsbn(repo.database, []), null);
+    assert.equal(NO_COVER_GIF.subarray(0, 6).toString(), 'GIF89a');
+  } finally {
+    repo.close();
+    await rm(directory, { recursive: true, force: true });
   }
 });

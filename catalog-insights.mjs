@@ -1,6 +1,8 @@
 // Read-only overview of how complete the collected data is: the offer → ISBN → catalog funnel,
 // data quality per source, completeness of catalog editions and progress per scan phrase.
 
+import { reviewQueueSummary } from './catalog-api.mjs';
+
 const pct = (part, total) => (total ? Math.round((part / total) * 1000) / 10 : 0);
 
 export function catalogInsights(repository) {
@@ -35,6 +37,7 @@ export function catalogInsights(repository) {
   const sets = Number(db.prepare('SELECT count(*) AS c FROM offer_sets').get().c);
   const offers = Number(funnelRow.offers || 0);
   const funnel = {
+    reviewQueue: reviewQueueSummary(repository),
     offers,
     withIsbn: Number(funnelRow.withIsbn || 0),
     matched: Number(funnelRow.matched || 0),

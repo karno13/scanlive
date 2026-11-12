@@ -11,8 +11,11 @@ test('review marks the selected offer as a set and updates review list', async (
 test('live queue status is refreshed and rendered without manual click', async () => {
   const app = await readFile(new URL('./app/app.js', import.meta.url), 'utf8');
   assert.match(app, /identificationProgressBar/);
-  assert.match(app, /setInterval\(async \(\) =>/);
-  assert.match(app, /lastCatalogDataRefresh/);
+  // Stage 1 of the 11.2026 review: server events (queue) instead of setInterval polling.
+  assert.doesNotMatch(app, /setInterval\(/);
+  assert.match(app, /connectLive\(\{/);
+  assert.match(app, /function onQueueChange\(\) \{\s*void loadCatalogStatus\(\);/);
+  assert.match(app, /lastQueueListRefresh >= 12000/);
 });
 test('resolver uses single BN ISBN and retains high-confidence conflict gates', async () => {
   const resolver = await readFile(new URL('./catalog-resolver.mjs', import.meta.url), 'utf8');

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import {
+  approveJobAsBook,
   decideIdentificationJob,
   getCatalogWork,
   listCatalogWorks,
@@ -246,6 +247,45 @@ test('book prices add up all editions; per variant and unknown apart; variants c
       () => setEditionVariant(repository, 'e2001', 'pub:nowhere:any'),
       /VARIANT_NOT_FOUND/,
     );
+  } finally {
+    repository.close();
+  }
+});
+
+test('"this book, edition not settled" from a title proposal named by ISBN (key N in review)', async () => {
+  const repository = discworld();
+  try {
+    offer(repository, 'o1', 'Kolor magii Pratchett');
+    const resolved = [];
+    const catalog = {
+      repository,
+      resolveIsbn: async (isbn) => {
+        resolved.push(isbn);
+        return { decision: 'not_found' };
+      },
+    };
+    // The proposal's ISBN is an edition already in the catalogue: its book, unknown edition.
+    const saved = await approveJobAsBook(catalog, 'j_o1', { isbn: ISBN });
+    assert.equal(saved.decision.unknownEdition, true);
+    assert.deepEqual(resolved, [], 'a known ISBN needs no lookup');
+    const edition = repository.database
+      .prepare('SELECT work_id, is_unknown FROM editions WHERE id=?')
+      .get(saved.decision.editionId);
+    assert.equal(edition.work_id, 'w');
+    assert.equal(edition.is_unknown, 1);
+    const row = repository.database
+      .prepare('SELECT action, reason, created_by FROM review_decisions WHERE offer_id=?')
+      .all('o1');
+    assert.equal(row.length, 1, 'one decision in the history');
+    assert.equal(row[0].action, 'approved');
+    // An ISBN no source resolves is not guessed: the offer stays in review.
+    offer(repository, 'o2', 'Kolor magii');
+    await assert.rejects(
+      approveJobAsBook(catalog, 'j_o2', { isbn: '9788375746358' }),
+      /ISBN_NOT_RESOLVED/,
+    );
+    assert.deepEqual(resolved, ['9788375746358']);
+    await assert.rejects(approveJobAsBook(catalog, 'j_o2', { isbn: '123' }), /INVALID_ISBN/);
   } finally {
     repository.close();
   }
