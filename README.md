@@ -27,21 +27,28 @@ Na Windows zamknij stary serwer BookFlip i uruchom **`Uruchom BookFlip przez Tai
 
 **Nie stosuj `tailscale funnel`, przekierowania portu ani `0.0.0.0`.** Serwer dopuszcza wyłącznie dokładny host Tailscale Serve i tożsamość właściciela, nadal nasłuchując wyłącznie na localhost. Szczegóły konfiguracji, wyłączania i rozwiązywania problemów: [BookFlip przez Tailscale na telefonie](docs/TAILSCALE.md).
 
-## Sześć obszarów aplikacji
+## Obszary aplikacji
 
-Po aktualizacji interfejs prowadzi przez wyszukanie, weryfikację i decyzję zakupową.
-Na telefonie Katalog i Ustawienia znajdziesz pod przyciskiem **Więcej**.
-Oferty mają widoki zakupowe, filtry całej bazy i pojedyncze stronicowanie.
-Scenariusze kosztów, faktyczna cena zakupu oraz ilości w zestawach są zapisywane
-w bazie i uwzględniane w kopii zapasowej. Szacunki odsprzedaży pozostają własnymi
-założeniami użytkownika.
+Aplikacja otwiera się na ekranie **Dziś**. Pokazuje on, co zmieniło się od ostatniej wizyty:
+- nowe oferty i zmiany cen;
+- liczbę decyzji w kolejce weryfikacji;
+- stan każdego źródła — czy działa, a jeśli nie, od kiedy i dlaczego;
+- ostatni i następny skan.
+
+Każdy kafel otwiera przefiltrowaną listę. Skany idą według harmonogramu; formularz skanu jest w widoku **Skan**; na telefonie otwiera go przycisk „Nowy skan” na ekranie Dziś.
+
+**Kolejka** zbiera wszystko, co czeka na decyzję, w zakładkach: Weryfikacja ofert, Zestawy do uzupełnienia, Podejrzane przypisania i Możliwe duplikaty dzieł. Skróty są wspólne: ↑/↓ wybór, Enter akcja, X odrzuć, S pomiń. Zakładki „Szybkie” i „Do dodania” otwierają się jako siatka pewnych decyzji (zdjęcie oferty obok okładki), które zatwierdzasz jednym Enterem i cofasz w całości w „Ostatnich decyzjach”. Przy odrzuceniu (klawisz R) możesz zapisać regułę „odrzucaj takie zawsze”; reguły są w Ustawieniach.
+
+Stan na ekranie aktualizuje się na żywo: serwer wysyła zdarzenia (`/api/events`, zmiana skanu, kolejki i źródeł), a po zerwaniu połączenia strona łączy się ponownie i pobiera stan od nowa. Przycisk „Odśwież” nie jest potrzebny.
+
+Funkcje handlowe (scenariusze kosztów, ceny docelowe) są ukryte, dopóki w Ustawieniach nie włączysz trybu handlu.
 
 Kopię można utworzyć bezpośrednio w **Ustawienia → Dane i kopie zapasowe**.
 Weryfikacja ISBN najpierw pokazuje propozycję; przypisanie następuje po
 zatwierdzeniu. Ostatnie ręczne decyzje można ponownie otworzyć do poprawienia
 w zakładce **Do weryfikacji**, z zachowaniem historii.
 
-Migracje **127–128**: frazy ofert jako tabela (`offer_queries`) i indeks kluczy dzieł (`work_keys`). Migracja **126**: uniwersa jako dane (edycja w Katalog → „Wydawcy i serie”). Migracja **125**: historia stanów oferty (przedział sprzedaży) i powiązania ponownie wystawionych ogłoszeń. Migracja **124**: pełny zapis obserwacji oferty (stan egzemplarza, opłata kupującego, sprzedawca, opis i liczba zdjęć, data wystawienia, polubienia, dostępność w sklepie, surowy obiekt ogłoszenia). Migracje **120–123**: opisy ogłoszeń (zestawy uzupełniają się same), warianty nazw wydawców i serii, ISBN potwierdzone na lubimyczytac.pl, warianty cenowe wydań i „Wydanie nieustalone”. Migracja **119** odtwarza ostatni udany odczyt źródeł (stan źródeł w Skanerze). Migracja **118** dodaje listy tomów cykli (widok Serie). Migracja **104** dodaje dane procesu zakupowego. Nie zmieniaj starszych plików
+Migracja **129**: reguły odrzucania („odrzucaj takie zawsze” — według sprzedawcy, frazy w tytule albo progu ceny; każde odrzucenie przez regułę to osobna decyzja w „Ostatnich decyzjach”), partie decyzji wsadowych (cofane w całości) i „Nie interesuje mnie” dla zestawów. Migracje **127–128**: frazy ofert jako tabela (`offer_queries`) i indeks kluczy dzieł (`work_keys`). Migracja **126**: uniwersa jako dane (edycja w Katalog → „Wydawcy i serie”). Migracja **125**: historia stanów oferty (przedział sprzedaży) i powiązania ponownie wystawionych ogłoszeń. Migracja **124**: pełny zapis obserwacji oferty (stan egzemplarza, opłata kupującego, sprzedawca, opis i liczba zdjęć, data wystawienia, polubienia, dostępność w sklepie, surowy obiekt ogłoszenia). Migracje **120–123**: opisy ogłoszeń (zestawy uzupełniają się same), warianty nazw wydawców i serii, ISBN potwierdzone na lubimyczytac.pl, warianty cenowe wydań i „Wydanie nieustalone”. Migracja **119** odtwarza ostatni udany odczyt źródeł (stan źródeł w Skanerze). Migracja **118** dodaje listy tomów cykli (widok Serie). Migracja **104** dodaje dane procesu zakupowego. Nie zmieniaj starszych plików
 migracji. Przed aktualizacją istniejącego schematu działa mechanizm kopii
 zapasowej opisany poniżej. Szczegóły zmian: [CHANGELOG](CHANGELOG.md).
 
@@ -71,7 +78,7 @@ i `BOOKFLIP_BACKUP_DIR` (druga kopia na innym dysku). Szczegóły w [CHANGELOG](
 
 **Tryb handlu** (Ustawienia → Interfejs) pokazuje statusy zakupu, ceny docelowe i koszty; domyślnie wyłączony, dopóki zbierasz dane.
 
-**Skaner:** w panelu zapisanych wyszukiwań można włączyć automatyczny skan profilu co N godzin (domyślnie wyłączony). Skuteczność każdej frazy jest w „Do weryfikacji → Ponawianie i szczegóły wyników”.
+**Skaner:** w panelu zapisanych wyszukiwań można włączyć automatyczny skan profilu co N godzin (domyślnie wyłączony). Skuteczność każdej frazy i każdego profilu (oferty, katalog, sprzedane w 14 dni) jest na ekranie Skanera, w wierszu „Skuteczność fraz i profili skanu”.
 
 Znajdowanie ISBN w źródłach zewnętrznych nie gwarantuje automatycznego przypisania. Sprzeczne lub słabe dowody nadal kierują ofertę do ręcznej weryfikacji.
 
@@ -113,7 +120,7 @@ node scripts/browser-smoke.mjs
 osobno dla każdego procesu testowego i ogranicza czas testu do 30 sekund.
 Uruchamiaj testy przez ten skrypt, aby nie korzystały z plików stanu użytkownika.
 
-CI: `.github/workflows/scanner-tests.yml` (testy Node na Linux i Windows) oraz `.github/workflows/browser-smoke.yml` (Chromium, sześć widoków, izolowana niepusta baza testowa). Test przeglądarkowy nie zastępuje pełnego testu skanowania rzeczywistych portali.
+CI: `.github/workflows/scanner-tests.yml` (testy Node na Linux i Windows) oraz `.github/workflows/browser-smoke.yml` (Chromium, sześć widoków, izolowana niepusta baza testowa; wszystkie widoki w motywie jasnym i ciemnym, na komputerze i telefonie, z kontrolą kontrastu tekstu do tła — co najmniej 3:1). Test przeglądarkowy nie zastępuje pełnego testu skanowania rzeczywistych portali.
 
 ## Architektura i dalsza dokumentacja
 
@@ -172,3 +179,21 @@ Wynik JSON zawiera czas obu operacji w milisekundach, liczbę ofert, zmian cen,
 obserwacji cenowych, rozmiar SQLite i RSS. Porównuj wyniki w podobnych warunkach:
 systemie, wersji Node i obciążeniu komputera. To nie jest pomiar rzeczywistego
 Vinted ani obietnica konkretnej szybkości na sprzęcie użytkownika.
+
+Empik: ceny odniesienia s? w osobnej zak?adce weryfikacji. Pewne dopasowanie tytu?u do katalogu mo?e automatycznie przypisa? dzie?o z wydaniem ?nieustalone?. Decyzj? mo?na cofn?? w ?Ostatnich decyzjach?; automat nie ponawia cofni?tej decyzji.
+
+## Opcjonalny autostart Windows
+
+Serwer można uruchamiać w tle przy logowaniu bieżącego użytkownika. Rejestrację wykonuje właściciel; instalacja aplikacji ani start serwera nie włączają autostartu.
+
+W PowerShell, w katalogu projektu:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows-autostart.ps1 -Action Enable
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows-autostart.ps1 -Action Status
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows-autostart.ps1 -Action Disable
+```
+
+`Enable` zapisuje zadanie „BookFlip Local Server” na następne logowanie, bez jego natychmiastowego uruchomienia. `Disable` usuwa autostart, ale nie zatrzymuje już działającego serwera. Skrypt nie nadpisuje istniejącego zadania. Po przeniesieniu repozytorium wyłącz autostart i włącz go z nowego katalogu. Node.js musi być dostępny w PATH użytkownika.
+
+Logi: `%LOCALAPPDATA%\BookFlip\logs\autostart.log` i `autostart-error.log`. Okno aplikacji otwórz pod `http://127.0.0.1:4317`. Harmonogram działa tylko przy uruchomionym serwerze; autostart nie wybudza uśpionego komputera. Skrypt sprawdza, czy serwer już odpowiada, zanim uruchomi nowy proces.
