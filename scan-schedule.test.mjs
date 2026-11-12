@@ -112,14 +112,14 @@ test('scheduled scans leave out sources that failed less than a day ago and repo
   saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 6 });
   const db = repo.database;
   db.prepare("UPDATE scan_profiles SET sources_json=? WHERE name='Fantasy'").run(
-    JSON.stringify(['Vinted', 'Allegro', 'OLX']),
+    JSON.stringify(['Vinted', 'Dedalus.pl', 'Tezeusz.pl']),
   );
   const clock = Date.parse('2026-11-07T12:00:00Z');
   const insert = db.prepare(
     'INSERT INTO source_health(source,last_checked_at,last_success_at,last_error_at,last_error,status) VALUES(?,?,?,?,?,?)',
   );
   insert.run(
-    'Allegro',
+    'Dedalus.pl',
     '2026-11-07T08:00:00.000Z',
     null,
     '2026-11-07T08:00:00.000Z',
@@ -127,7 +127,7 @@ test('scheduled scans leave out sources that failed less than a day ago and repo
     'failed',
   );
   insert.run(
-    'OLX',
+    'Tezeusz.pl',
     '2026-11-05T08:00:00.000Z',
     null,
     '2026-11-05T08:00:00.000Z',
@@ -141,7 +141,9 @@ test('scheduled scans leave out sources that failed less than a day ago and repo
       calls.push(input);
       db.prepare('INSERT INTO scan_runs(scanned_at,summary_json,created_at) VALUES(?,?,?)').run(
         '2026-11-07T12:00:01.000Z',
-        JSON.stringify({ errors: [{ source: 'OLX', query: 'Warcraft', code: 'SOURCE_HTTP_403' }] }),
+        JSON.stringify({
+          errors: [{ source: 'Tezeusz.pl', query: 'Warcraft', code: 'SOURCE_HTTP_403' }],
+        }),
         '2026-11-07T12:00:01.000Z',
       );
       return 200;
@@ -150,13 +152,13 @@ test('scheduled scans leave out sources that failed less than a day ago and repo
   });
   const outcome = await scheduler.tick();
   // Allegro failed 4 h ago: paused. OLX failed 2 days ago: tried again.
-  assert.deepEqual(calls[0].sources, ['Vinted', 'OLX']);
+  assert.deepEqual(calls[0].sources, ['Vinted', 'Tezeusz.pl']);
   assert.deepEqual(outcome, {
     ran: true,
     result: 'partial',
-    skipped: ['Allegro'],
-    problems: ['OLX'],
+    skipped: ['Dedalus.pl'],
+    problems: ['Tezeusz.pl'],
   });
-  assert.deepEqual(getScanSchedule(repo).lastSkipped, ['Allegro']);
-  assert.deepEqual(getScanSchedule(repo).lastProblems, ['OLX']);
+  assert.deepEqual(getScanSchedule(repo).lastSkipped, ['Dedalus.pl']);
+  assert.deepEqual(getScanSchedule(repo).lastProblems, ['Tezeusz.pl']);
 });

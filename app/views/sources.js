@@ -15,8 +15,9 @@ export function installSources({ $, json, escapeHtml, openOffers }) {
       return;
     }
     const now = new Date();
-    const down = items.filter((row) => row.state === 'down' || row.state === 'never').length;
-    mount.innerHTML = `<div class="panel-heading"><div><h3>Stan źródeł</h3><p>${items.length - down} z ${items.length} działa${down ? ` · ${down} nie działa — nie są zaznaczane w nowym skanie` : ''}.</p></div></div>
+    const counted = items.filter((row) => row.state !== 'no_access');
+    const down = counted.filter((row) => row.state === 'down' || row.state === 'never').length;
+    mount.innerHTML = `<div class="panel-heading"><div><h3>Stan źródeł</h3><p>${counted.length - down} z ${counted.length} działa${down ? ` · ${down} nie działa — nie są zaznaczane w nowym skanie` : ''}.</p></div></div>
       <ul class="today-sources-list">${items
         .map(
           (row) =>

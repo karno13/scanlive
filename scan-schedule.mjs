@@ -4,6 +4,7 @@
 import { request as httpRequest } from 'node:http';
 import { listScanProfiles } from './scan-profiles-api.mjs';
 import { NEWEST_ORDER_SOURCES } from './marketplaces.mjs';
+import { hasNoLegalAccess, scannableSources } from './source-blocks.mjs';
 
 const KEY = 'scan_schedule';
 // Schedule value meaning "every saved profile in turn": one profile per run, alphabetical.
@@ -52,7 +53,9 @@ export function getScanSchedule(repository) {
 export const DEAD_SOURCE_PAUSE_MS = 24 * 3_600_000;
 
 /** The profile's sources minus those that failed their last check less than a day ago. */
-export function sourcesToScan(repository, sources, at = Date.now()) {
+export function sourcesToScan(repository, allSources, at = Date.now()) {
+  // Allegro and OLX have no legal access (source-blocks.mjs): never part of a scheduled scan.
+  const sources = scannableSources(allSources);
   let rows = [];
   try {
     rows = repository.database
@@ -76,7 +79,7 @@ export function sourcesToScan(repository, sources, at = Date.now()) {
   };
 }
 
-/** Sources that reported errors in the scan saved at or after `since`. */
+/** Sources that reported errors in the scan saved at or after `since` (not the ones without legal access). */
 export function scanProblems(repository, since) {
   try {
     const row = repository.database
@@ -85,7 +88,11 @@ export function scanProblems(repository, since) {
       )
       .get(since);
     const errors = row ? JSON.parse(row.summary_json).errors || [] : [];
-    return [...new Set(errors.map((error) => error.source).filter(Boolean))].sort();
+    return [
+      ...new Set(
+        errors.map((error) => error.source).filter((source) => source && !hasNoLegalAccess(source)),
+      ),
+    ].sort();
   } catch {
     return [];
   }

@@ -2,6 +2,16 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-12 (55) — Skaner: Allegro i OLX bez błędów, więcej ofert z potwierdzoną dostępnością
+
+- **Allegro i OLX:** stały stan „brak legalnego dostępu do wyszukiwania ofert” (powody w `docs/SOURCES-ACCESS-2026-11.md`). Są szare, nie czerwone; nie wchodzą do liczników „Źródła 4/5” na „Dziś”, do „źródeł z błędami” ostatniego skanu ani do formularza skanu; skan, harmonogram i szybki skan ich nie pytają (do tej pory każdy skan wysyłał do nich jedno zapytanie, które kończyło się CAPTCHA albo 403).
+- **Dedalus.pl** zwraca CAPTCHA (od 11.11, 10:12; 4 oferty w bazie). CAPTCHA nie jest omijana. Bazowy odstęp zapytań wzrósł z 2 s do 6 s, źródło zostaje w stanie „nie działa” z powodem i samo wraca, gdy serwis przestanie blokować. Opis w dokumencie o dostępie do źródeł.
+- **Potwierdzona dostępność ofert** (stan inny niż „niepotwierdzona” i „nie było w skanie”), pomiar na kopii bazy, 2660 ofert: **10,8% → 24,8%** (288 → 660).
+  - Dlaczego było tak mało: `offer-lifecycle` sprawdzał tylko Vinted i tylko oferty, które zniknęły ze skanów. Oferty wciąż widoczne w wynikach nigdy nie były sprawdzane na własnej stronie, a Empik, Tezeusz i Allegro Lokalnie nie były sprawdzane wcale.
+  - Empik i Dedalus podają dostępność w samej liście wyników (`IN_24_H`, `PRE_SALE`, `InStock`): 319 ofert potwierdzone bez żadnego zapytania (10,8% → 22,8%), z datą ostatniego widzenia.
+  - Strony produktów Tezeusza (JSON-LD), Empiku (`product:availability`) i Allegro Lokalnie (microdata) są teraz czytane przez bramkę (`readSourceHtml`, bez żadnego nowego toru zapytań): 20 ofert co 10 minut, najdroższe najpierw. Próbny przebieg na kopii: 56 stron, 52 aktywne, 3 sprzedane, 1 usunięta (22,8% → 24,8%); Allegro Lokalnie odpowiedziało CAPTCHA po 13 stronach, więc źródło jest odkładane na pół godziny. Pełne pokrycie to około 15 godzin pracy w tle (1818 ofert niepotwierdzonych, 120 stron na godzinę).
+  - Błąd: ta sama oferta mogłaby trafić do jednego przebiegu dwa razy (zniknęła ze skanów i nie była sprawdzana) — zdublowany wpis jest pomijany.
+
 ## 2026-11-12 (54) — Katalog: braki wydań uzupełniane ze źródeł
 
 Pomiar na kopii bazy (550 prawdziwych wydań, bez 93 „Wydań nieustalonych”, które z założenia nie mają wydawcy ani roku):

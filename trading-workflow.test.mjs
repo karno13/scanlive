@@ -116,10 +116,10 @@ test('retry executes only failed source/query pairs, without adding cross combin
   const result = await searchOffers(
     {
       queries: ['Solaris', 'Diuna'],
-      sources: ['Empik', 'OLX'],
+      sources: ['Empik', 'Tezeusz.pl'],
       tasks: [
         { source: 'Empik', query: 'Solaris' },
-        { source: 'OLX', query: 'Diuna' },
+        { source: 'Tezeusz.pl', query: 'Diuna' },
       ],
     },
     {
@@ -131,14 +131,14 @@ test('retry executes only failed source/query pairs, without adding cross combin
   );
   assert.deepEqual(calls.sort(), [
     ['Empik', 'Solaris'],
-    ['OLX', 'Diuna'],
+    ['Tezeusz.pl', 'Diuna'],
   ]);
   assert.equal(result.results.length, 2);
   await assert.rejects(
     searchOffers({
       queries: ['Solaris'],
       sources: ['Empik'],
-      tasks: [{ source: 'OLX', query: 'Solaris' }],
+      tasks: [{ source: 'Tezeusz.pl', query: 'Solaris' }],
     }),
     /INVALID_SCAN_TASKS/,
   );

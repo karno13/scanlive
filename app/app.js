@@ -344,25 +344,29 @@ async function loadSources() {
   const [data, health] = await Promise.all([json('/api/sources'), json('/api/source-health').catch(() => ({ items: [] }))]);
   state.sources = data.sources || [];
   const blocked = data.blocked || {};
+  // Allegro and OLX: no legal access (docs/SOURCES-ACCESS-2026-11.md) — not in the form, not red.
+  const noAccess = data.noAccess || {};
+  const scannable = (source) => !Object.hasOwn(noAccess, source);
   const row = (source) => health.items?.find((item) => item.source === source);
   const healthNote = (source) => sourceHealthNote(row(source), { short: true });
   const blockLabel = (code) => (code === 'SOURCE_CAPTCHA' ? 'blokuje odczyt (CAPTCHA)' : 'blokuje odczyt (HTTP 403)');
   const isDead = (source) => Boolean(blocked[source]) || healthNote(source) === 'nie działa';
-  state.deadSources = new Set(state.sources.filter(isDead));
+  state.deadSources = new Set(state.sources.filter((source) => scannable(source) && isDead(source)));
   // When it last worked: tells "blocked for an hour" apart from "has not worked for a week".
   const lastWorked = (source) => (row(source)?.last_success_at ? 'ostatnio działał ' + daysAgo(row(source).last_success_at) : 'nigdy nie zadziałał');
   const note = (source) =>
     blocked[source] ? blockLabel(blocked[source]) + ' · ' + lastWorked(source) : isDead(source) ? lastWorked(source) : healthNote(source);
   // Sources that refused the last scan start unchecked, also when the previous search had them on.
-  const wanted = savedSearch?.sources || state.sources;
-  state.autoUnchecked = (savedSearch?.sources || []).filter((source) => state.sources.includes(source) && isDead(source));
+  const wanted = (savedSearch?.sources || state.sources).filter(scannable);
+  state.autoUnchecked = (savedSearch?.sources || []).filter((source) => state.sources.includes(source) && scannable(source) && isDead(source));
   const chosen = new Set(wanted.filter((source) => !isDead(source)));
   // Sources are toggle chips; the dot tells working (green), partly failing (amber) and dead (red).
   const tone = (source) => (isDead(source) ? 'dead' : healthNote(source) ? 'partial' : 'ok');
   const option = (source) =>
     `<label class="source-option is-${tone(source)}" title="${escapeHtml(note(source) || 'Działał w ostatnim skanie')}"><input type="checkbox" value="${escapeHtml(source)}" ${chosen.has(source) ? 'checked' : ''}><i class="source-dot-state" aria-hidden="true"></i><span>${escapeHtml(source)}</span>${tone(source) === 'ok' ? '' : '<small class="sr-only">' + escapeHtml(note(source)) + '</small>'}</label>`;
-  const working = state.sources.filter((source) => !isDead(source));
-  const dead = state.sources.filter(isDead);
+  const working = state.sources.filter((source) => scannable(source) && !isDead(source));
+  const dead = state.sources.filter((source) => scannable(source) && isDead(source));
+  const noAccessNames = state.sources.filter((source) => !scannable(source));
   // One sentence for all dead sources instead of a note under each.
   const byNote = new Map();
   for (const source of dead) byNote.set(lastWorked(source), [...(byNote.get(lastWorked(source)) || []), source]);
@@ -376,7 +380,10 @@ async function loadSources() {
   const unavailable = dead.length
     ? `<details class="source-unavailable"${dead.some((source) => chosen.has(source)) ? ' open' : ''}><summary>Niedostępne (${dead.length}): ${escapeHtml(dead.join(', '))}</summary><div class="source-unavailable-body">${dead.map(option).join('')}${deadNote}</div></details>`
     : '';
-  $('#sourceGrid').innerHTML = working.map(option).join('') + unavailable || '<span class="loading-copy">Brak aktywnych adapterów.</span>';
+  const noAccessNote = noAccessNames.length
+    ? `<p class="source-noaccess-note">Bez legalnego dostępu, nie są skanowane: <b>${escapeHtml(noAccessNames.join(', '))}</b>.</p>`
+    : '';
+  $('#sourceGrid').innerHTML = working.map(option).join('') + unavailable + noAccessNote || '<span class="loading-copy">Brak aktywnych adapterów.</span>';
   $('#sourceDeadNote').hidden = true;
   $('#settingsSources').innerHTML = state.sources
     // Same text as Ustawienia's own refresh (it may run first when the page opens on Ustawienia).

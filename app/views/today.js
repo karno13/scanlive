@@ -24,6 +24,7 @@ export function whenLabel(value, now = new Date()) {
 export function sourceLine(row, now = new Date()) {
   if (row.state === 'ok') return row.lastSuccessAt ? 'działa · ostatnio ' + whenLabel(row.lastSuccessAt, now) : 'działa';
   if (row.state === 'unknown') return 'jeszcze nie sprawdzany';
+  if (row.state === 'no_access') return row.reason || 'brak legalnego dostępu';
   const since = row.downSince ? whenLabel(row.downSince, now) : '';
   const head = row.state === 'never' ? 'nigdy nie zadziałał' + (since ? ' (próby od ' + since + ')' : '') : 'nie działa' + (since ? ' od ' + since : '');
   return head + (row.reason ? ' — ' + row.reason : '');
@@ -60,11 +61,13 @@ export function todayTiles(data, now = new Date()) {
     go: { view: 'review' },
     attention: (data.queue?.decisions ?? 0) > 0,
   });
-  const down = (data.sources || []).filter((row) => row.state === 'down' || row.state === 'never');
+  // Sources without legal access (Allegro, OLX) are neither working nor failing: not counted.
+  const counted = (data.sources || []).filter((row) => row.state !== 'no_access');
+  const down = counted.filter((row) => row.state === 'down' || row.state === 'never');
   tiles.push({
     id: 'sources',
     label: 'Źródła',
-    value: `${(data.sources || []).length - down.length}/${(data.sources || []).length}`,
+    value: `${counted.length - down.length}/${counted.length}`,
     note: down.length ? `nie ${down.length === 1 ? 'działa' : 'działają'}: ${down.map((row) => row.source).join(', ')}` : 'wszystkie działają',
     go: { anchor: 'todaySources' },
     warn: down.length > 0,

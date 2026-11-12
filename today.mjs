@@ -5,6 +5,7 @@
 import { countCatalogOffers, reviewQueueSummary } from './catalog-api.mjs';
 import { getScanSchedule, nextQuickRunAt, nextRunAt } from './scan-schedule.mjs';
 import { sourceStatus } from './source-status.mjs';
+import { hasNoLegalAccess } from './source-blocks.mjs';
 
 /**
  * @param {{ database: any }} repository
@@ -57,7 +58,7 @@ export function todaySummary(repository, { since = null, sources }) {
           priceChanges: Number(summary.priceChanges || 0),
           failedSources: [
             ...new Set(errors.map((/** @type {any} */ error) => error?.source).filter(Boolean)),
-          ],
+          ].filter((source) => !hasNoLegalAccess(source)),
           queries: Array.isArray(summary.context?.queries) ? summary.context.queries.length : null,
           filters: { scan: last.scanned_at },
         }

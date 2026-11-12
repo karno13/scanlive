@@ -15,11 +15,11 @@ test('local app validates saved sources and query limits', () => {
 });
 test('local app combines offers, deduplicates URLs and preserves source errors', async () => {
   const result = await searchOffers(
-    { queries: ['Warcraft', 'Warhammer'], sources: ['Empik', 'Allegro'] },
+    { queries: ['Warcraft', 'Warhammer'], sources: ['Empik', 'Dedalus.pl'] },
     {
       now: () => new Date('2026-10-29T20:00:00Z'),
       scanner: async (task) => {
-        if (task.source === 'Allegro')
+        if (task.source === 'Dedalus.pl')
           throw Object.assign(Error('SOURCE_CAPTCHA'), { status: 403, blocked: true });
         return {
           offers: [
@@ -40,7 +40,7 @@ test('local app combines offers, deduplicates URLs and preserves source errors',
   assert.equal(result.summary.unavailable, 2);
   assert.deepEqual(result.offers[0].matchedQueries, ['Warcraft', 'Warhammer']);
   assert.equal(
-    result.results.find((row) => row.source === 'Allegro').diagnostic.code,
+    result.results.find((row) => row.source === 'Dedalus.pl').diagnostic.code,
     'SOURCE_CAPTCHA',
   );
 });
@@ -217,7 +217,7 @@ test('a source that blocks automated requests is not asked again for the other p
   const asked = [];
   const events = [];
   const result = await searchOffers(
-    { queries: ['Mort', 'Kosiarz', 'Eryk'], sources: ['OLX'] },
+    { queries: ['Mort', 'Kosiarz', 'Eryk'], sources: ['Tezeusz.pl'] },
     {
       scanner: async (task) => {
         asked.push(task.searchQuery);

@@ -4,9 +4,80 @@
 import { readSourceHtml } from './marketplaces.mjs';
 import { CHECK_TIERS, detectRelists, recordOfferStatus } from './offer-status.mjs';
 
-// Only sources with a status parser consume the periodic check budget.
+// Only sources with a status parser consume the periodic check budget. Allegro and OLX are not
+// here (no legal access, source-blocks.mjs), nor is Dedalus (CAPTCHA): its listing already carries
+// the shop's own availability code (confirmFromListingCodes).
 // All marketplace scan adapters remain enabled and unchanged.
-export const LIFECYCLE_SOURCES = new Set(['Vinted']);
+export const LIFECYCLE_SOURCES = new Set(['Vinted', 'Tezeusz.pl', 'Empik', 'Allegro Lokalnie']);
+
+const AVAILABLE = /^(?:InStock|LimitedAvailability|OnlineOnly|PreOrder|PreSale|InStoreOnly)$/i;
+const SOLD = /^SoldOut$/i;
+const UNAVAILABLE = /^(?:OutOfStock|Discontinued)$/i;
+const mapSchema = (value) =>
+  AVAILABLE.test(value)
+    ? 'available'
+    : SOLD.test(value)
+      ? 'sold'
+      : UNAVAILABLE.test(value)
+        ? 'unavailable'
+        : null;
+
+/**
+ * 'available' | 'sold' | 'unavailable' | null from the product page of a shop: Empik's
+ * `product:availability` meta, Allegro Lokalnie's schema.org microdata link, or the JSON-LD
+ * `availability` of the product (Tezeusz, Dedalus). null when the page says nothing of the kind.
+ */
+export function parseStoreAvailability(html) {
+  const text = String(html ?? '');
+  const meta = text.match(/property="product:availability"\s+content="(true|false)"/i)?.[1];
+  if (meta) return meta === 'true' ? 'available' : 'unavailable';
+  const micro = text.match(/itemprop="availability"[^>]*?href="[^"]*\/(\w+)"/i)?.[1];
+  if (micro) return mapSchema(micro);
+  const ld = text.match(/"availability"\s*:\s*"[^"]*\/(\w+)"/i)?.[1];
+  return ld ? mapSchema(ld) : null;
+}
+
+const LISTING_AVAILABLE =
+  /^(?:IN_\d+_(?:H|DAYS)|IN_\d+(?:_\d+)?_DAYS|PRE_SALE|InStock|LimitedAvailability)$/;
+
+/**
+ * Offers whose shop listing carried an "available" code (Empik "IN_24_H", Dedalus "InStock") in
+ * the latest sighting: availability 'available' as of that sighting, without a page request.
+ * Offers that later leave the scans are checked like any other.
+ */
+export function confirmFromListingCodes(
+  repository,
+  { now = () => new Date(), maxAgeMs = 3 * 86_400_000 } = {},
+) {
+  const cutoff = new Date(now().getTime() - maxAgeMs).toISOString();
+  const rows = repository.database
+    .prepare(
+      `SELECT id, source, normalized_url AS url, availability, current_price AS price, source_availability AS code, last_seen_at AS seenAt
+       FROM offers WHERE availability='unconfirmed' AND source_availability IS NOT NULL AND last_seen_at>=?`,
+    )
+    .all(cutoff)
+    .filter((row) => LISTING_AVAILABLE.test(row.code));
+  for (const row of rows) save(repository, row, 'available', row.seenAt);
+  return { confirmed: rows.length };
+}
+
+/**
+ * Offers still in the scans, never checked on their own page: the most expensive first. Their
+ * availability is "unconfirmed" until a page says more (it does not follow from being listed).
+ */
+export function pendingConfirmations(
+  repository,
+  { limit = 8, sources = [...LIFECYCLE_SOURCES] } = {},
+) {
+  const marks = sources.map(() => '?').join(',');
+  return repository.database
+    .prepare(
+      `SELECT id, source, normalized_url AS url, availability, current_price AS price FROM offers
+       WHERE source IN (${marks}) AND availability='unconfirmed' AND availability_checked_at IS NULL
+       ORDER BY coalesce(current_price,0) DESC, last_seen_at DESC LIMIT ?`,
+    )
+    .all(...sources, Math.max(1, Math.min(100, limit)));
+}
 
 /** 'sold' | 'reserved' | 'hidden' | 'available' | null (cannot tell) from a Vinted item page. */
 export function parseVintedStatus(html, itemId) {
@@ -94,9 +165,12 @@ export async function checkOfferLifecycle(
     limit = 8,
     now = () => new Date(),
     signal = null,
+    // Sources left alone this round (they refused recently); the caller keeps the pause.
+    skipSources = [],
   } = {},
 ) {
   const report = {
+    blockedSources: [],
     checked: 0,
     sold: 0,
     reserved: 0,
@@ -107,8 +181,23 @@ export async function checkOfferLifecycle(
     stopped: null,
     unresolved: { unrecognizedPage: 0, blocked: 0, redirect: 0, transport: 0 },
   };
+  // The shop's own availability code on the listing (Empik, Dedalus) confirms without a request.
+  report.listingConfirmed = confirmFromListingCodes(repository, { now }).confirmed;
   const blocked = new Set();
-  for (const offer of pendingLifecycleChecks(repository, { limit, now })) {
+  const sources = [...LIFECYCLE_SOURCES].filter((source) => !skipSources.includes(source));
+  const gone = sources.length ? pendingLifecycleChecks(repository, { limit, now, sources }) : [];
+  // Left over budget goes to offers that are still listed but were never checked on their page.
+  const goneIds = new Set(gone.map((offer) => offer.id));
+  const due = [
+    ...gone,
+    // The same offer can be in both lists (left the scans and never checked): once is enough.
+    ...(gone.length < limit && sources.length
+      ? pendingConfirmations(repository, { limit: limit + gone.length, sources })
+          .filter((offer) => !goneIds.has(offer.id))
+          .slice(0, limit - gone.length)
+      : []),
+  ];
+  for (const offer of due) {
     if (signal?.aborted) break;
     if (blocked.has(offer.source)) continue;
     const at = now().toISOString();
@@ -129,15 +218,19 @@ export async function checkOfferLifecycle(
       // A challenge or rate limit applies to the whole source: leave it alone this round.
       if (error?.blocked || error?.status === 429 || error?.status === 403) {
         blocked.add(offer.source);
+        report.blockedSources.push(offer.source);
         report.stopped = String(error.message);
       }
       continue;
     }
     report.checked += 1;
-    const status = offer.source === 'Vinted' ? parseVintedStatus(html, vintedId(offer.url)) : null;
+    const status =
+      offer.source === 'Vinted'
+        ? parseVintedStatus(html, vintedId(offer.url))
+        : parseStoreAvailability(html);
     if (status === 'sold') report.sold += 1;
     else if (status === 'reserved') report.reserved += 1;
-    else if (status === 'hidden') report.removed += 1;
+    else if (status === 'hidden' || status === 'unavailable') report.removed += 1;
     else if (status === 'available') report.available += 1;
     else {
       report.unknown += 1;

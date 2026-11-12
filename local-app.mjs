@@ -25,7 +25,7 @@ import { checkOfferLifecycle } from './offer-lifecycle.mjs';
 import { fillSetsFromDescriptions } from './set-descriptions.mjs';
 import { lookupUnknownIsbns } from './isbn-lookups.mjs';
 import { getPolishOnly, rejectForeignEditions } from './language-policy.mjs';
-import { blockedSources } from './source-blocks.mjs';
+import { blockedSources, NO_LEGAL_ACCESS, scannableSources } from './source-blocks.mjs';
 import { reassignOffer, unassignOffer } from './offer-assignment.mjs';
 import {
   editionForWorkAssignment,
@@ -168,15 +168,19 @@ export function validateSearchInput(input) {
         .filter(Boolean),
     ),
   ];
-  const sources = [...new Set((Array.isArray(input?.sources) ? input.sources : []).map(String))];
+  const requested = [...new Set((Array.isArray(input?.sources) ? input.sources : []).map(String))];
   if (!queries.length || queries.length > 10 || queries.some((query) => query.length > 120))
     throw Object.assign(Error('INVALID_QUERIES'), { statusCode: 400 });
   if (
-    !sources.length ||
-    sources.length > Object.keys(localSourceHosts).length ||
-    sources.some((source) => !localSourceHosts[source])
+    !requested.length ||
+    requested.length > Object.keys(localSourceHosts).length ||
+    requested.some((source) => !localSourceHosts[source])
   )
     throw Object.assign(Error('INVALID_SOURCES'), { statusCode: 400 });
+  // Allegro and OLX are never scanned (no legal access, source-blocks.mjs); a scan that names only
+  // them is refused like an unknown source.
+  const sources = scannableSources(requested);
+  if (!sources.length) throw Object.assign(Error('INVALID_SOURCES'), { statusCode: 400 });
   if (input?.tasks !== undefined) {
     if (
       !Array.isArray(input.tasks) ||
@@ -824,6 +828,8 @@ function scheduleProposalRefresh(catalogStore) {
 // ten minutes, through the shared per-source pacing gate.
 let runningLifecycle = null;
 let lifecycleNextAt = 0;
+// A source that answered a challenge or HTTP 429/403 to a page check is left alone for half an hour.
+const lifecyclePausedUntil = new Map();
 // ISBNs that BN, Open Library and e-ISBN do not know: searched by title on lubimyczytac.pl (two
 // per two minutes, paced); a page with the same ISBN fills the "create edition" draft.
 let runningIsbnLookups = null;
@@ -895,9 +901,17 @@ function scheduleLifecycleCheck(catalogStore) {
     return;
   if (!catalogStore.repository?.database) return;
   lifecycleNextAt = Date.now() + 10 * 60_000;
-  runningLifecycle = checkOfferLifecycle(catalogStore.repository, { limit: 8 })
+  runningLifecycle = checkOfferLifecycle(catalogStore.repository, {
+    limit: 20,
+    skipSources: [...lifecyclePausedUntil]
+      .filter(([, until]) => until > Date.now())
+      .map(([source]) => source),
+  })
     .then((report) => {
-      if (report.checked || report.errors) recordProgress({ type: 'offer_lifecycle', ...report });
+      for (const source of report.blockedSources ?? [])
+        lifecyclePausedUntil.set(source, Date.now() + 30 * 60_000);
+      if (report.checked || report.errors || report.listingConfirmed)
+        recordProgress({ type: 'offer_lifecycle', ...report });
     })
     .catch((error) =>
       recordProgress({
@@ -1554,6 +1568,7 @@ export function createLocalAppServer({
         200,
         JSON.stringify({
           sources: Object.keys(localSourceHosts),
+          noAccess: NO_LEGAL_ACCESS,
           blocked: (() => {
             try {
               const catalog = getProductionCatalog();

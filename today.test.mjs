@@ -62,22 +62,23 @@ function seed() {
   return repository;
 }
 
-test('each source: works, never worked, or down since the first failed scan after its last success', () => {
+test('each source: works, down since the first failed scan after its last success; Allegro and OLX have no legal access', () => {
   const repository = seed();
   try {
     const rows = sourceStatus(repository, ['Vinted', 'Allegro', 'OLX', 'Dedalus.pl', 'Empik']);
     const by = Object.fromEntries(rows.map((row) => [row.source, row]));
     assert.deepEqual(
       rows.map((row) => row.state),
-      ['never', 'down', 'never', 'unknown', 'ok'],
-      'non-working first',
+      ['down', 'unknown', 'ok', 'no_access', 'no_access'],
+      'non-working first, sources without legal access last',
     );
     assert.equal(by['Dedalus.pl'].state, 'down');
     assert.equal(by['Dedalus.pl'].downSince, '2026-11-11T09:00:00.000Z');
     assert.equal(by['Dedalus.pl'].reason, 'serwis żąda CAPTCHA (blokada automatów)');
-    assert.equal(by.Allegro.state, 'never');
-    assert.equal(by.Allegro.downSince, '2026-11-01T10:00:00.000Z');
-    assert.equal(by.OLX.reason, 'serwis odmawia dostępu (HTTP 403)');
+    // Not an error: a stated fact (docs/SOURCES-ACCESS-2026-11.md), never red and never retried.
+    assert.equal(by.Allegro.state, 'no_access');
+    assert.equal(by.Allegro.downSince, null);
+    assert.match(by.OLX.reason, /brak legalnego dostępu/);
     assert.equal(by.Vinted.state, 'ok');
     assert.equal(by.Vinted.downSince, null);
     assert.equal(by.Empik.state, 'unknown');
@@ -131,7 +132,7 @@ test('Dziś counts what changed since the visit, with the filters of the list it
     assert.equal(listCatalogOffers(repository, visit.newOffers.filters).total, 1);
     assert.equal(listCatalogOffers(repository, visit.priceChanges.filters).items[0].id, old.id);
     assert.equal(visit.lastScan.at, '2026-11-11T19:00:00.000Z');
-    assert.deepEqual(visit.lastScan.failedSources, ['Allegro', 'Dedalus.pl']);
+    assert.deepEqual(visit.lastScan.failedSources, ['Dedalus.pl']);
     assert.equal(visit.nextScan.enabled, false);
 
     // No previous visit in this browser: "new" means new in the last scan.

@@ -40,3 +40,19 @@ Ten dokument jest tylko rozpoznaniem i nie zmienia kodu. BookFlip nie obchodzi C
    - rejestracja aplikacji na developer.allegro.pl;
    - przeczytanie regulaminu z 10.09.2025;
    - zapytania przez `metadata-sources/*` z osobnym limitem, tak jak dla BN i Open Library.
+
+## Decyzja z 12.11.2026: Allegro i OLX — „brak legalnego dostępu”
+
+Punkt 2 powyżej jest wdrożony (`NO_LEGAL_ACCESS` w `source-blocks.mjs`):
+
+- Allegro i OLX mają stały stan „brak legalnego dostępu do wyszukiwania ofert” (szary, nie czerwony). Nie są zliczane jako niedziałające w „Dziś” i w „Źródłach”, nie trafiają do „Ostatniego skanu — źródła z błędami”.
+- Nie są skanowane: formularz skanu ich nie pokazuje, `validateSearchInput` odrzuca skan wyłącznie z nimi (a z innymi źródłami je pomija), harmonogram i szybki skan pomijają je w profilach. BookFlip nie wysyła do nich już nawet jednego zapytania na skan.
+- Zmiana decyzji: usunąć wpis z `NO_LEGAL_ACCESS` (np. gdy pojawi się oficjalne API z wyszukiwarką ofert).
+
+## Dedalus.pl — CAPTCHA (rozpoznanie, 12.11.2026)
+
+Na kopii danych Dedalus działał 11.11 o 08:24, a o 10:12 zaczął przekierowywać każde zapytanie na `/captcha.php`. To jest kontrola botów, nie strona do odczytu.
+
+- **Czego nie robimy:** nie omijamy CAPTCHA (żadnych zmian nagłówków podszywających się pod przeglądarkę, rotacji adresów ani rozwiązywania zadań). Zmiana nagłówków pod kątem „wyglądania jak człowiek” byłaby właśnie obejściem.
+- **Co zrobiliśmy legalnie:** bazowy odstęp między zapytaniami do Dedalusa wynosi 6 s zamiast 2 s (`SOURCE_INTERVAL_MS`); po blokadzie bramka dalej podwaja odstęp (do 30 s), a skan odpuszcza resztę fraz tego źródła. Dedalus nie bierze udziału w sprawdzaniu dostępności stron ofert (`LIFECYCLE_SOURCES`); jego dostępność wynika z kodu `InStock` na liście wyników.
+- **Co zostaje:** źródło pozostaje w stanie „nie działa (CAPTCHA)” z datą, a skan próbuje je raz na skan i sam wraca, jeśli serwis przestanie blokować. Ma tylko 4 oferty w bazie; nie warto ryzykować więcej. Jeśli Dedalus udostępnia kanał dla partnerów (np. feed produktów), to kontakt z nim jest decyzją właściciela.

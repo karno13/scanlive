@@ -4454,3 +4454,10 @@ body.density-compact #view-catalog#view-catalog #catalogList:not(.is-grid):not(.
   #view-catalog .catalog-gaps { flex: 1 1 100%; margin-right: -130px; gap: 0 10px; }
   #view-catalog .catalog-gaps b { align-self: center; }
 }
+
+/* Allegro, OLX: no legal access — a calm fact, not an error. */
+.today-sources-list li.is-no_access { opacity: 0.75; }
+.today-sources-list li.is-no_access .source-dot-state { background: var(--muted); }
+.source-noaccess-note { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.today-sources li.is-no_access .source-dot-state { background: var(--muted); }
+.today-sources li.is-no_access { opacity: 0.8; }

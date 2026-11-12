@@ -7,7 +7,8 @@
 //   30 s; each successful answer shortens it by a tenth, back to the base. A new source needs no
 //   special case: it slows itself down when it starts refusing.
 // No CAPTCHA bypass or extra retries.
-export const SOURCE_INTERVAL_MS = { 'Allegro Lokalnie': 8000 };
+// Dedalus answered a CAPTCHA after a normal scan (11.2026): a slower base pace, not a way around it.
+export const SOURCE_INTERVAL_MS = { 'Allegro Lokalnie': 8000, 'Dedalus.pl': 6000 };
 export const MAX_INTERVAL_MS = 30_000;
 
 export function createMarketplaceGate({

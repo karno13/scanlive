@@ -1,9 +1,9 @@
 // @ts-check
 // Per source: does it work, since when it does not, and why — from source_health (last check of
 // each source) and the scan_runs summaries (which scan first failed after the last success).
-import { blockedSources } from './source-blocks.mjs';
+import { blockedSources, hasNoLegalAccess, NO_LEGAL_ACCESS } from './source-blocks.mjs';
 
-const RANK = { down: 0, never: 0, unknown: 1, ok: 2 };
+const RANK = { down: 0, never: 0, unknown: 1, ok: 2, no_access: 3 };
 
 const REASONS = {
   SOURCE_CAPTCHA: 'serwis żąda CAPTCHA (blokada automatów)',
@@ -24,7 +24,7 @@ export function sourceReason(code) {
 }
 
 /**
- * @typedef {{ source: string, state: 'ok' | 'down' | 'never' | 'unknown', lastSuccessAt: string | null,
+ * @typedef {{ source: string, state: 'ok' | 'down' | 'never' | 'unknown' | 'no_access', lastSuccessAt: string | null,
  *   lastCheckedAt: string | null, downSince: string | null, reasonCode: string | null, reason: string | null }} SourceState
  */
 
@@ -68,6 +68,16 @@ export function sourceStatus(repository, sources) {
   return (
     all
       .map((source) => {
+        if (hasNoLegalAccess(source))
+          return {
+            source,
+            state: /** @type {const} */ ('no_access'),
+            lastSuccessAt: null,
+            lastCheckedAt: null,
+            downSince: null,
+            reasonCode: 'NO_LEGAL_ACCESS',
+            reason: NO_LEGAL_ACCESS[source],
+          };
         const row = health.get(source);
         if (!row && !blocked[source])
           return {

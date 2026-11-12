@@ -28,3 +28,21 @@ export function blockedSources(repository, { recentRuns = 3 } = {}) {
     if (perRun.every((codes) => codes.has(source))) blocked[source] = code;
   return blocked;
 }
+
+/**
+ * Sources BookFlip does not read because there is no legal way in (docs/SOURCES-ACCESS-2026-11.md):
+ * Allegro answers automated search with a CAPTCHA and has no public offer search in its API; OLX
+ * answers 403 and its partner API is for one's own adverts only. They are not scanned, not counted
+ * as failures and not shown in red — a stated fact, not an error.
+ */
+export const NO_LEGAL_ACCESS = Object.freeze({
+  Allegro: 'brak legalnego dostępu do wyszukiwania ofert (REST API nie ma wyszukiwarki ofert)',
+  OLX: 'brak legalnego dostępu do wyszukiwania ofert (API partnera służy tylko do własnych ogłoszeń)',
+});
+
+/** @param {unknown} source */
+export const hasNoLegalAccess = (source) =>
+  Object.prototype.hasOwnProperty.call(NO_LEGAL_ACCESS, String(source));
+
+/** The sources without the ones that have no legal access. @param {string[]} sources */
+export const scannableSources = (sources) => sources.filter((source) => !hasNoLegalAccess(source));

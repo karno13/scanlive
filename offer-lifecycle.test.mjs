@@ -58,12 +58,15 @@ test('offers missing from scans are checked once and their sale is dated', async
       now,
       fetchHtml: async (url) => {
         if (url.includes('222')) throw Object.assign(Error('SOURCE_HTTP_404'), { status: 404 });
-        return url.includes('111') ? soldPage('111') : livePage('333');
+        return url.includes('111')
+          ? soldPage('111')
+          : livePage(url.split('/items/')[1].split('-')[0]);
       },
     });
     assert.equal(report.sold, 1);
     assert.equal(report.removed, 1);
-    assert.equal(report.available, 1);
+    // "fresh" is still listed but never checked on its page: it uses the left-over budget.
+    assert.equal(report.available, 2);
     const row = (id) =>
       repository.database
         .prepare(
@@ -75,6 +78,7 @@ test('offers missing from scans are checked once and their sale is dated', async
     assert.equal(row('sold').current_price, 3000, 'last price kept');
     assert.equal(row('gone').availability, 'unavailable');
     assert.equal(row('live').availability, 'available');
+    assert.equal(row('fresh').availability, 'available');
     assert.equal(
       pendingLifecycleChecks(repository, { now }).length,
       0,
@@ -111,7 +115,7 @@ test('a blocked source is left alone for the rest of the round', async () => {
   }
 });
 
-test('sources without a status parser do not consume the eight-check budget', async () => {
+test('only sources with a page parser are checked: not Allegro, OLX or Dedalus', async () => {
   const repository = new SqliteCatalogRepository(':memory:');
   try {
     for (const [id, source] of [
@@ -119,6 +123,9 @@ test('sources without a status parser do not consume the eight-check budget', as
       ['e', 'Empik'],
       ['t', 'Tezeusz.pl'],
       ['a', 'Allegro Lokalnie'],
+      ['x', 'Allegro'],
+      ['o', 'OLX'],
+      ['d', 'Dedalus.pl'],
     ]) {
       repository.upsertOffer({
         id,
@@ -137,9 +144,9 @@ test('sources without a status parser do not consume the eight-check budget', as
         return livePage('123');
       },
     });
-    assert.deepEqual(calls, ['Vinted']);
+    assert.deepEqual(calls.sort(), ['Allegro Lokalnie', 'Empik', 'Tezeusz.pl', 'Vinted']);
     assert.equal(report.available, 1);
-    assert.equal(repository.database.prepare('SELECT count(*) n FROM offers').get().n, 4);
+    assert.equal(repository.database.prepare('SELECT count(*) n FROM offers').get().n, 7);
   } finally {
     repository.close();
   }
