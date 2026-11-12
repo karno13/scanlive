@@ -1,5 +1,5 @@
 {
-  "//": "Type checking without a build step: JSDoc types, only files that start with // @ts-check (the offer path and the repository). npm run typecheck.",
+  "//": "Type checking without a build step: JSDoc types, only files that start with // @ts-check (the offer path, the repository, Today and its measures, rejection rules). npm run typecheck. typecheck-coverage.test.mjs fails when a // @ts-check file is missing from 'files'.",
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
@@ -20,6 +20,8 @@
     "offer-identity.mjs",
     "live-events.mjs",
     "source-status.mjs",
-    "today.mjs"
+    "today.mjs",
+    "catalog-measures.mjs",
+    "rejection-rules.mjs"
   ]
 }

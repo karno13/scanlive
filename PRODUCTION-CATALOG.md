@@ -23,6 +23,8 @@ Przed uruchomieniem niezaaplikowanych migracji istniejącej bazy wykonywany jest
 
 ## Konfiguracja
 
+Jedyna pełna lista zmiennych środowiskowych (README tylko tu odsyła). Wartość `0` wyłącza daną funkcję; brak zmiennej oznacza ustawienie domyślne.
+
 | Zmienna | Działanie |
 | --- | --- |
 | `BOOKFLIP_CATALOG_DB` | Jawna ścieżka bazy |
@@ -38,11 +40,13 @@ Przed uruchomieniem niezaaplikowanych migracji istniejącej bazy wykonywany jest
 | `BOOKFLIP_SCHEDULED_SCANS=0` | Wyłączenie harmonogramu automatycznych skanów |
 | `BOOKFLIP_OFFER_LIFECYCLE=0` | Bez sprawdzania, czy znikające oferty są sprzedane/usunięte |
 | `BOOKFLIP_E_ISBN=0` | Wyłączenie źródła e-ISBN |
+| `BOOKFLIP_EDITION_GAPS=0` | Bez uzupełniania wydawcy i roku wydań ze źródeł metadanych (`edition-gaps.mjs`, co 10 minut po 6 wydań) |
 | `BOOKFLIP_GOOGLE_BOOKS_KEY` | Klucz Google Books (bez klucza źródło jest pomijane) |
 | `BOOKFLIP_AUTO_BACKUP=0`, `BOOKFLIP_BACKUP_DIR` | Wyłączenie codziennej kopii; drugi katalog kopii |
 | `BOOKFLIP_CATALOG_SEEDS=0` | Bez zasilania katalogu z BN w tle |
 | `BOOKFLIP_STARTER_PROFILES=0` | Bez profili startowych skanera |
 | `BOOKFLIP_BUYBACK_AUTO=0` | Bez automatycznego pobierania cen skupu |
+| `BOOKFLIP_STORAGE` | Tryb magazynu; jedyna dopuszczalna wartość to `sqlite` (domyślna) — inna przerywa start serwera błędem `SQLITE_ONLY_STORAGE_MODE` |
 | `BOOKFLIP_TAILSCALE_HOST`, `BOOKFLIP_TAILSCALE_USER` | Ustawiane przez skrypt Tailscale (`docs/TAILSCALE.md`) |
 
 ## Zasady integralności
@@ -59,7 +63,7 @@ Przed uruchomieniem niezaaplikowanych migracji istniejącej bazy wykonywany jest
 
 ## Diagnostyka i testy
 
-Log serwera: `%LOCALAPPDATA%\BookFlip\data\local-app.log`. Uruchom `npm test`, `npm run lint` i `npm run check:syntax`. CI sprawdza backend na Windows/Linux oraz podstawowy start interfejsu w Chromium. Te testy nie gwarantują, że zewnętrzny portal aktualnie pozwala na skanowanie.
+Log serwera: `%LOCALAPPDATA%\BookFlip\data\local-app.log`. Przed zakończeniem pracy uruchom `npm run verify` (lint, składnia, typy, formatowanie, testy); start interfejsu w Chromium sprawdza `node scripts/browser-smoke.mjs`. Te testy nie gwarantują, że zewnętrzny portal aktualnie pozwala na skanowanie.
 
 ## Weryfikacja i katalog (od 2026-11-07)
 
@@ -69,5 +73,3 @@ Log serwera: `%LOCALAPPDATA%\BookFlip\data\local-app.log`. Uruchom `npm test`, `
 - Propozycje po tytule (tabela `title_proposals`) nigdy nie przypisują oferty same; służą do wypełnienia pola ISBN i uruchomienia zwykłego podglądu.
 - Nowe wydanie o tym samym tytule i pierwszym autorze co istniejące dzieło trafia do tego dzieła (powód `same_title_and_author_work`). Niejednoznaczny klucz (kilka takich dzieł) nie jest łączony automatycznie.
 - Ceny ≥ 10 000 zł są traktowane jako nieznane (`MAX_PLAUSIBLE_PRICE_GROSZE`).
-
-`BOOKFLIP_EDITION_GAPS=0` wyłącza uzupełnianie wydawcy i roku wydań ze źródeł metadanych (`edition-gaps.mjs`, co 10 minut po 6 wydań).

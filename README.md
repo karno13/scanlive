@@ -1,14 +1,12 @@
-# BookFlip — lokalne narzędzie do handlu książkami
+# BookFlip — skaner ofert i katalog książek
 
-BookFlip to lokalna aplikacja na Windows wspierająca handel używanymi książkami: skanowanie ofert, identyfikację towaru, porównywanie cen i decyzje zakupowe, z interfejsem w przeglądarce i bazą SQLite. Główny serwer to `local-app.mjs`. **GitHub Pages jest tylko demonstracją**, nie uruchamia skanów ani nie przechowuje Twojego katalogu.
+BookFlip to lokalna aplikacja na Windows, która skanuje oferty używanych książek, rozpoznaje książki i wydania (ISBN, tytuł, seria, tom) i prowadzi katalog w bazie SQLite, z interfejsem w przeglądarce. Główny serwer to `local-app.mjs`. **GitHub Pages jest tylko demonstracją**, nie uruchamia skanów ani nie przechowuje Twojego katalogu.
 
-## Cel produktu i granice rozwoju
+## Cel produktu i bieżący priorytet
 
-**BookFlip służy do handlu książkami, nie do prowadzenia prywatnej kolekcji.** Jego celem jest wyszukiwanie okazji, prawidłowe rozpoznawanie książek i wydań, ocena pełnych kosztów zakupu, potencjalnej ceny odsprzedaży, zysku i ryzyka oraz obsługa ofert i transakcji.
+**Teraz rozwijamy skaner, katalog i weryfikację:** pokrycie i niezawodność źródeł, strukturę dzieł, wydań i serii oraz szybkość i trafność rozpoznawania książek. Funkcje stricte handlowe (ocena okazji, zysk, rejestr transakcji, alerty zakupowe) są odłożone i domyślnie ukryte.
 
-Katalog, ISBN, serie, tomy i zestawy pomagają **identyfikować i wyceniać towar**, a nie kompletować własną biblioteczkę. **Nie planujemy funkcji dla kolekcjonerów** takich jak prywatne półki, brakujące tomy do własnego zbioru, statystyki czytania czy ranking kompletności kolekcji. Propozycje nowych funkcji oceniamy przez ich wartość w procesie zakupu i odsprzedaży.
-
-Zasady podejmowania decyzji produktowych i lista celów poza zakresem: [Kierunek produktu — handel, nie kolekcjonerstwo](docs/PRODUCT-DIRECTION.md).
+Cel docelowy się nie zmienia: BookFlip ma wspierać handel używanymi książkami, a nie prowadzenie prywatnej kolekcji. Katalog, serie i zestawy służą identyfikacji i wycenie towaru; **nie planujemy funkcji dla kolekcjonerów** (prywatne półki, brakujące tomy do własnego zbioru, statystyki czytania). Zasady decyzji, cel docelowy i lista celów poza zakresem: [Kierunek produktu](docs/PRODUCT-DIRECTION.md).
 
 ## Uruchomienie (Windows 11)
 
@@ -19,7 +17,9 @@ Zasady podejmowania decyzji produktowych i lista celów poza zakresem: [Kierunek
 
 Pozostaw serwer uruchomiony, gdy skanujesz lub identyfikujesz książki. Aplikacja domyślnie nasłuchuje **wyłącznie na localhost**; nie udostępniaj portu 4317 bez osobnego, przetestowanego rozwiązania uwierzytelnienia i sieci prywatnej.
 
-## Dostęp do BookFlip z telefonu (Tailscale)
+Ustawienia przez zmienne środowiskowe (port, wyłączanie zadań w tle, klucze źródeł, druga kopia zapasowa) opisuje tabela w [PRODUCTION-CATALOG.md](PRODUCTION-CATALOG.md#konfiguracja).
+
+### Dostęp z telefonu (Tailscale)
 
 BookFlip można otworzyć z telefonu przez **prywatną sieć Tailscale i Tailscale Serve** (HTTPS, bez publicznego portu, bez Funnel). Na komputerze i telefonie potrzebny jest Tailscale na tym samym koncie; komputer musi być włączony.
 
@@ -29,62 +29,26 @@ Na Windows zamknij stary serwer BookFlip i uruchom **`Uruchom BookFlip przez Tai
 
 ## Obszary aplikacji
 
-Aplikacja otwiera się na ekranie **Dziś**. Pokazuje on, co zmieniło się od ostatniej wizyty:
-- nowe oferty i zmiany cen;
-- liczbę decyzji w kolejce weryfikacji;
-- stan każdego źródła — czy działa, a jeśli nie, od kiedy i dlaczego;
-- ostatni i następny skan.
+Sześć zakładek (jak w `app/index.html`): **Dziś**, **Kolejka**, **Książki**, **Oferty**, **Źródła**, **Ustawienia**. Aplikacja otwiera się na ekranie **Dziś**.
 
-Każdy kafel otwiera przefiltrowaną listę. Skany idą według harmonogramu; formularz skanu jest w widoku **Skan**; na telefonie otwiera go przycisk „Nowy skan” na ekranie Dziś.
+- **Dziś** — co zmieniło się od ostatniej wizyty: nowe oferty i zmiany cen, liczba decyzji w kolejce, stan każdego źródła (czy działa, a jeśli nie, od kiedy i dlaczego), ostatni i następny skan oraz cztery miary z trendem. Każdy kafel otwiera przefiltrowaną listę; na telefonie przycisk „Nowy skan” otwiera formularz skanu.
+- **Kolejka** — wszystko, co czeka na decyzję, w zakładkach: Weryfikacja ofert, Zestawy do uzupełnienia, Podejrzane przypisania i Możliwe duplikaty dzieł. Skróty są wspólne: ↑/↓ wybór, Enter akcja, X odrzuć, S pomiń. Zakładki „Szybkie” i „Do dodania” otwierają się jako siatka pewnych decyzji (zdjęcie oferty obok okładki), które zatwierdzasz jednym Enterem i cofasz w całości w „Ostatnich decyzjach”. Przy odrzuceniu (klawisz R) możesz zapisać regułę „odrzucaj takie zawsze”; reguły są w Ustawieniach.
+- **Książki** — dzieła, wydania i serie. Dodruki tej samej książki trafiają do jednego dzieła; „Braki w katalogu” pokazują wydania bez wydawcy lub roku; „Wydawcy i serie” to jedna pisownia nazw i uniwersa; katalog można zasilać z Biblioteki Narodowej po autorze, wydawcy lub serii.
+- **Oferty** — zapisane ogłoszenia z filtrami, historią cen i szczegółami (stan egzemplarza, sprzedawca, zdjęcia); grupowanie „Wg książki”. Zestawy (jedna oferta z kilkoma wydaniami, cena dotyczy całości) są tu i w Kolejce.
+- **Źródła** — stan źródeł, formularz i przebieg skanu, harmonogram (automatyczny skan profilu co N godzin, domyślnie wyłączony), „Tylko polskie wydania” oraz skuteczność fraz i profili skanu.
+- **Ustawienia** — interfejs (motyw, tryb handlu), reguły odrzucania, dane i kopie zapasowe, diagnostyka identyfikacji i ręczne ponowienie kolejki.
 
-**Kolejka** zbiera wszystko, co czeka na decyzję, w zakładkach: Weryfikacja ofert, Zestawy do uzupełnienia, Podejrzane przypisania i Możliwe duplikaty dzieł. Skróty są wspólne: ↑/↓ wybór, Enter akcja, X odrzuć, S pomiń. Zakładki „Szybkie” i „Do dodania” otwierają się jako siatka pewnych decyzji (zdjęcie oferty obok okładki), które zatwierdzasz jednym Enterem i cofasz w całości w „Ostatnich decyzjach”. Przy odrzuceniu (klawisz R) możesz zapisać regułę „odrzucaj takie zawsze”; reguły są w Ustawieniach.
+`Ctrl+K` otwiera paletę poleceń w całej aplikacji. Stan na ekranie aktualizuje się na żywo: serwer wysyła zdarzenia (`/api/events`), a po zerwaniu połączenia strona łączy się ponownie i pobiera stan od nowa.
 
-Stan na ekranie aktualizuje się na żywo: serwer wysyła zdarzenia (`/api/events`, zmiana skanu, kolejki i źródeł), a po zerwaniu połączenia strona łączy się ponownie i pobiera stan od nowa. Przycisk „Odśwież” nie jest potrzebny.
+**Weryfikacja:** ISBN najpierw pokazuje propozycję; przypisanie następuje po zatwierdzeniu. Oferty bez ISBN dostają propozycje po tytule („pewna / możliwa propozycja”) — propozycja tylko wypełnia ISBN i uruchamia zwykły podgląd. ISBN nieznany źródłom zostaje w kolejce zamiast znikać. Znalezienie ISBN w źródłach zewnętrznych nie gwarantuje automatycznego przypisania: sprzeczne lub słabe dowody kierują ofertę do ręcznej weryfikacji. Z klawiatury: `1`–`5` propozycja, `Enter` zatwierdź, `X` odrzuć, `S` pomiń, `Z` zestaw, `J`/`K` następna/poprzednia, `F` tryb skupienia.
 
-Funkcje handlowe (scenariusze kosztów, ceny docelowe) są ukryte, dopóki w Ustawieniach nie włączysz trybu handlu.
+**Decyzje automatyczne (zawsze do cofnięcia w „Ostatnich decyzjach”):** ponownie wystawiona kopia ręcznie odrzuconej oferty (ten sam tytuł w tym samym źródle albo ten sam ISBN) jest odrzucana od razu; przy włączonym „Tylko polskie wydania” (domyślnie włączone) odrzucane są wydania obcojęzyczne. Ceny odniesienia z Empiku są w osobnej zakładce weryfikacji; pewne dopasowanie tytułu do katalogu może automatycznie przypisać dzieło z wydaniem „nieustalonym”, a cofniętej decyzji automat nie ponawia. Ręczne przypisania i zestawy nigdy nie są zmieniane automatycznie. Wydanie jest wybierane tylko, gdy ogłoszenie je wskazuje — inaczej oferta trafia do „Wydanie nieustalone” tej książki.
 
-Kopię można utworzyć bezpośrednio w **Ustawienia → Dane i kopie zapasowe**.
-Weryfikacja ISBN najpierw pokazuje propozycję; przypisanie następuje po
-zatwierdzeniu. Ostatnie ręczne decyzje można ponownie otworzyć do poprawienia
-w zakładce **Do weryfikacji**, z zachowaniem historii.
+**Zdjęcia i okładki:** skaner zapisuje zdjęcie ogłoszenia; obrazy są pobierane przez lokalny serwer i trzymane w `image-cache` obok bazy.
 
-Migracja **132**: zapisy dzienne czterech miar z „Dziś” (trend). Migracja **131**: uzupełnianie wydawcy i roku wydań ze źródeł (odwracalne, `BOOKFLIP_EDITION_GAPS=0` wyłącza). Migracja **130**: „To różne książki” w duplikatach dzieł (odwracalne, widoczne w „Ostatnich decyzjach”). Migracja **129**: reguły odrzucania („odrzucaj takie zawsze” — według sprzedawcy, frazy w tytule albo progu ceny; każde odrzucenie przez regułę to osobna decyzja w „Ostatnich decyzjach”), partie decyzji wsadowych (cofane w całości) i „Nie interesuje mnie” dla zestawów. Migracje **127–128**: frazy ofert jako tabela (`offer_queries`) i indeks kluczy dzieł (`work_keys`). Migracja **126**: uniwersa jako dane (edycja w Katalog → „Wydawcy i serie”). Migracja **125**: historia stanów oferty (przedział sprzedaży) i powiązania ponownie wystawionych ogłoszeń. Migracja **124**: pełny zapis obserwacji oferty (stan egzemplarza, opłata kupującego, sprzedawca, opis i liczba zdjęć, data wystawienia, polubienia, dostępność w sklepie, surowy obiekt ogłoszenia). Migracje **120–123**: opisy ogłoszeń (zestawy uzupełniają się same), warianty nazw wydawców i serii, ISBN potwierdzone na lubimyczytac.pl, warianty cenowe wydań i „Wydanie nieustalone”. Migracja **119** odtwarza ostatni udany odczyt źródeł (stan źródeł w Skanerze). Migracja **118** dodaje listy tomów cykli (widok Serie). Migracja **104** dodaje dane procesu zakupowego. Nie zmieniaj starszych plików
-migracji. Przed aktualizacją istniejącego schematu działa mechanizm kopii
-zapasowej opisany poniżej. Szczegóły zmian: [CHANGELOG](CHANGELOG.md).
+**Tryb handlu** (Ustawienia → Interfejs) pokazuje statusy zakupu, ceny docelowe i koszty; domyślnie wyłączony.
 
-**Budowa bazy (migracje 112–114):** wydania mają dane z rekordu MARC Biblioteki Narodowej
-(osoby z rolami, serie z numerami tomów, tytuł oryginału, oprawa, strony). Katalog można zasilać
-z BN po autorze, wydawcy lub serii (Katalog → „Zasilanie katalogu z Biblioteki Narodowej”).
-Oferty znikające ze skanów są sprawdzane jako sprzedane lub usunięte. Kopia zapasowa robi się
-codziennie sama. Opcjonalne zmienne: `BOOKFLIP_GOOGLE_BOOKS_KEY` (trzecie źródło metadanych)
-i `BOOKFLIP_BACKUP_DIR` (druga kopia na innym dysku). Szczegóły w [CHANGELOG](CHANGELOG.md).
-
-| Zakładka | Funkcja |
-| --- | --- |
-| Skaner | Wybór źródeł, zapytania, przebieg skanu i oferty |
-| Do weryfikacji | Decyzje dotyczące ISBN i wydania, oznaczanie oferty jako zestawu |
-| Katalog | Dzieła i wydania, identyfikatory, metadane |
-| Zestawy | Jedna oferta z kilkoma wydaniami; cena dotyczy całego zestawu |
-| Oferty | Filtry, historia cen i szczegóły zapisanych ogłoszeń |
-| Ustawienia | Stan SQLite, diagnostyka identyfikacji, ręczne ponowienie kolejki |
-
-**Weryfikacja:** oferty bez ISBN dostają propozycje po tytule (znacznik „pewna / możliwa propozycja”, sortowanie „Najpewniejsze propozycje”, skróty Alt+Enter i Alt+1…5). Propozycja tylko wypełnia ISBN i uruchamia zwykły podgląd — nic nie jest przypisywane bez potwierdzenia. ISBN nieznany BN i Open Library zostaje w kolejce zamiast znikać.
-
-**Katalog:** dodruki tej samej książki trafiają do jednego dzieła; istniejące duplikaty łączysz w panelu „Możliwe duplikaty dzieł”.
-
-**Zdjęcia i okładki:** skaner zapisuje zdjęcie ogłoszenia; starsze oferty dostają je przy pierwszym podglądzie albo kolejnym skanie. Obrazy są pobierane przez lokalny serwer i trzymane w `image-cache` obok bazy.
-
-**Weryfikacja z klawiatury:** `1`–`5` propozycja, `Enter` zatwierdź, `X` odrzuć, `S` pomiń, `Z` zestaw, `J`/`K` następna/poprzednia, `F` tryb skupienia. `Ctrl+K` otwiera paletę poleceń w całej aplikacji.
-
-**Tryb handlu** (Ustawienia → Interfejs) pokazuje statusy zakupu, ceny docelowe i koszty; domyślnie wyłączony, dopóki zbierasz dane.
-
-**Skaner:** w panelu zapisanych wyszukiwań można włączyć automatyczny skan profilu co N godzin (domyślnie wyłączony). Skuteczność każdej frazy i każdego profilu (oferty, katalog, sprzedane w 14 dni) jest na ekranie Skanera, w wierszu „Skuteczność fraz i profili skanu”.
-
-Znajdowanie ISBN w źródłach zewnętrznych nie gwarantuje automatycznego przypisania. Sprzeczne lub słabe dowody nadal kierują ofertę do ręcznej weryfikacji.
-
-**Decyzje automatyczne (zawsze do cofnięcia w „Ostatnie decyzje”):** ponownie wystawiona kopia ręcznie odrzuconej oferty (ten sam tytuł w tym samym źródle albo ten sam ISBN) jest odrzucana od razu; przy włączonym „Tylko polskie wydania” (Skaner, domyślnie włączone) odrzucane są wydania obcojęzyczne. Ręczne przypisania i zestawy nigdy nie są odrzucane automatycznie. Kandydaci w weryfikacji to książki; wydanie jest wybierane tylko, gdy ogłoszenie je wskazuje — inaczej oferta trafia do „Wydanie nieustalone” tej książki.
-
-## Gdzie są dane?
+## Dane i kopie zapasowe
 
 **Nowa instalacja niczego nie importuje ze starego katalogu programu.**
 
@@ -94,55 +58,20 @@ Znajdowanie ISBN w źródłach zewnętrznych nie gwarantuje automatycznego przyp
 - Zmienna `BOOKFLIP_CATALOG_DB` pozwala świadomie wskazać inną bazę.
 - Stary `scan-results/` pozostaje nieużywany przez nowy domyślny magazyn SQLite; jego usunięcie nie jest wymagane i może pozbawić Cię archiwum.
 
-**Aktualizacja:** zamknij BookFlip, wymień tylko pliki programu i uruchom ponownie. Nie usuwaj katalogu `%LOCALAPPDATA%\BookFlip\data`. Przed zmianami struktury istniejącej bazy program wykonuje kopię w podfolderze `backups`. Przed większą aktualizacją zalecana jest dodatkowa kopia na inny dysk.
+**Aktualizacja:** zamknij BookFlip, wymień tylko pliki programu i uruchom ponownie. Nie usuwaj katalogu `%LOCALAPPDATA%\BookFlip\data`. Przed zmianami struktury istniejącej bazy program wykonuje kopię w podfolderze `backups`. Migracje bazy są niezmienne (nowa zmiana schematu to nowy plik w `migrations/`); co wnosi każda, opisuje [CHANGELOG](CHANGELOG.md).
 
-### Ręczny backup
+### Kopia zapasowa
+
+Serwer codziennie sam tworzy kopię w `backups` (zostaje 7 najnowszych); drugą kopię w innym miejscu włącza zmienna opisana w [PRODUCTION-CATALOG.md](PRODUCTION-CATALOG.md#konfiguracja). Kopię można też utworzyć w **Ustawienia → Dane i kopie zapasowe** albo poleceniem:
 
 ```powershell
 npm run backup
 npm run backup -- "D:\\Backups\\bookflip.sqlite"
 ```
 
-Backup używa API SQLite (uwzględnia WAL), sprawdza integralność i nie nadpisuje istniejącej kopii. Kopia zapasowa na tym samym dysku nie chroni przed awarią dysku.
+Backup używa API SQLite (uwzględnia WAL), sprawdza integralność i nie nadpisuje istniejącej kopii. Zawiera katalog, historię cen, obserwowane oferty, notatki, serie i profile skanowania. Kopia na tym samym dysku nie chroni przed awarią dysku — trzymaj kopie także na innym.
 
-## Testowanie
-
-```powershell
-npm install          # jednorazowo: ESLint i Prettier (devDependencies)
-npm test
-npm run lint
-npm run check:syntax
-# test przeglądarkowy; jednorazowo: npm install --no-save --no-package-lock playwright@1.55.1 && npx playwright install chromium
-node scripts/browser-smoke.mjs
-```
-
-`npm test` izoluje katalog SQLite, log i stan skanowania w katalogu tymczasowym
-osobno dla każdego procesu testowego i ogranicza czas testu do 30 sekund.
-Uruchamiaj testy przez ten skrypt, aby nie korzystały z plików stanu użytkownika.
-
-CI: `.github/workflows/scanner-tests.yml` (testy Node na Linux i Windows) oraz `.github/workflows/browser-smoke.yml` (Chromium, sześć widoków, izolowana niepusta baza testowa; wszystkie widoki w motywie jasnym i ciemnym, na komputerze i telefonie, z kontrolą kontrastu tekstu do tła — co najmniej 3:1). Test przeglądarkowy nie zastępuje pełnego testu skanowania rzeczywistych portali.
-
-## Architektura i dalsza dokumentacja
-
-- `local-app.mjs` — serwer i API; `app/` — interfejs.
-- `marketplaces.mjs`, `local-scan.mjs` — źródła skanowania.
-- `catalog-production.mjs`, `sqlite-catalog-repository.mjs`, `catalog-api.mjs`, `offer-sets.mjs` — zapis i odczyt katalogu oraz zestawów.
-- `catalog-resolver.mjs`, `identification-worker.mjs`, `metadata-sources/` — dopasowanie ISBN i metadane.
-- `migrations/` — **niezmienne** migracje SQLite; nie usuwaj starych plików migracji.
-
-Szczegóły: [Katalog i konfiguracja](PRODUCTION-CATALOG.md), [Przechowywanie i migracje](docs/DATA-MIGRATION.md), [Mapa repozytorium](docs/REPOSITORY-MAP.md).
-
-## Co jest historyczne?
-
-Nieaktywny runner GitHub Actions został usunięty, ponieważ nie był wykorzystywany przez lokalny BookFlip. Zachowano odrębnie testowane parsery źródeł i narzędzia importu starej historii JSON, które mogą służyć diagnostyce. Historyczne raporty UI i zrzuty usunięto z bieżącej gałęzi; pozostają w historii Git. Dokument historycznej migracji JSON zachowano w `docs/archive/`.
-
-Nie commituj prawdziwych baz SQLite, historii skanów, cookies, kluczy ani innych danych prywatnych.
-
-
-## Przywracanie katalogu SQLite
-
-Kopia utworzona poleceniem `npm run backup` zawiera katalog, historię cen,
-obserwowane oferty, notatki i serie (oraz profile skanowania w wersjach obsługujących tę funkcję).
+### Przywracanie
 
 1. Zamknij aplikację BookFlip przed przełączaniem plików katalogu.
 2. Uruchom `npm run restore -- "ścieżka/do/kopii.sqlite" "ścieżka/do/odzyskanego.sqlite"`.
@@ -153,34 +82,41 @@ obserwowane oferty, notatki i serie (oraz profile skanowania w wersjach obsługu
 5. Dopiero po sprawdzeniu zdecyduj o zastąpieniu starej bazy. Nie podmieniaj pliku
    SQLite, kiedy serwer pracuje.
 
-Kopie warto trzymać także na innym dysku. Niezależnie od ręcznego backupu serwer
-codziennie sam tworzy kopię w `backups` (zostaje 7 najnowszych); `BOOKFLIP_BACKUP_DIR`
-dodaje drugą kopię w innym miejscu.
+Nie commituj prawdziwych baz SQLite, historii skanów, cookies, kluczy ani innych danych prywatnych.
 
-## Pomiar wydajności skanowania SQLite (bez internetu)
+## Testowanie
 
-Osobny pomiar kolejki identyfikacji: `npm run bench:identification -- --offers 1000`.
-Tworzy syntetyczne oferty bez ISBN w bazie pamięciowej i mierzy ich przekazanie do
-ręcznej weryfikacji. Nie korzysta z danych użytkownika ani z internetu. Wynik nie
-mierzy czasu odpowiedzi BN/Open Library ani skuteczności rozpoznawania książek.
+```powershell
+npm install          # jednorazowo: ESLint, Prettier, TypeScript (devDependencies)
+npm run verify       # lint, składnia, typy, formatowanie i testy — po kolei, stop na pierwszym błędzie
+npm test             # same testy; jeden plik: npm test -- rejected-offers.test.mjs
+# test przeglądarkowy; jednorazowo: npm install --no-save --no-package-lock playwright@1.55.1 && npx playwright install chromium
+node scripts/browser-smoke.mjs
+```
 
-Uruchom `npm run bench:scan -- --offers 1000`, a następnie
-`npm run bench:scan -- --offers 10000`, aby porównać zapis nowych ofert
-z ponownym skanem zmieniającym 10% cen. Narzędzie tworzy osobną
-**syntetyczną** bazę w katalogu tymczasowym, nie łączy się z marketplace'ami,
-nie dotyka prywatnego katalogu i po pomiarze usuwa dane testowe.
+`npm run verify` to kontrola przed zakończeniem pracy. `npm test` izoluje katalog SQLite, log i stan skanowania w katalogu tymczasowym osobno dla każdego procesu testowego i ogranicza czas testu do 30 sekund; uruchamiaj testy przez ten skrypt, aby nie korzystały z plików stanu użytkownika.
 
-Opcja `--matched`, np. `npm run bench:scan -- --offers 1000 --matched`,
-przypisuje przed powtórnym skanem każdą ofertę do osobnego wydania.
-Pozwala sprawdzić koszt analizy wielu grup; przygotowanie przypisań nie jest
-wliczane do mierzonego czasu skanu.
+Test przeglądarkowy (`scripts/browser-smoke.mjs`) uruchamia Chromium na izolowanej niepustej bazie: wszystkie widoki w motywie jasnym i ciemnym, na komputerze i telefonie, z kontrolą kontrastu tekstu do tła (co najmniej 3:1). Nie zastępuje pełnego testu skanowania rzeczywistych portali. Pliki w `.github/workflows/` są pozostałością — repozytorium nie ma zdalnej kopii, więc nic ich nie uruchamia.
 
-Wynik JSON zawiera czas obu operacji w milisekundach, liczbę ofert, zmian cen,
-obserwacji cenowych, rozmiar SQLite i RSS. Porównuj wyniki w podobnych warunkach:
-systemie, wersji Node i obciążeniu komputera. To nie jest pomiar rzeczywistego
-Vinted ani obietnica konkretnej szybkości na sprzęcie użytkownika.
+## Architektura i dalsza dokumentacja
 
-Empik: ceny odniesienia s? w osobnej zak?adce weryfikacji. Pewne dopasowanie tytu?u do katalogu mo?e automatycznie przypisa? dzie?o z wydaniem ?nieustalone?. Decyzj? mo?na cofn?? w ?Ostatnich decyzjach?; automat nie ponawia cofni?tej decyzji.
+- `local-app.mjs` — serwer i API; `app/` — interfejs.
+- `marketplaces.mjs`, `local-scan.mjs` — źródła skanowania (każde zapytanie przez `marketplace-gate.mjs`).
+- `catalog-production.mjs`, `sqlite-catalog-repository.mjs`, `catalog-api.mjs`, `offer-sets.mjs` — zapis i odczyt katalogu oraz zestawów.
+- `catalog-resolver.mjs`, `identification-worker.mjs`, `metadata-sources/` — dopasowanie ISBN i metadane.
+- `migrations/` — **niezmienne** migracje SQLite; nie usuwaj ani nie zmieniaj starych plików.
+
+Szczegóły: [Katalog i konfiguracja](PRODUCTION-CATALOG.md), [Przechowywanie i migracje](docs/DATA-MIGRATION.md), [Mapa repozytorium](docs/REPOSITORY-MAP.md), [CHANGELOG](CHANGELOG.md) (starsze wpisy w `docs/archive/`).
+
+Elementy historyczne: nieaktywny runner GitHub Actions usunięto; zachowano odrębnie testowane parsery źródeł i narzędzia importu starej historii JSON (diagnostyka dawnych danych), opisane w mapie repozytorium. Stare raporty i dokumenty jednorazowe są w `docs/archive/`, a usunięte materiały w historii Git.
+
+## Pomiar wydajności (bez internetu)
+
+Pomiar kolejki identyfikacji: `npm run bench:identification -- --offers 1000`. Tworzy syntetyczne oferty bez ISBN w bazie pamięciowej i mierzy ich przekazanie do ręcznej weryfikacji. Nie korzysta z danych użytkownika ani z internetu; nie mierzy czasu odpowiedzi BN/Open Library ani skuteczności rozpoznawania książek.
+
+Pomiar zapisu skanu: `npm run bench:scan -- --offers 1000`, a następnie `npm run bench:scan -- --offers 10000` — porównuje zapis nowych ofert z ponownym skanem zmieniającym 10% cen. Narzędzie tworzy osobną **syntetyczną** bazę w katalogu tymczasowym, nie łączy się z marketplace'ami, nie dotyka prywatnego katalogu i po pomiarze usuwa dane testowe. Opcja `--matched` przypisuje przed powtórnym skanem każdą ofertę do osobnego wydania (koszt analizy wielu grup; przygotowanie przypisań nie jest wliczane do czasu).
+
+Wynik JSON zawiera czas obu operacji w milisekundach, liczbę ofert, zmian cen, obserwacji cenowych, rozmiar SQLite i RSS. Porównuj wyniki w podobnych warunkach (system, wersja Node, obciążenie). To nie jest pomiar rzeczywistego Vinted ani obietnica konkretnej szybkości.
 
 ## Opcjonalny autostart Windows
 

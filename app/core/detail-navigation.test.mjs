@@ -29,10 +29,10 @@ test('mobile detail navigation restores the list position without replacing form
     installDetailNavigation();
     openDetailView('catalog');
     assert.equal(classes.has('detail-is-open'), true);
-    assert.equal(window.scrollY, 0);
+    assert.equal(globalThis.window.scrollY, 0);
     buttons.get('back').click();
     assert.equal(classes.has('detail-is-open'), false);
-    assert.equal(window.scrollY, 340);
+    assert.equal(globalThis.window.scrollY, 340);
     assert.equal(trigger.focused, true);
     assert.equal(view.form, form);
     assert.equal(form.value, 'Niezapisana notatka');
