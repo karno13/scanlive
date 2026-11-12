@@ -59,8 +59,20 @@ export function mountSeriesEditor(work, target, onSave = () => {}, options = {})
   const current = data[String(work.id)] || {};
   const block = document.createElement('section');
   block.className = 'detail-section series-editor';
-  const heading = document.createElement('h4');
-  heading.textContent = options.save ? 'Seria i tom' : 'Seria i tom (notatka w tej przeglądarce)';
+  const fold = document.createElement('details');
+  fold.className = 'edit-fold';
+  const heading = document.createElement('summary');
+  const label = document.createElement('span');
+  label.className = 'edit-fold-label';
+  label.textContent = options.save ? 'Seria i tom' : 'Seria i tom (notatka w tej przeglądarce)';
+  const value = document.createElement('b');
+  value.textContent = current.series ? `${current.series}${current.volume ? ', tom ' + current.volume : ''}` : 'brak';
+  const action = document.createElement('span');
+  action.className = 'edit-fold-action';
+  action.textContent = 'Edytuj';
+  heading.append(label, ' ', value, ' ', action);
+  const body = document.createElement('div');
+  body.className = 'edit-fold-body';
   const series = document.createElement('input');
   series.placeholder = 'Nazwa serii, np. Horus Heresy';
   series.maxLength = 120;
@@ -118,7 +130,9 @@ export function mountSeriesEditor(work, target, onSave = () => {}, options = {})
       series.dispatchEvent(new Event('input', { bubbles: true }));
       feedback.textContent = 'Wstawiono podpowiedź. Sprawdź i zapisz.';
     });
-    block.append(heading, suggestion, series, volume, save, feedback);
-  } else block.append(heading,series,volume,save,feedback);
+    body.append(suggestion, series, volume, save, feedback);
+  } else body.append(series, volume, save, feedback);
+  fold.append(heading, body);
+  block.append(fold);
   target.append(block);
 }

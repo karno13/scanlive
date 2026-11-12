@@ -27,5 +27,6 @@ export function mountSetTrading({active,target,json}) {
       save.addEventListener('click',async()=>{save.disabled=true;try{await request('PUT','/api/offer-scenarios/'+encodeURIComponent(active.offerId),Object.fromEntries(Object.entries(fields).map(([key,input])=>[key,readAmount(input)])));savedCosts();status.textContent='Zapisano scenariusz. Ceny są Twoimi założeniami.';}catch(error){status.textContent='Nie zapisano. Sprawdź kwoty.';}finally{save.disabled=false;}});
     }catch(error){costs.append(document.createTextNode('Nie udało się odczytać scenariusza. Wybierz zestaw ponownie.'));}
   }
-  void mountCosts();
+  // Trading-only: nothing is requested while trading mode is off (the section stays hidden).
+  if (document.body.classList.contains('trading-mode')) void mountCosts();
 }

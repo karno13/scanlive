@@ -1,7 +1,7 @@
 import { openDetailView } from '../core/detail-navigation.js';
 import { amountInput, readAmount, statusLabel, markDirty,watchForm } from '../core/ux.js';
 import { confirmDialog } from '../core/dialogs.js';
-import { sourceHealthNote } from '../core/formatters.js';
+import { sourceHealthNote, escapeHtml, problemLabel, problemTasks } from '../core/formatters.js';
 import { isRetryableError } from './scan-run.js';
 export function installTradingControls({state,$,json,toast,showView,loadCatalogData,loadCatalogStatus,openOfferDrawer,onOfferFilters,onCatalogFilters}) {
   const write=(path,body,method='PUT')=>json(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -33,6 +33,26 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
   }
   /** Failed tasks of a saved run that are worth sending again (not bot checks, not skipped ones). */
   const retryable = (run) => (run?.errors || []).filter(isRetryableError);
+  /**
+   * "14 zadań z problemami" opens the list of those tasks: per source and reason, which phrases
+   * failed and which were skipped after the block; and leads to "Ponów chwilowe błędy", or says
+   * there is nothing worth retrying (blocks pass only with time).
+   */
+  function problemsMarkup(errors,retryCount) {
+    const groups=new Map();
+    for(const error of errors) {
+      const key=error.source+'\u0000'+error.code;
+      if(!groups.has(key)) groups.set(key,{source:error.source,code:error.code,failed:[],skipped:[],retry:0});
+      const group=groups.get(key);
+      (error.skipped?group.skipped:group.failed).push(error.query);
+      if(isRetryableError(error)) group.retry++;
+    }
+    const rows=[...groups.values()].map(group=>'<li><b>'+escapeHtml(group.source)+'</b> — '+escapeHtml(problemLabel(group.code))+(group.retry?' (chwilowy)':'')+': '+escapeHtml(group.failed.join(', ')||'—')+(group.skipped.length?'<br><small>pominięte po blokadzie, bez zapytania: '+escapeHtml(group.skipped.join(', '))+'</small>':'')+'</li>').join('');
+    const retry=retryCount
+      ?'<p>'+retryCount+' z nich to chwilowe błędy: <button type="button" class="link-button" data-retry-failed>Ponów chwilowe błędy ('+retryCount+')</button></p>'
+      :'<p>Żaden nie jest chwilowy — to blokady źródeł; ponowienie teraz nic nie da. Odznacz te źródła albo spróbuj za kilka godzin.</p>';
+    return ' · <details class="scan-problems"><summary>'+problemTasks(errors.length)+' — wyniki mogą być niepełne</summary><ul>'+rows+'</ul>'+retry+'</details>';
+  }
   async function refreshRuns() {
     const response=await json('/api/scan-runs'); state.scanRuns=response.items || [];
     const selected=$('#offerScan').value;
@@ -50,7 +70,9 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
       const failed=run.errors?.length||0;
       const again=retryable(run);
       const skipped=failed-again.length;
-      $('#scanResultSummary').textContent=new Date(run.at).toLocaleString('pl-PL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+(failed?' · '+failed+' zadań z problemami — wyniki mogą być niepełne':'')+(skipped&&again.length?' · blokad ('+skipped+') nie ponawiamy':'')+(run.context?.cancelled?' · skan przerwany: tylko ukończone frazy':'');
+      const head=new Date(run.at).toLocaleString('pl-PL',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})+(run.context?.cancelled?' · skan przerwany: tylko ukończone frazy':'');
+      $('#scanResultSummary').innerHTML=escapeHtml(head)+(failed?problemsMarkup(run.errors,again.length):'');
+      $('#scanResultSummary').querySelector('[data-retry-failed]')?.addEventListener('click',()=>$('#retryFailedScan').click());
       $('#retryFailedScan').hidden=!again.length || !run.context;
       $('#retryFailedScan').textContent='Ponów chwilowe błędy ('+again.length+')';
       renderScanResultCard(run);
@@ -94,9 +116,6 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
     if(again.length) document.dispatchEvent(new CustomEvent('bookflip-retry-scan',{detail:again.map(row=>({source:row.source,query:row.query}))}));
   });
   document.addEventListener('bookflip-scan-complete',()=>{void refreshRuns().catch(error=>toast(error.message));});
-  $('#mobileMore').addEventListener('click',()=>$('#moreDialog').showModal());
-  $('#closeMore').addEventListener('click',()=>$('#moreDialog').close());
-  document.querySelectorAll('[data-more-view]').forEach(button=>button.addEventListener('click',()=>{$('#moreDialog').close();showView(button.dataset.moreView);}));
   const defaultFields=['shipping','other'].map((key,i)=>amountInput(i?'Inne koszty (zł)':'Dostawa (zł)',key));
   $('#defaultCostFields').append(...defaultFields);
   $('#saveTradingDefaults').addEventListener('click',async()=>{
@@ -129,14 +148,27 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
         copy.textContent=sourceHealthNote(row);
         item.append(title,copy);$('#settingsSources').append(item);
       }
-      if(!settingsLoaded) {
+      if(!settingsLoaded && document.body.classList.contains('trading-mode')) {
+        settingsLoaded=true;
         const defaults=await json('/api/trading-defaults');defaultFields.forEach(field=>{const input=field.querySelector('input');input.value=defaults[input.name]??'';});savedDefaults=watchForm('defaults',defaultFields.map(field=>field.querySelector('input')));settingsLoaded=true;
       }
     } catch(error){toast('Nie udało się odświeżyć ustawień. Spróbuj ponownie.');}
   }
   async function refreshDecisions() {
     try {
-      const response=await json('/api/review-decisions');const parent=$('#reviewDecisionHistory');parent.replaceChildren();
+      const [response,batches]=await Promise.all([json('/api/review-decisions'),json('/api/review-batches').catch(()=>({items:[]}))]);const parent=$('#reviewDecisionHistory');parent.replaceChildren();
+      // Batch approvals (review 11.2026, stage 2): one row per batch, "Cofnij całą partię".
+      for(const batch of batches.items.filter(item=>item.open>0)) {
+        const item=document.createElement('div');item.className='decision-history-row is-batch';
+        const label=document.createElement('span');label.textContent='Partia '+(batch.kind==='add'?'„Do dodania”':'„Szybkie”')+' · '+batch.decisions+' decyzji · '+new Date(batch.createdAt).toLocaleString('pl-PL');
+        const undo=document.createElement('button');undo.type='button';undo.className='button secondary';undo.textContent='Cofnij całą partię ('+batch.open+')';
+        undo.addEventListener('click',async()=>{
+          undo.disabled=true;
+          try {const result=await write('/api/review-batches/'+encodeURIComponent(batch.id)+'/undo',{},'POST');toast('Cofnięto '+result.reopened+' decyzji'+(result.failed.length?'; '+result.failed.length+' ma nowszą zmianę i zostaje.':'.'));await loadCatalogData();await refreshDecisions();}
+          catch(error){undo.disabled=false;toast('Nie cofnięto partii: '+error.message);}
+        });
+        item.append(label,undo);parent.append(item);
+      }
       for(const row of response.items) {
         const item=document.createElement('div');item.className='decision-history-row';
         const label=document.createElement('span');label.textContent=row.title+' · '+statusLabel(row.action)+' · '+new Date(row.createdAt).toLocaleString('pl-PL');

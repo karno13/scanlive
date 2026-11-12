@@ -119,11 +119,14 @@ export function tidyWorkTitle(raw) {
   return (parts.title || String(raw ?? '')).replace(/\s+:\s+/g, ': ');
 }
 
-/** Image URL for an ISBN cover via the local cached proxy (Open Library). */
+/**
+ * Image URL for an ISBN cover: /api/cover serves a photo of a stored offer of that book, else
+ * Open Library, else a 1×1 transparent image (handled as "no cover" by installCoverFallback).
+ */
 export function isbnCover(isbn, size = 'M') {
   const clean = String(isbn ?? '').replace(/[^0-9X]/gi, '');
   if (!/^(?:\d{9}[\dX]|\d{13})$/.test(clean)) return null;
-  return '/api/image?u=' + encodeURIComponent(`https://covers.openlibrary.org/b/isbn/${clean}-${size}.jpg?default=false`);
+  return `/api/cover?isbn=${clean}&size=${size}`;
 }
 
 /** Deterministic hue for placeholder covers so one series keeps one color. */
@@ -133,11 +136,24 @@ export function hueFor(text) {
   return hash % 360;
 }
 
+// Covers up to 56 px wide are thumbnails: the server serves the CDN's small variant (Allegro
+// originals are 2–3 MB). Larger covers (detail panels, the review photo) keep the full image.
+const THUMB_SIZES = new Set(['xs', 'sm', 'md']);
+
+/** Local image URL asking for the small variant (`thumb=1`); other URLs are returned unchanged. */
+export function thumbnailSrc(src) {
+  const value = String(src);
+  if (!/^\/api\/(?:image\?|cover\?|offers\/[^?]+\/image(?:$|\?))/.test(value)) return value;
+  if (/[?&]thumb=1\b/.test(value)) return value;
+  return value + (value.includes('?') ? '&' : '?') + 'thumb=1';
+}
+
 /**
  * Markup of a cover thumbnail. `src` may be null: then a generated placeholder with the initials is
  * shown. Broken images fall back to the placeholder via installCoverFallback().
  */
 export function coverMarkup(src, label, { size = 'md', escapeHtml } = {}) {
+  if (src && THUMB_SIZES.has(size)) src = thumbnailSrc(src);
   const text = String(label ?? '').trim();
   const initials = text
     .split(/[\s.:,-]+/)
@@ -151,17 +167,18 @@ export function coverMarkup(src, label, { size = 'md', escapeHtml } = {}) {
   return `<span class="cover cover-${size}${src ? ' has-image' : ''}" data-hue="${hue}" aria-hidden="true"><span class="cover-fallback">${safe(initials || '•')}</span>${src ? `<img src="${safe(src)}" alt="" loading="lazy" decoding="async">` : ''}</span>`;
 }
 
-/** One delegated listener: a failed cover image reveals the placeholder underneath. */
+/**
+ * Delegated listeners: a failed cover image, or the 1×1 "no cover" image of /api/cover, reveals
+ * the placeholder underneath.
+ */
 export function installCoverFallback(root = document) {
-  root.addEventListener(
-    'error',
-    (event) => {
-      const image = event.target;
-      if (image?.tagName === 'IMG' && image.parentElement?.classList.contains('cover')) {
-        image.parentElement.classList.remove('has-image');
-        image.remove();
-      }
-    },
-    true,
-  );
+  const fallback = (event) => {
+    const image = event.target;
+    if (image?.tagName !== 'IMG' || !image.parentElement?.classList.contains('cover')) return;
+    if (event.type === 'load' && image.naturalWidth > 1) return;
+    image.parentElement.classList.remove('has-image');
+    image.remove();
+  };
+  root.addEventListener('error', fallback, true);
+  root.addEventListener('load', fallback, true);
 }

@@ -16,15 +16,17 @@ const styles = (
   )
 ).join('\n');
 
-test('desktop shell exposes all six workspaces in order', () => {
+// Stage 1 of the 11.2026 review: "Dziś" is the start view; the scan form is the "Skan" view.
+test('desktop shell starts on Dziś and keeps every workspace in order', () => {
   const views = [...html.matchAll(/class="nav-item(?: active)?"[^>]+data-view="([^"]+)"/g)].map(
     (match) => match[1],
   );
-  assert.deepEqual(views, ['scanner', 'offers', 'review', 'catalog', 'sets', 'settings']);
-  assert.match(
-    html,
-    /id="view-scanner"[^>]+class="view active"|class="view active"[^>]+id="view-scanner"/,
-  );
+  // Stage 2: "Kolejka" replaces "Do weryfikacji" and "Zestawy" (their screens are its tabs).
+  assert.deepEqual(views, ['today', 'queue', 'catalog', 'offers', 'scanner', 'settings']);
+  for (const id of ['view-review', 'view-sets', 'view-checks'])
+    assert.match(html, new RegExp('id="' + id + '" data-title="Kolejka"'));
+  assert.match(html, /class="view active" id="view-today" data-title="Dziś"/);
+  assert.match(html, /class="view" id="view-scanner" data-title="Źródła" hidden/);
   assert.doesNotMatch(html, /data-view="history"/);
 });
 
@@ -100,14 +102,17 @@ test('book-centric UI exposes comparison and mobile offers without external imag
   assert.match(styles, /\.book-spine/);
 });
 
-test('scanner previews persisted offers separately from scan-session metrics', () => {
-  assert.match(html, /id="scannerOfferList"/);
-  assert.match(html, /id="scannerBrowseOffers"/);
-  assert.match(script, /function renderScannerOffers\(\)/);
-  assert.match(script, /Nie są to wyniki bieżącego skanu/);
-  assert.match(script, /data-scanner-offer-id/);
-  assert.match(script, /openOfferDrawer\(button\.dataset\.scannerOfferId\)/);
-  assert.match(styles, /\.scanner-offer-row/);
+// Stage 1: "Nowe z ostatniego skanu" repeated the last-scan card; Dziś counts new offers and
+// price changes once and opens Oferty with the same filters.
+test('the scan view no longer repeats the last scan as a preview list', () => {
+  assert.doesNotMatch(html, /id="scannerOfferList"|class="panel scanner-discover"/);
+  assert.doesNotMatch(script, /function renderScannerOffers|function refreshScannerOffers/);
+  assert.match(script, /async function openOffers\(filters = \{\}\)/);
+  assert.match(
+    script,
+    /since: state\.offerSince \|\| '', priceChangedSince: state\.offerPriceSince \|\| ''/,
+  );
+  assert.match(html, /id="offerScope" hidden/);
 });
 
 test('review compares observed ISBN against candidate edition and warns on conflicts', () => {
@@ -120,21 +125,10 @@ test('review compares observed ISBN against candidate edition and warns on confl
   assert.match(styles, /\.verification-match/);
 });
 
-test('scanner saved-offer search and source filter are separated from scan counters', () => {
-  assert.match(html, /id="scannerOfferSearch"/);
-  assert.match(html, /id="scannerOfferSource"/);
-  assert.match(html, /id="scannerOfferCount"/);
-  assert.match(script, /sourceSelect\.value/);
-  assert.match(script, /filtered\.slice\(0, 12\)/);
-  assert.match(script, /scannerOfferSearch'\)\.addEventListener\('input', renderScannerOffers\)/);
-  assert.match(styles, /\.scanner-discover-toolbar/);
-});
-
 test('desktop workspace preserves functional scanner controls and adds editorial shell', () => {
-  for (const id of ['sourceGrid', 'startSearch', 'scanRun', 'scanRunSources', 'scannerOfferList'])
+  for (const id of ['sourceGrid', 'startSearch', 'scanRun', 'scanRunSources'])
     assert.ok(html.includes('id=\"' + id + '\"'));
   assert.match(styles, /#view-scanner\{display:grid/);
-  assert.match(styles, /#view-scanner>\.scanner-discover\{grid-column:2/);
 });
 
 test('mobile repairs keep scanner filters usable and catalog avoids cramped headers', () => {
@@ -184,9 +178,7 @@ test('covers use ISBN checksum and show neutral spine until real image loads', (
   for (const expression of [
     'functionvalidCoverIsbn(value)',
     'functioncoverPreviewMarkup(identifiers=[])',
-    'covers.openlibrary.org/b/isbn',
-    'default=false',
-    'referrerpolicy="no-referrer"',
+    'src="${isbnCover(isbn)}"',
     'naturalWidth>1',
   ])
     assert.ok(compact.includes(expression), expression);
@@ -194,16 +186,17 @@ test('covers use ISBN checksum and show neutral spine until real image loads', (
   assert.match(styles, /\.edition-identity/);
 });
 
-test('manual refresh never announces success after SQLite load or status failure', () => {
+// Stage 1: the live channel replaced the "Odśwież" button; a failed list read still says so.
+test('no manual refresh: the live channel re-reads everything after a reconnection', () => {
   const compact = script.replace(/\s+/g, '');
+  assert.doesNotMatch(html, /id="refreshView"/);
+  assert.doesNotMatch(script, /refreshView/);
   for (const expression of [
-    'asyncfunctionloadCatalogData()',
+    'asyncfunctionloadCatalogData({kinds=null}={})',
     'returnfalse;',
-    'Promise.allSettled([loadHistory(),loadCatalogStatus(),loadCatalogData(),])',
-    'catalogResult.value!==true',
-    'catalogDataOk.value!==true',
-    'Nie wszystkiedaneodświeżono'.replace(/\s+/g, ''),
-    'finally{button.disabled=false;}',
+    'NieudałosięwczytaćkataloguSQLite',
+    'onReconnect:()=>{voidloadCatalogStatus();',
+    'if(loadedKinds.size)voidloadCatalogData();',
   ])
     assert.ok(compact.includes(expression), expression);
 });
@@ -240,8 +233,11 @@ test('review and catalog DOM rendering is bounded despite loading many SQLite pa
     'rows.slice(0,visible)',
     'state.visibleRows[kind]+=100',
     "visibleCatalogRows('works',rows).map((row)",
-    "visibleCatalogRows('jobs',rows).map((job)",
     'data-show-loaded-kind',
+    // The review queue is paged on the server: 50 decisions at a time, more on demand.
+    'constreviewPageSize=50',
+    "view:'list'",
+    'functionloadMoreReview()',
   ])
     assert.ok(compact.includes(expression), expression);
 });

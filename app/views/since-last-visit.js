@@ -1,8 +1,4 @@
-import { json } from '../core/api.js';
-import { escapeHtml } from '../core/formatters.js';
-
-// "Since your last visit" strip at the top of the scanner: new listings, decisions waiting and
-// (dead sources are shown in the source list) — the things worth a look before starting a new scan.
+// The moment of the previous visit, for the "Dziś" view (app/views/today.js): what changed since then.
 const VISIT_KEY = 'bookflip.lastVisitAt';
 const BASELINE_KEY = 'bookflip.visitBaseline';
 
@@ -28,46 +24,4 @@ export function visitBaseline(now = new Date(), local = globalThis.localStorage,
   }
   if (local) write(local, VISIT_KEY, now.toISOString());
   return baseline || null;
-}
-
-const plural = (n, one, few, many) => (n === 1 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many);
-
-export function installSinceLastVisit({ state, showView }) {
-  const scanner = document.querySelector('#view-scanner');
-  const heading = scanner?.querySelector('.view-heading');
-  if (!heading || document.querySelector('#sinceLastVisit')) return () => {};
-  const strip = document.createElement('section');
-  strip.id = 'sinceLastVisit';
-  strip.className = 'since-visit';
-  strip.setAttribute('aria-label', 'Od ostatniej wizyty');
-  strip.hidden = true;
-  heading.after(strip);
-  const since = visitBaseline();
-
-  async function refresh() {
-    const offers = await (since ? json('/api/offers?' + new URLSearchParams({ since, limit: '1', offset: '0' })).catch(() => null) : null);
-    const fresh = Number(offers?.total || 0);
-    const pending = Number(state.reviewQueueTotal ?? state.catalogPages?.jobs?.total ?? 0);
-    const parts = [];
-    // Nothing new since the last visit is not worth a sentence: next to "Nowe z ostatniego skanu (35)"
-    // it read as a contradiction (those 35 came before the last visit).
-    if (since && fresh)
-      parts.push(
-        `<span><b>${fresh}</b> ${plural(fresh, 'nowa oferta', 'nowe oferty', 'nowych ofert')} od ${escapeHtml(new Date(since).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }))} <button type="button" class="link-button" data-since="offers">Pokaż</button></span>`,
-      );
-    if (pending) parts.push(`<span><b>${pending}</b> do decyzji <button type="button" class="link-button" data-since="review">Weryfikuj</button></span>`);
-    // Dead sources are shown in the source list of the form (grouped, with when they last worked).
-    strip.hidden = !parts.length;
-    strip.innerHTML = parts.join('');
-    strip.querySelector('[data-since="review"]')?.addEventListener('click', () => showView('review'));
-    strip.querySelector('[data-since="offers"]')?.addEventListener('click', () => {
-      const sort = document.querySelector('#offerSort');
-      if (sort) {
-        sort.value = 'newest';
-        sort.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      showView('offers');
-    });
-  }
-  return () => void refresh().catch(() => {});
 }

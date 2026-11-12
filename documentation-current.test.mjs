@@ -7,7 +7,9 @@ test('active documentation reflects persistent storage and six workspaces', asyn
   const readme = await read('./README.md');
   const migration = await read('./docs/DATA-MIGRATION.md');
   const production = await read('./PRODUCTION-CATALOG.md');
-  assert.match(readme, /Sześć obszarów aplikacji/);
+  // Stage 1 of the 11.2026 review: the app opens on "Dziś"; the old "six areas" text is gone.
+  assert.match(readme, /## Obszary aplikacji/);
+  assert.ok(readme.includes('otwiera się na ekranie **Dziś**'));
   assert.match(readme, /%LOCALAPPDATA%/);
   assert.match(readme, /Zestawy/);
   assert.match(migration, /pustą bazę/);

@@ -58,14 +58,15 @@ const CONDITION_LABELS = { new: 'Nowa', very_good: 'Bardzo dobra', good: 'Dobra'
 // their condition. A median over all of them mixed a new Empik book with a worn Vinted copy.
 function comparableMarkup(overview, { money, escapeHtml }) {
   const sold = overview.vintedSold || { count: 0 };
+  // A tile without data ("Sprzedane na Vinted —") says nothing: only tiles with a value are shown.
   const tiles = [
-    `<div class="wp-sold"><small>Sprzedane na Vinted</small><strong>${sold.count ? money(sold.median) : '–'}</strong><small>${sold.count ? `${sold.count} ${plural(sold.count, 'sprzedaż', 'sprzedaże', 'sprzedaży')}${sold.count > 1 ? ` · ${money(sold.min)}–${money(sold.max)}` : ''}` : 'brak potwierdzonych sprzedaży'}</small></div>`,
-    ...(overview.kinds || []).map((row) => `<div><small>${escapeHtml(row.label)}</small><strong>${row.median != null ? money(row.median) : '–'}</strong><small>${row.live} ${plural(row.live, 'dostępna', 'dostępne', 'dostępnych')}${row.min != null && row.live > 1 ? ` · od ${money(row.min)}` : ''}</small></div>`),
-  ];
+    sold.count && `<div class="wp-sold"><small>Sprzedane na Vinted</small><strong>${sold.count ? money(sold.median) : '–'}</strong><small>${sold.count ? `${sold.count} ${plural(sold.count, 'sprzedaż', 'sprzedaże', 'sprzedaży')}${sold.count > 1 ? ` · ${money(sold.min)}–${money(sold.max)}` : ''}` : 'brak potwierdzonych sprzedaży'}</small></div>`,
+    ...(overview.kinds || []).filter((row) => row.median != null).map((row) => `<div><small>${escapeHtml(row.label)}</small><strong>${row.median != null ? money(row.median) : '–'}</strong><small>${row.live} ${plural(row.live, 'dostępna', 'dostępne', 'dostępnych')}${row.min != null && row.live > 1 ? ` · od ${money(row.min)}` : ''}</small></div>`),
+  ].filter(Boolean);
   const kindRows = (overview.kinds || []).map((row) => `<tr><th scope="row">${escapeHtml(row.label)}</th>${statCells(row, money)}</tr>`).join('');
   const conditionRows = (overview.conditions || []).map((row) => `<tr><th scope="row">${escapeHtml(CONDITION_LABELS[row.condition] || row.condition)}</th>${statCells(row, money)}</tr>`).join('');
   return `<div class="edition-price-summary wp-comparable">${tiles.join('')}</div>
-    ${kindRows || conditionRows ? `<div class="wp-table-wrap"><table class="wp-table"><thead><tr><th scope="col">Rodzaj oferty / stan</th><th scope="col">Oferty</th><th scope="col">Mediana</th><th scope="col">Najniższa</th><th scope="col">Sprzedane</th></tr></thead><tbody>${kindRows}</tbody>${conditionRows ? `<tbody class="wp-conditions"><tr><th scope="rowgroup" colspan="5">Wg stanu egzemplarza (wszystkie rodzaje)</th></tr>${conditionRows}</tbody>` : ''}</table></div>` : ''}`;
+    ${(overview.kinds || []).length > 1 || (overview.conditions || []).length > 1 ? `<div class="wp-table-wrap"><table class="wp-table"><thead><tr><th scope="col">Rodzaj oferty / stan</th><th scope="col">Oferty</th><th scope="col">Mediana</th><th scope="col">Najniższa</th><th scope="col">Sprzedane</th></tr></thead><tbody>${kindRows}</tbody>${conditionRows ? `<tbody class="wp-conditions"><tr><th scope="rowgroup" colspan="5">Wg stanu egzemplarza (wszystkie rodzaje)</th></tr>${conditionRows}</tbody>` : ''}</table></div>` : ''}`;
 }
 
 export function workPricesMarkup(overview, { money, escapeHtml }) {
@@ -86,12 +87,15 @@ export function workPricesMarkup(overview, { money, escapeHtml }) {
     .filter((variant) => slots.get(variant.key))
     .map((variant) => `<span><i class="wp-key wp-s${slots.get(variant.key)}"></i>${escapeHtml(variant.label)}</span>`)
     .join('') + (variants.some((variant) => variant.offers && !slots.get(variant.key)) || overview.unknown.offers ? '<span><i class="wp-key wp-s0"></i>pozostałe i nieustalone</span>' : '');
+  // One variant with no unnamed offers repeats the tiles above: the table and its note start at two rows.
+  const chart = overall.offers ? chartMarkup(overview, slots, { money, escapeHtml }) : '';
+  const variantTable = variants.length + (unknown ? 1 : 0) > 1;
   return `<section class="detail-section work-prices"><h4>Ceny tej książki — wszystkie wydania</h4>
     ${overall.offers ? comparableMarkup(overview, { money, escapeHtml }) : '<p class="inline-note">Brak ofert przypisanych do tej książki.</p>'}
-    ${overall.offers ? chartMarkup(overview, slots, { money, escapeHtml }) : ''}
-    ${overall.offers && legend ? `<div class="wp-legend">${legend}</div>` : ''}
-    ${rows || unknown ? `<div class="wp-table-wrap"><table class="wp-table"><thead><tr><th scope="col">Wariant cenowy</th><th scope="col">Oferty</th><th scope="col">Mediana</th><th scope="col">Najniższa</th><th scope="col">Sprzedane</th></tr></thead><tbody>${rows}${unknown}</tbody></table></div>` : ''}
-    <p class="inline-note">Warianty łączą wydania o podobnej cenie (ten sam wydawca i oprawa). Mediana wariantu liczy tylko oferty z tym wydaniem; „nieustalone” wchodzą do ceny całej książki. Ceny ofertowe w PLN, bez dostawy; nowe książki ze sklepów, antykwariaty i prywatne egzemplarze liczone osobno.</p>
+    ${chart}
+    ${chart && legend ? `<div class="wp-legend">${legend}</div>` : ''}
+    ${variantTable ? `<div class="wp-table-wrap"><table class="wp-table"><thead><tr><th scope="col">Wariant cenowy</th><th scope="col">Oferty</th><th scope="col">Mediana</th><th scope="col">Najniższa</th><th scope="col">Sprzedane</th></tr></thead><tbody>${rows}${unknown}</tbody></table></div>` : ''}
+    <p class="inline-note">${variantTable ? 'Warianty łączą wydania o podobnej cenie (ten sam wydawca i oprawa). Mediana wariantu liczy tylko oferty z tym wydaniem; „nieustalone” wchodzą do ceny całej książki. ' : ''}Ceny ofertowe w PLN, bez dostawy; nowe książki ze sklepów, antykwariaty i prywatne egzemplarze liczone osobno.</p>
     ${variants.length > 1 ? variantToolsMarkup(variants, escapeHtml) : ''}
   </section>`;
 }

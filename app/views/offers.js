@@ -1,6 +1,6 @@
 import { mountOfferAssignment } from './offer-assignment.js';
 import {statusLabel,markDirty,hasUnsavedChanges,confirmDiscard,watchForm} from '../core/ux.js';
-import { safeOfferHref , availabilityLabel, availabilityBadge } from '../core/formatters.js';
+import { safeOfferHref , availabilityLabel, availabilityBadge, dateMarkup } from '../core/formatters.js';
 import { groszeToZloty, moneyFromZloty } from '../core/formatters.js';
 import { isWatchedOffer, mountOfferWorkspace, loadOfferWorkspace, allSavedOfferNotes, readOfferNotes } from './offer-workspace.js';
 import { confirmDialog, noticeDialog } from '../core/dialogs.js';
@@ -54,8 +54,22 @@ function drawerPills(offer, active) {
   const listing = availabilityBadge(offer);
   const job = offer.identificationJob?.status;
   const identification = active ? 'W katalogu' : job === 'completed' ? 'Bez przypisania' : statusLabel(job);
-  const tone = active ? 'success' : job === 'review_required' ? 'warning' : 'neutral';
+  const tone = active ? 'success' : job === 'review_required' ? 'pending' : ['failed', 'retry_wait'].includes(job) ? 'warning' : 'neutral';
   return `<span class="status-pill ${listing.tone}" title="Stan ogłoszenia">${esc(listing.label)}</span> <span class="status-pill ${tone}" title="Stan identyfikacji">${esc(identification)}</span>`;
+}
+/**
+ * One name for an offer's state in the phone list, the desktop table and the drawer:
+ * in the catalogue, rejected, still being identified, or waiting for the operator's decision.
+ */
+function offerState(item, matched) {
+  if (matched) return { label: matched.method === 'manual' ? 'W katalogu · ręcznie' : 'W katalogu', tone: 'success' };
+  if (item.rejected) return { label: 'Odrzucona', tone: 'neutral' };
+  const job = item.identification?.status;
+  if (job === 'completed') return { label: 'Bez przypisania', tone: 'neutral' };
+  if (['queued', 'running'].includes(job)) return { label: statusLabel(job), tone: 'neutral' };
+  if (['retry_wait', 'failed'].includes(job)) return { label: statusLabel(job), tone: 'warning' };
+  // The usual state of a fresh offer: quiet. The warning colour is kept for exceptions (errors, retries).
+  return { label: 'Wymaga decyzji', tone: 'pending' };
 }
 // offers workspace, preserving existing behavior while isolating its implementation.
 export function createOffersView({ state, $, $$, json, money, date, escapeHtml, allOffers, bookFor, showView, priceStats, onFiltersChange, toast, onAssignmentChanged }) {
@@ -129,8 +143,7 @@ function renderOffers() {
   state.offerPage = Math.min(state.offerPage, pages);
   const start = (state.offerPage - 1) * state.pageSize,
     pageRows = rows;
-  $('#offerTotal').textContent =
-    `${state.catalogPages.offers.total} pasujących ofert`;
+  $('#offerTotal').textContent = `${state.catalogPages.offers.total} pasujących ofert`;
   const mobile = $('#offersMobileList');
   if (mobile) {
     mobile.innerHTML =
@@ -142,8 +155,8 @@ function renderOffers() {
               ? { workTitle: bookFor(item.bookId)?.title, method: item.linkMode }
               : null);
           const title = tidyOfferTitle(item.title || item.originalTitle);
-          const status = tradingMode() && item.purchaseStatus ? statusLabel(item.purchaseStatus) : match ? 'W katalogu' : item.rejected ? 'Odrzucona' : 'Do sprawdzenia';
-          return `<button class="mobile-offer offer-card" data-mobile-offer-id="${escapeHtml(item.id)}" type="button">${coverMarkup(item.image, title, { size: 'sm', escapeHtml })}<span class="mobile-offer-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(item.source)}"></span>${escapeHtml(item.source)} · ${escapeHtml(item.observedIsbn || item.isbn || 'ISBN nieznany')} · wykryta ${escapeHtml(date(item.firstSeenAt || item.lastSeenAt))}${(() => { const badge = availabilityBadge(item); return badge.tone === 'success' ? '' : ' · <b class="offer-gone">' + escapeHtml(badge.label) + '</b>'; })()}</small>${match?.workTitle ? `<small class="offer-match">↳ ${escapeHtml(match.workTitle)}</small>` : ''}</span><span class="mobile-offer-price"><b>${money(item.currentPrice)}</b><small class="status-tag ${match ? 'is-good' : item.rejected ? '' : 'is-warn'}">${tradingMode() && item.targetReached ? 'Cena docelowa · ' : ''}${escapeHtml(status)}</small></span></button>`;
+          const status = tradingMode() && item.purchaseStatus ? statusLabel(item.purchaseStatus) : offerState(item, match).label;
+          return `<button class="mobile-offer offer-card" data-mobile-offer-id="${escapeHtml(item.id)}" type="button">${coverMarkup(item.image, title, { size: 'sm', escapeHtml })}<span class="mobile-offer-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(item.source)}"></span>${escapeHtml(item.source)} · ${escapeHtml(item.observedIsbn || item.isbn || 'ISBN nieznany')} · wykryta ${dateMarkup(item.firstSeenAt || item.lastSeenAt)}${(() => { const badge = availabilityBadge(item); return badge.tone === 'success' ? '' : ' · <b class="offer-gone">' + escapeHtml(badge.label) + '</b>'; })()}</small>${match?.workTitle ? `<small class="offer-match">↳ ${escapeHtml(match.workTitle)}</small>` : ''}</span><span class="mobile-offer-price"><b>${money(item.currentPrice)}</b><small class="status-tag ${{ success: 'is-good', warning: 'is-warn', neutral: '' }[offerState(item, match).tone]}">${tradingMode() && item.targetReached ? 'Cena docelowa · ' : ''}${escapeHtml(status)}</small></span></button>`;
         })
         .join('') || '<div class="empty-detail">Brak ofert zgodnych z filtrami.</div>';
     mobile
@@ -158,10 +171,16 @@ function renderOffers() {
             (offer.bookId
               ? { workTitle: bookFor(offer.bookId)?.title, method: offer.linkMode }
               : null);
-          return `<tr><td><span class="offer-cell">${coverMarkup(offer.image, offer.title || offer.originalTitle, { size: 'xs', escapeHtml })}<span><button class="link-button offer-title" type="button" data-offer-id="${escapeHtml(offer.id)}">${escapeHtml(tidyOfferTitle(offer.title || offer.originalTitle))}</button><span class="offer-subtitle">${escapeHtml(offer.matchedQueries?.join(', ') || '')}</span></span></span></td><td>${escapeHtml(offer.source)}</td><td>${money(offer.currentPrice)}${offer.targetReached ? ' ✓ próg' : ''}</td><td>${escapeHtml(offer.observedIsbn || offer.isbn || '-')}</td><td>${escapeHtml(matched?.workTitle || matched?.editionTitle || '-')}</td><td>${tradingMode() ? `<strong>${escapeHtml(statusLabel(offer.purchaseStatus))}</strong><br>` : ''}<span class="status-pill ${matched?.method === 'manual' ? 'success' : matched ? 'warning' : 'neutral'}">${matched?.method === 'manual' ? 'Ręczne' : matched ? 'Automatyczne' : escapeHtml(statusLabel(offer.identification?.status))}</span></td><td>${escapeHtml(date(offer.firstSeenAt || offer.lastSeenAt))}</td></tr>`;
+          const offerStatus = offerState(offer, matched);
+          return `<tr data-open-offer="${escapeHtml(offer.id)}"><td><span class="offer-cell">${coverMarkup(offer.image, offer.title || offer.originalTitle, { size: 'xs', escapeHtml })}<span><button class="link-button offer-title" title="${escapeHtml([offer.title || offer.originalTitle, ...(offer.matchedQueries || [])].join(' · '))}" type="button" data-offer-id="${escapeHtml(offer.id)}">${escapeHtml(tidyOfferTitle(offer.title || offer.originalTitle))}</button><span class="offer-subtitle">${escapeHtml(offer.matchedQueries?.join(', ') || '')}</span></span></span></td><td>${escapeHtml(offer.source)}</td><td class="offer-price-cell">${money(offer.currentPrice)}${offer.targetReached ? ' ✓ próg' : ''}</td><td>${escapeHtml(offer.observedIsbn || offer.isbn || '—')}</td><td>${matched?.workId ? `<button type="button" class="link-button offer-book" data-open-work="${escapeHtml(matched.workId)}" title="Strona książki">${escapeHtml(matched.workTitle || matched.editionTitle)}</button>` : escapeHtml(matched?.workTitle || matched?.editionTitle || '—')}</td><td>${tradingMode() ? `<strong>${escapeHtml(statusLabel(offer.purchaseStatus))}</strong><br>` : ''}<span class="status-pill ${offerStatus.tone === 'warning' ? 'warning' : 'neutral'}">${escapeHtml(offerStatus.label)}</span></td><td>${dateMarkup(offer.firstSeenAt || offer.lastSeenAt)}</td></tr>`;
         })
         .join('')
     : '<tr><td colspan="7" class="empty-cell">Brak ofert zgodnych z filtrami.</td></tr>';
+  // The assignment opens the book page (editions, every offer of the book, prices over time).
+  $('#offersTableBody').querySelectorAll('[data-open-work]').forEach((button) => button.addEventListener('click', () => document.dispatchEvent(new CustomEvent('bookflip-open-work', { detail: { workId: button.dataset.openWork } }))));
+  $('#offersTableBody').querySelectorAll('[data-open-offer]').forEach(row => row.addEventListener('click', event => {
+    if (!event.target.closest('button, a')) openOfferDrawer(row.dataset.openOffer);
+  }));
   const activeSort = $('#offerSort').value;
   document.querySelectorAll('#view-offers [data-offer-sort]').forEach((button) => {
     const isActive = activeSort === button.dataset.offerSort || activeSort === button.dataset.offerSortReverse;
@@ -256,9 +275,9 @@ async function openOfferDrawer(id) {
       active = offer.matches.find((item) => item.status === 'active');
     if(serial!==drawerSerial) return;
     $('#offerDrawerContent').innerHTML =
-      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><p class="drawer-pills">${drawerPills(offer, active)}</p><h2>${escapeHtml(offer.title)}</h2><div class="detail-grid"><span><b>Cena</b><small>${money(offer.currentPrice)}</small></span><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span>${observationFacts(offer, { money, date, escapeHtml })}</div>${listingHistoryMarkup(offer, { money, date, escapeHtml })}${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}<button class="button secondary" type="button" id="drawerMarkSet" title="Jedno ogłoszenie, kilka książek: skład ustalisz w zakładce Zestawy">${looksLikeSet(offer.title) ? 'Oznacz jako zestaw' : 'To zestaw kilku książek'}</button></div>`;
+      `<figure class="drawer-photo">${coverMarkup(offer.image || `/api/offers/${encodeURIComponent(offer.id)}/image`, offer.title, { size: 'xl', escapeHtml })}</figure><p class="drawer-pills">${drawerPills(offer, active)}</p><h2>${escapeHtml(offer.title)}</h2><p class="drawer-main-price">${money(offer.currentPrice)}</p><div class="detail-grid"><span><b>Źródło</b><small>${escapeHtml(offer.source)}</small></span><span><b>ISBN</b><small>${escapeHtml(offer.observedIsbn || 'brak')}</small></span><span><b>Ostatnio wykryto</b><small>${escapeHtml(date(offer.lastSeenAt))}</small></span><span><b>Wykrycia</b><small>${offer.seenCount || 0}</small></span><span><b>Wydanie</b><small>${escapeHtml(active?.editionTitle || 'nieprzypisane')}</small></span>${observationFacts(offer, { money, date, escapeHtml })}</div>${listingHistoryMarkup(offer, { money, date, escapeHtml })}${priceEvidenceMarkup(offer)}${scenarioCalculatorMarkup(offer)}<section class="detail-section"><details class="detail-disclosure price-history-disclosure"><summary>Historia cen ofertowych (${Array.isArray(offer.priceHistory) ? offer.priceHistory.length : 0} obserwacji)</summary><p class="inline-note">Historia zapisanych cen ogłoszenia; nie potwierdza transakcji ani dostępności.</p><div class="price-list">${offer.priceHistory.map((item) => `<span><small>${escapeHtml(date(item.observedAt))}</small><b>${money(item.price)}</b></span>`).join('') || '<p>Brak obserwacji.</p>'}</div></details></section><div class="detail-actions"><a class="button primary" href="${escapeHtml(safeOfferHref(offer.url))}" target="_blank" rel="noreferrer">Otwórz ogłoszenie</a>${offer.identificationJob && offer.identificationJob.status === 'review_required' ? '<button class="button secondary" type="button" id="drawerReview">Przejdź do weryfikacji</button>' : ''}<button class="button secondary" type="button" id="drawerMarkSet" title="Jedno ogłoszenie, kilka książek: skład ustalisz w zakładce Zestawy">${looksLikeSet(offer.title) ? 'Oznacz jako zestaw' : 'To zestaw kilku książek'}</button></div>`;
     const primaryActions = $('#offerDrawerContent .detail-actions');
-    $('#offerDrawerContent h2').after(primaryActions);
+    $('#offerDrawerContent .drawer-main-price').after(primaryActions);
     await ensureWorkspaceLoaded();
     if(serial!==drawerSerial) return;
     mountOfferWorkspace(offer, $('#offerDrawerContent'), ()=>{renderOffers();onFiltersChange?.();}, {json});
@@ -269,7 +288,8 @@ async function openOfferDrawer(id) {
     freshness.textContent='Stan ogłoszenia: '+availabilityLabel(offer)+(age!==null?' · ostatnio w wynikach: '+(age<=0?'dziś':age===1?'wczoraj':age+' dni temu'):'');
     $('#offerDrawerContent .detail-grid').after(freshness);
     const scenario=$('#offerDrawerContent .scenario-calculator');workspace.after(scenario);
-    try {
+    // The scenario calculator is trading-only: no trading request while trading mode is off.
+    if (tradingMode()) try {
       const [saved,defaults]=await Promise.all([json('/api/offer-scenarios/'+encodeURIComponent(id)),json('/api/trading-defaults')]);
       if(serial!==drawerSerial) return;
       const map={purchase:'scenarioPurchase',shipping:'scenarioShipping',other:'scenarioOther',resale:'scenarioResale',actualPurchase:'scenarioActualPurchase'};
@@ -291,22 +311,11 @@ async function openOfferDrawer(id) {
       });
     } catch(error){if(serial!==drawerSerial)return;$('#scenarioSaveStatus').textContent='Nie udało się odczytać scenariusza. Otwórz ofertę ponownie.';$('#saveScenario').disabled=true;}
     if(active) {
-      const catalogLink=document.createElement('button');catalogLink.type='button';catalogLink.className='button secondary';catalogLink.textContent='Wydanie i historia w katalogu';
-      catalogLink.addEventListener('click',()=>{const go=()=>document.dispatchEvent(new CustomEvent('bookflip-open-edition',{detail:{editionId:active.editionId}}));if(closeOfferDrawer(go))go();});
-      $('#offerDrawerContent .detail-actions').append(catalogLink);
-      const comparison=document.createElement('button');comparison.type='button';comparison.className='button secondary';comparison.textContent='Porównaj ceny tego wydania';
-      comparison.addEventListener('click',async()=>{
-        if(!await confirmDiscard())return;
-        let edition;
-        try { edition=await json('/api/catalog/editions/'+encodeURIComponent(active.editionId)); }
-        catch { toast('Nie udało się pobrać porównania cen. Spróbuj ponownie.'); return; }
-        const panel=document.createElement('section');panel.className='detail-section';
-        const title=document.createElement('h4');title.textContent='Porównanie zapisanych ofert tego wydania';panel.append(title);
-        for(const item of edition.offers) {
-          const row=document.createElement('p');row.textContent=item.source+' · '+money(item.currentPrice)+' · wykryto '+date(item.lastSeenAt)+' · '+availabilityLabel(item);panel.append(row);
-        }
-        comparison.replaceWith(panel);
-      });scenario.after(comparison);
+      // The book page holds the editions, every offer of the book, prices over time and the sets
+      // with it (review 11.2026, stage 3); the drawer keeps what is about this one listing.
+      const bookLink=document.createElement('button');bookLink.type='button';bookLink.className='button secondary';bookLink.textContent='Strona książki';
+      bookLink.addEventListener('click',()=>{const go=()=>document.dispatchEvent(new CustomEvent(active.workId?'bookflip-open-work':'bookflip-open-edition',{detail:{workId:active.workId,editionId:active.editionId}}));if(closeOfferDrawer(go))go();});
+      $('#offerDrawerContent .detail-actions').append(bookLink);
     }
     // Change or remove the edition this offer is assigned to (sets are edited in Zestawy).
     const assignmentSection=document.createElement('section');assignmentSection.className='detail-section';

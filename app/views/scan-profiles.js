@@ -217,4 +217,6 @@ export async function installScanProfiles({ queriesInput, sourceGrid, panel, toa
   document.addEventListener('bookflip-scan-complete', () => { freshness = null; void showStale(); });
   await reload();
   void showStale();
+  // The schedule section lists the same profiles (one request at start-up instead of two).
+  return profiles;
 }

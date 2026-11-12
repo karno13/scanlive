@@ -1,18 +1,42 @@
 // Command palette (Ctrl+K): jump to a view, run a frequent action, or find an offer / work / ISBN.
 import { coverMarkup, tidyOfferTitle, tidyWorkTitle, parseBnPeople } from '../core/bibliography.js';
 
-export function installCommandPalette({ $, json, escapeHtml, money, showView, openOfferDrawer, openWork, actions = [] }) {
+/** Digits of a text that looks like an ISBN (10 or 13 characters after removing spaces and dashes), else null. */
+export function isbnLike(text) {
+  const clean = String(text ?? '').replace(/[\s-]/g, '').toUpperCase();
+  return /^(?:\d{9}[\dX]|97[89]\d{10})$/.test(clean) ? clean : null;
+}
+
+/**
+ * What the palette offers when nothing matched: scan the phrase, search the offers or the
+ * catalogue for it, and for an ISBN-like text add the book by ISBN. Empty for an empty query.
+ * @returns {{ kind: 'isbn' | 'scan' | 'offers' | 'catalog', label: string, hint: string }[]}
+ */
+export function fallbackActions(query) {
+  const text = String(query ?? '').trim();
+  if (!text) return [];
+  const isbn = isbnLike(text);
+  return [
+    ...(isbn ? [{ kind: 'isbn', label: 'Dodaj książkę przez ISBN', hint: 'ISBN ' + isbn + ' · BN, Open Library, e-ISBN' }] : []),
+    { kind: 'scan', label: 'Skanuj «' + text + '»', hint: 'Skan tej frazy w zaznaczonych źródłach' },
+    { kind: 'offers', label: 'Szukaj w ofertach', hint: '„' + text + '” w zapisanych ofertach' },
+    { kind: 'catalog', label: 'Szukaj w katalogu', hint: '„' + text + '” w dziełach i wydaniach' },
+  ];
+}
+
+export function installCommandPalette({ $, json, escapeHtml, money, showView, openOfferDrawer, openWork, onFallback = () => {}, actions = [] }) {
   const dialog = $('#commandPalette');
   const input = $('#paletteInput');
   const results = $('#paletteResults');
   if (!dialog || !input || !results) return;
   const views = [
-    ['scanner', 'Skaner', 'Skanowanie i stan katalogu'],
-    ['review', 'Do weryfikacji', 'Kolejka decyzji'],
-    ['catalog', 'Katalog', 'Dzieła i wydania'],
+    ['today', 'Dziś', 'Zmiany od ostatniej wizyty, stan źródeł'],
+    ['queue', 'Kolejka', 'Weryfikacja, zestawy, podejrzane przypisania, duplikaty'],
+    ['catalog', 'Książki', 'Dzieła, wydania i serie'],
     ['offers', 'Oferty', 'Wszystkie zebrane ogłoszenia'],
-    ['sets', 'Zestawy', 'Oferty z wieloma książkami'],
-    ['settings', 'Ustawienia', 'Interfejs, kopie, diagnostyka'],
+    ['scanner', 'Źródła', 'Stan źródeł i nowy skan'],
+    ['sets', 'Zestawy', 'Kolejka: oferty z wieloma książkami'],
+    ['settings', 'Ustawienia', 'Interfejs, reguły odrzucania, kopie'],
   ];
   let items = [];
   let active = 0;
@@ -27,6 +51,17 @@ export function installCommandPalette({ $, json, escapeHtml, money, showView, op
       ...actions.map((action) => ({ group: 'Akcja', ...action })),
     ];
     return needle ? list.filter((item) => fold(item.label + ' ' + (item.hint || '')).includes(needle)) : list;
+  }
+
+  // Nothing matched (yet): the text itself becomes the action instead of "Brak wyników".
+  function withFallback(list, query) {
+    if (list.length) return list;
+    return fallbackActions(query).map((action) => ({
+      group: 'Brak trafień — co zrobić z tym tekstem',
+      label: action.label,
+      hint: action.hint,
+      run: () => onFallback(action.kind, query.trim(), isbnLike(query)),
+    }));
   }
 
   function render() {
@@ -45,7 +80,7 @@ export function installCommandPalette({ $, json, escapeHtml, money, showView, op
 
   async function search(query) {
     const request = ++serial;
-    items = staticItems(query);
+    items = withFallback(staticItems(query), query);
     active = 0;
     render();
     const text = query.trim();
@@ -56,8 +91,8 @@ export function installCommandPalette({ $, json, escapeHtml, money, showView, op
         json('/api/catalog/works?' + new URLSearchParams({ query: text, limit: '6' })),
       ]);
       if (request !== serial) return;
-      items = [
-        ...items,
+      items = withFallback([
+        ...staticItems(query),
         ...(works.items || []).map((work) => ({
           group: 'Katalog',
           label: tidyWorkTitle(work.title),
@@ -74,7 +109,7 @@ export function installCommandPalette({ $, json, escapeHtml, money, showView, op
           cover: offer.image || null,
           run: () => openOfferDrawer(offer.id),
         })),
-      ];
+      ], query);
       render();
     } catch {
       // Static entries stay usable when search fails.
@@ -97,7 +132,7 @@ export function installCommandPalette({ $, json, escapeHtml, money, showView, op
 
   input.addEventListener('input', () => {
     clearTimeout(timer);
-    items = staticItems(input.value);
+    items = withFallback(staticItems(input.value), input.value);
     active = 0;
     render();
     timer = setTimeout(() => void search(input.value), 220);

@@ -35,7 +35,7 @@ export function scheduleHeadline(schedule) {
   return `Automatyczny skan: co ${schedule.everyHours} h (${profile})${next}${warn}`;
 }
 
-export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
+export async function mountScanSchedule({ panel, json, toast, escapeHtml, profiles: initialProfiles = null }) {
   if (!panel) return;
   const root = document.createElement('details');
   root.className = 'scan-schedule';
@@ -81,9 +81,9 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
     root.classList.toggle('is-warn', schedule.enabled && Boolean(schedule.lastResult) && schedule.lastResult !== 'ok');
   };
 
-  async function load() {
+  async function load(knownProfiles = null) {
     try {
-      const [profiles, schedule] = await Promise.all([json('/api/scan-profiles'), json('/api/scan-schedule')]);
+      const [profiles, schedule] = await Promise.all([knownProfiles ?? json('/api/scan-profiles'), json('/api/scan-schedule')]);
       const items = Array.isArray(profiles) ? profiles : profiles.items || [];
       $('#scheduleProfile').innerHTML =
         '<option value="">Wybierz profil</option>' +
@@ -141,5 +141,5 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml }) {
   });
   // Shown without opening the section; refreshed after each scan (it may have been the scheduled one).
   for (const name of ['bookflip-scan-complete', 'bookflip-profiles-changed']) document.addEventListener(name, () => void load());
-  await load();
+  await load(initialProfiles);
 }

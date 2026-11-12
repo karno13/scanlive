@@ -1,3 +1,4 @@
+import { problemTasks } from '../core/formatters.js';
 import { readSearchStream } from '../scan-stream.js';
 
 export async function requestScanCancellation({ $, toast }) {
@@ -127,14 +128,14 @@ async function startSearch(options = {}) {
     state.scan.completed = state.scan.total;
     const summary = state.scan.result.summary || {};
     const problems=(state.scan.result.results || []).filter(row=>row.status!=='ok').length;
-    $('#progressMessage').textContent=problems ? `Zapisano ${summary.offers || 0} ofert; ${problems} zadań z problemami` : `Zapisano ${summary.offers || 0} ofert`;
+    $('#progressMessage').textContent=problems ? `Zapisano ${summary.offers || 0} ofert; ${problemTasks(problems)}` : `Zapisano ${summary.offers || 0} ofert`;
     $('#progressDetail').textContent = '';
     document.dispatchEvent(new CustomEvent('bookflip-scan-complete'));
     $('#scanStateBadge').textContent = problems ? 'Zakończony z problemami' : 'Zakończony';
     $('#scanStateBadge').className = problems ? 'state-badge warning' : 'state-badge neutral';
     await Promise.all([loadHistory(), loadCatalogStatus(), loadCatalogData()]);
     toast(`Skan zakończony: ${summary.offers || 0} ofert.`);
-    notifyDone(`Skan zakończony: ${summary.offers || 0} ofert` + (summary.newOffers != null ? `, ${summary.newOffers} nowych` : "") + (problems ? `, ${problems} zadań z problemami.` : "."));
+    notifyDone(`Skan zakończony: ${summary.offers || 0} ofert` + (summary.newOffers != null ? `, ${summary.newOffers} nowych` : "") + (problems ? `, ${problemTasks(problems)}.` : "."));
   } catch (error) {
     if (error.message === 'SCAN_CANCELLED') {
       $('#progressMessage').textContent = 'Skan anulowany';

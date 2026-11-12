@@ -2,10 +2,10 @@ import { json } from '../core/api.js';
 import { escapeHtml } from '../core/formatters.js';
 import { mountBuybackBatch } from './buyback.js';
 
-// Scanner home: how much of the collected market data is already identified, how good each source
-// is, and how far each followed series (scan phrase) has been catalogued.
+// Bottom of "Dziś": how much of the collected market data is already identified, how good each
+// source is, and how far each followed series (scan phrase) has been catalogued.
 export function installDashboard({ state, showView }) {
-  const scanner = document.querySelector('#view-scanner');
+  const scanner = document.querySelector('#view-today');
   if (!scanner || document.querySelector('#workflowDashboard')) return () => {};
   const panel = document.createElement('section');
   panel.id = 'workflowDashboard';
@@ -27,9 +27,7 @@ export function installDashboard({ state, showView }) {
       localStorage.setItem('bookflip.dashboardOpen', fold.open ? '1' : '0');
     } catch {}
   });
-  const anchor = scanner.querySelector('.scanner-discover');
-  if (anchor) anchor.before(fold);
-  else scanner.append(fold);
+  scanner.append(fold);
 
   let backfillTimer = null;
   let backfillWasRunning = false;
@@ -53,7 +51,7 @@ export function installDashboard({ state, showView }) {
     if (box) box.innerHTML = backfillMarkup(status);
     const running = status.state === 'running';
     if (running) backfillTimer = setTimeout(backfillTick, 2000);
-    else if (backfillWasRunning) void refresh();
+    else if (backfillWasRunning) void refresh({ force: true });
     backfillWasRunning = running;
   }
 
@@ -115,12 +113,26 @@ export function installDashboard({ state, showView }) {
     return `<div class="insight-alert" role="status"><strong>Biblioteka Narodowa niedostępna — ${escapeHtml(reason)}.</strong> ${outage.waiting} ${outage.waiting === 1 ? 'oferta z ISBN czeka' : 'ofert z ISBN czeka'} na rozpoznanie. Aplikacja ponawia coraz rzadziej (najwyżej co godzinę${next ? `, następna próba ok. ${next}` : ''}), korzysta zastępczo z Open Library i ruszy sama, gdy BN odpowie. To problem po stronie BN — nic nie trzeba robić.</div>`;
   }
 
-  async function refresh() {
+  // Start-up asked for it three times (install, opening the scanner, catalogue status); the
+  // insights take ~300 ms of the single server thread each. One request at a time, and not again
+  // within 3 s unless asked explicitly.
+  let inflight = null;
+  let loadedAt = 0;
+  function refresh({ force = false } = {}) {
+    if (inflight) return inflight;
+    if (!force && Date.now() - loadedAt < 3000) return Promise.resolve();
+    inflight = load().finally(() => {
+      inflight = null;
+      loadedAt = Date.now();
+    });
+    return inflight;
+  }
+  async function load() {
     let data;
     try {
       data = await json('/api/catalog/insights');
     } catch {
-      panel.innerHTML = '<p class="inline-note">Nie udało się odczytać stanu katalogu. Użyj „Odśwież”.</p>';
+      panel.innerHTML = '<p class="inline-note">Nie udało się odczytać stanu katalogu. Spróbuję ponownie po odzyskaniu połączenia.</p>';
       return;
     }
     const f = data.funnel;
@@ -128,13 +140,13 @@ export function installDashboard({ state, showView }) {
       ['Zebrane oferty', f.offers, 'offers', 'wszystkie źródła'],
       ['Z numerem ISBN', f.withIsbn, 'offers', `${rate(f.offers ? Math.round((f.withIsbn / f.offers) * 1000) / 10 : 0)} ofert`],
       ['W katalogu', f.matched, 'catalog', `${f.manual} zatwierdzonych ręcznie`],
-      ['Czeka na decyzję', f.review, 'review', `${f.queued} w kolejce automatu`],
+      ['Oferty wymagające weryfikacji (z referencjami)', f.review, 'review', `${f.queued} w kolejce automatu`],
     ];
     const top = Math.max(1, f.offers);
     panel.innerHTML = `${outageMarkup(data.outage)}
       <div class="insight-head">
         <div><p class="section-eyebrow">STAN KATALOGU</p><h3>Od oferty do rozpoznanego wydania</h3></div>
-        <button type="button" class="button primary compact" data-go="review">Weryfikuj ${f.review ? `(${f.review})` : ''}</button>
+        <button type="button" class="button primary compact" data-go="review">Weryfikuj (${f.reviewQueue.decisions} do decyzji)</button>
       </div>
       <ol class="funnel">${steps
         .map(
@@ -150,7 +162,7 @@ export function installDashboard({ state, showView }) {
               ? data.series
                   .map(
                     (item) =>
-                      `<li><button type="button" data-go="review" data-query="${escapeHtml(item.phrase)}"><span class="series-name">${escapeHtml(item.phrase)}</span><span class="series-meta">${item.matched}/${item.offers} w katalogu${item.review ? ` · <b>${item.review} do decyzji</b>` : ''}</span>${bar(item.matchRate)}</button></li>`,
+                      `<li><button type="button" data-go="review" data-query="${escapeHtml(item.phrase)}"><span class="series-name">${escapeHtml(item.phrase)}</span><span class="series-meta">${item.matched}/${item.offers} w katalogu${item.review ? ` · <b>${item.review} ofert do weryfikacji</b>` : ''}</span>${bar(item.matchRate)}</button></li>`,
                   )
                   .join('')
               : '<li class="inline-note">Brak fraz — uruchom pierwszy skan.</li>'

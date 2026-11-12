@@ -141,11 +141,9 @@ export function createScanRun({ $ }) {
       if (lastStatus === 'running' && data.status !== 'running' && !$('#scanRun').dataset.local && typeof document !== 'undefined')
         document.dispatchEvent(new CustomEvent('bookflip-remote-scan-complete'));
       lastStatus = data.status;
-      // While a scan runs, follow it; afterwards stay quiet.
-      if (data.status === 'running') timer = setTimeout(refresh, 1500);
+      // While a scan runs the server's live channel (scan events) asks for the next refresh.
       return data;
     } catch {
-      timer = setTimeout(refresh, 5000);
       return last;
     } finally {
       busy = false;

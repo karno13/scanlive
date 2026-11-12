@@ -26,6 +26,9 @@ export function mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogDat
     </article>`;
 
   function setSummary() {
+    const count = $('#catalogToolsCount');
+    if (count) count.textContent = conflicts.length ? `· ${conflicts.length}` : '';
+    if (count) count.title = `Podejrzane przypisania: ${conflicts.length}`;
     panel.querySelector('summary').textContent = conflicts.length
       ? `Podejrzane przypisania (${conflicts.length})`
       : 'Podejrzane przypisania';

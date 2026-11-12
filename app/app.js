@@ -4,7 +4,11 @@ import { viewFromSearch, idFromSearch, urlForView, shouldPush } from './core/vie
 import { identificationProgress } from './core/identification-progress.js';
 import { installTradingControls } from './views/trading-controls.js';
 import { installDashboard } from './views/dashboard.js';
-import { installSinceLastVisit } from './views/since-last-visit.js';
+import { installTodayView } from './views/today.js';
+import { connectLive } from './core/live.js';
+import { installQueue, QUEUE_TYPES, QUEUE_VIEWS } from './views/queue.js';
+import { mountRuleSettings } from './views/reject-rule.js';
+import { installSources } from './views/sources.js';
 import { createScanRun } from './views/scan-run.js';
 import { installScanProfiles } from './views/scan-profiles.js';
 import { createScanInsights } from './views/scan-insights.js';
@@ -17,9 +21,8 @@ import { mountCatalogSeeds } from './views/catalog-seeds.js';
 import { mountTitleConflicts } from './views/title-conflicts.js';
 import { mountScanSchedule } from './views/scan-schedule.js';
 import { createOffersView } from './views/offers.js';
-import { installOfferGroups } from './views/offer-groups.js';
 import { json } from './core/api.js';
-import { escapeHtml, money, date, shortTime, sourceHealthNote } from './core/formatters.js';
+import { escapeHtml, money, date, dateMarkup, shortTime, sourceHealthNote } from './core/formatters.js';
 import { createSettingsView } from './views/settings.js';
 import { createScannerView } from './views/scanner.js';
 import { requestScanCancellation } from './views/scanner.js';
@@ -31,7 +34,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 const state = {
-  activeView: 'catalog',
+  activeView: 'today',
   sources: [],
   history: null,
   catalog: null,
@@ -62,7 +65,7 @@ const state = {
   reviewScan: '',
   scanRuns: [],
   offerPage: 1,
-  pageSize: 25,
+  pageSize: matchMedia('(min-width: 901px)').matches ? 50 : 25,
   catalogPages: {
     works: { total: 0, offset: 0 },
     jobs: { total: 0, offset: 0 },
@@ -121,57 +124,6 @@ function allOffers() {
 function reviewOffers() {
   return state.reviewJobs;
 }
-function renderScannerOffers() {
-  const mount = $('#scannerOfferList');
-  if (!mount) return;
-  const all = [...state.scannerOffers];
-  const sourceSelect = $('#scannerOfferSource');
-  const activeSource = sourceSelect.value;
-  const sources = [...new Set([...state.sources,...all.map((item) => item.source)].filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b, 'pl'),
-  );
-  sourceSelect.innerHTML =
-    '<option value="">Wszystkie źródła</option>' +
-    sources
-      .map((source) => `<option value="${escapeHtml(source)}">${escapeHtml(source)}</option>`)
-      .join('');
-  sourceSelect.value = sources.includes(activeSource) ? activeSource : '';
-  const needle = $('#scannerOfferSearch').value.trim().toLocaleLowerCase('pl');
-  const filtered = all
-    .filter(
-      (item) =>
-        (!sourceSelect.value || item.source === sourceSelect.value) &&
-        (!needle ||
-          `${item.title || item.originalTitle || ''} ${item.source || ''} ${item.observedIsbn || item.isbn || ''}`
-            .toLocaleLowerCase('pl')
-            .includes(needle)),
-    )
-    .sort((a, b) => String(b.firstSeenAt || b.lastSeenAt || '').localeCompare(String(a.firstSeenAt || a.lastSeenAt || '')));
-  const offers = filtered.slice(0, 12);
-  $('#scannerOfferCount').textContent =
-    `Pokazano ${offers.length} z ${state.scannerTotal} ${state.scannerScope === 'new' ? 'nowych' : 'pasujących'} ofert`;
-  const scanned = state.scannerRun ? new Date(state.scannerRun.at).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-  $('#scannerDiscoverTitle').textContent = state.scannerScope === 'new' ? 'Nowe z ostatniego skanu' : 'Ostatnio wykryte oferty';
-  $('#scannerDiscoverSummary').textContent =
-    state.scannerScope === 'new'
-      ? 'Oferty wykryte po raz pierwszy w skanie z ' + scanned + '.'
-      : 'Ostatni skan nie przyniósł nowych ofert — poniżej najnowsze zapisane. Nie są to wyniki bieżącego skanu.';
-  mount.innerHTML = offers.length
-    ? offers
-        .map((item) => {
-          const title = tidyOfferTitle(item.title || item.originalTitle || 'Tytuł nieznany');
-          const isbn = item.observedIsbn || item.isbn || 'ISBN nieznany';
-          return `<button class="scanner-offer-row" type="button" data-scanner-offer-id="${escapeHtml(item.id)}">${coverMarkup(item.image, title, { size: 'sm', escapeHtml })}<span class="scanner-offer-copy"><strong>${escapeHtml(title)}</strong><small><span class="source-dot" data-source="${escapeHtml(item.source)}"></span>${escapeHtml(item.source)} · ${escapeHtml(isbn)}</small><small>wykryta ${escapeHtml(date(item.firstSeenAt || item.lastSeenAt))}</small></span><span class="scanner-offer-price">${money(item.currentPrice)}</span></button>`;
-        })
-        .join('')
-    : '<div class="empty-detail"><p>Brak ofert zgodnych z filtrami albo baza jest pusta.</p></div>';
-  mount
-    .querySelectorAll('[data-scanner-offer-id]')
-    .forEach((button) =>
-      button.addEventListener('click', () => openOfferDrawer(button.dataset.scannerOfferId)),
-    );
-}
-
 // Keeps ?id= in the address equal to the item selected in the active list/detail view.
 // Disabled until the startup restore has finished so a deep link is not wiped by early renders.
 let itemUrlReady = false;
@@ -196,7 +148,7 @@ document.addEventListener('bookflip-open-set', (event) => {
 async function restoreItem(view, id) {
   if (!id) return;
   try {
-    if (view === 'catalog') await catalogView.openCatalogDetail(id);
+    if (view === 'catalog') await catalogView.openCatalogDetail(id, { fromHistory: true });
     else if (view === 'review') { state.selectedReviewId = id; renderReview(); openDetailView('review'); }
     else if (view === 'sets') { await setsView.refreshSets(id); openDetailView('sets'); }
   } catch (error) { toast(error.message); }
@@ -207,7 +159,9 @@ let firstViewRender = true;
 // options.fromHistory: called by popstate, the URL is already correct and must not be touched.
 const viewScroll = new Map();
 function showView(name, options = {}) {
-  if (!['scanner', 'review', 'catalog', 'sets', 'offers', 'settings'].includes(name)) name = 'scanner';
+  // "Kolejka" opens the queue type used last (review, sets or one of the catalogue checks).
+  if (name === 'queue') name = QUEUE_TYPES.find((type) => type.id === state.queueType)?.view || 'review';
+  if (!['today', 'scanner', 'review', 'checks', 'catalog', 'sets', 'offers', 'settings'].includes(name)) name = 'today';
   if (hasUnsavedChanges()) {
     // Ask without blocking the page; the switch continues only after the user agrees.
     void confirmDiscard().then((ok) => { if (ok) showView(name, options); });
@@ -223,13 +177,18 @@ function showView(name, options = {}) {
     view.classList.toggle('active', !view.hidden);
   });
   if (previous !== name) window.scrollTo({ top: viewScroll.get(name) || 0, behavior: 'instant' });
+  const navName = QUEUE_VIEWS.includes(name) ? 'queue' : name;
   $$('.nav-item, .mobile-nav-item').forEach((button) => {
-    const active = button.dataset.view === name;
+    const active = button.dataset.view === navName;
     button.classList.toggle('active', active);
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
   $('#viewTitle').textContent = $(`#view-${name}`).dataset.title;
+  for (const [view, id] of [['today', 'todaySince'], ['scanner', 'scanStateBadge'], ['review', 'reviewCount'], ['sets', 'setTotal'], ['offers', 'offerTotal']]) {
+    const badge = document.getElementById(id);
+    if (badge) { badge.hidden = view !== name; $('#viewSummary').append(badge); }
+  }
   if (!options.fromHistory) {
     const current = location.pathname + location.search;
     // Reloading or re-entering the same view keeps the selected item in the address.
@@ -239,18 +198,17 @@ function showView(name, options = {}) {
     else history.replaceState({ view: name }, '', urlForView(name, keepId));
   }
   firstViewRender = false;
-  if (name === 'scanner') {
-    void scanRun?.refresh();
+  void ensureViewData(name);
+  queue?.attach(name);
+  if (name === 'today') {
+    void todayView?.refresh();
     refreshWorkflowDashboard?.();
-    refreshSinceVisit?.();
   }
-  if(['sets','settings'].includes(name)) $('#mobileMore')?.setAttribute('aria-current','page');
-  else $('#mobileMore')?.removeAttribute('aria-current');
+  if (name === 'scanner') { void scanRun?.refresh(); void sourcesView?.refresh(); }
   if (name === 'review') { renderReview(); void tradingControls?.refreshDecisions(); }
   if (name === 'catalog') renderCatalog();
   if (name === 'offers') renderOffers();
-  if (name === 'scanner') { renderScannerOffers(); void refreshScannerOffers(); }
-  if (name === 'settings') { renderSettings(); void tradingControls?.refreshSettings(); }
+  if (name === 'settings') { renderSettings(); void tradingControls?.refreshSettings(); void ruleSettings?.refresh(); }
   if (name === 'sets') void setsView.refreshSets().catch(error => toast(error.message));
   return true;
 }
@@ -259,7 +217,14 @@ function showView(name, options = {}) {
 // URL is restored so the address bar keeps matching what is on screen.
 window.addEventListener('popstate', () => {
   const target = viewFromSearch(location.search);
-  if (target === state.activeView) return;
+  if (target === state.activeView) {
+    if (target === 'catalog') {
+      const id = idFromSearch(location.search);
+      if (id && id !== state.selectedCatalogId) void catalogView.openCatalogDetail(id, { fromHistory: true });
+      else if (!id) catalogView.closeBookPage({ fromHistory: true });
+    }
+    return;
+  }
   if (hasUnsavedChanges()) {
     history.pushState({ view: state.activeView }, '', urlForView(state.activeView));
     void confirmDiscard().then((ok) => { if (ok) showView(target); });
@@ -268,6 +233,90 @@ window.addEventListener('popstate', () => {
   showView(target, { fromHistory: true });
   void restoreItem(target, idFromSearch(location.search));
 });
+
+// First visit of a view reads what it shows (lists, the brief history the lists need, the
+// catalogue tools); later visits reuse it and the regular refreshes keep it current.
+const viewDataRequests = new Map();
+function ensureViewData(name) {
+  if (viewDataRequests.has(name)) return viewDataRequests.get(name);
+  const tasks = [];
+  if (['review', 'catalog', 'offers'].includes(name) && !state.history && !historyRequest) tasks.push(loadHistory());
+  const kind = viewKinds[name];
+  if (kind && !loadedKinds.has(kind)) tasks.push(loadCatalogData({ kinds: [kind] }));
+  if (name === 'catalog' || name === 'checks') mountCatalogTools();
+  if (['scanner', 'offers', 'review'].includes(name)) tasks.push(ensureScanRuns());
+  const request = Promise.all(tasks).catch((error) => {
+    viewDataRequests.delete(name);
+    toast('Nie udało się wczytać danych widoku: ' + error.message);
+  });
+  viewDataRequests.set(name, request);
+  return request;
+}
+
+// The scan list (/api/scan-runs: Oferty scan filter, the scan result card) is read once, when a
+// view that uses it opens; a finished scan reads it again (trading-controls.js).
+let scanRunsRequest = null;
+function ensureScanRuns() {
+  scanRunsRequest ||= tradingControls.refreshRuns().catch((error) => {
+    scanRunsRequest = null;
+    throw error;
+  });
+  return scanRunsRequest;
+}
+
+// Opens Oferty with the filters of a "Dziś" tile: since a moment, price changed since, one scan
+// (new / price changes), one source. Every other filter is cleared so the list matches the count.
+async function openOffers(filters = {}) {
+  if (filters.scan) await ensureScanRuns().catch(() => {});
+  $('#offerSearch').value = '';
+  $('#offerStatus').value = '';
+  $('#offerSource').value = filters.source || '';
+  $('#offerMinPrice').value = '';
+  $('#offerMaxPrice').value = '';
+  const scan = $('#offerScan');
+  if (filters.scan && ![...scan.options].some((option) => option.value === filters.scan)) {
+    const option = document.createElement('option');
+    option.value = filters.scan;
+    option.textContent = new Date(filters.scan).toLocaleString('pl-PL');
+    scan.append(option);
+  }
+  scan.value = filters.scan || '';
+  $('#offerScanChange').value = filters.scanChange || '';
+  $('#offerSort').value = filters.sort || 'newest';
+  state.offerSince = filters.since || '';
+  state.offerPriceSince = filters.priceChangedSince || '';
+  state.offerPage = 1;
+  renderOfferScope();
+  if (!showView('offers')) return;
+  if (loadedKinds.has('offers')) scheduleGlobalCatalogSearch('offers');
+}
+// The filters a "Dziś" tile sets are said in one chip above the list (the scan filter sits in a
+// folded section, the "since" filters have no field at all); its ✕ clears them.
+function renderOfferScope() {
+  const chip = $('#offerScope');
+  if (!chip) return;
+  const at = (value) => new Date(value).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const scan = $('#offerScan').value;
+  const change = $('#offerScanChange').value;
+  const text = state.offerSince
+    ? 'Nowe od ' + at(state.offerSince)
+    : state.offerPriceSince
+      ? 'Zmiana ceny od ' + at(state.offerPriceSince)
+      : scan
+        ? (change === 'new' ? 'Nowe w skanie ' : change === 'price' ? 'Zmiany cen w skanie ' : 'Skan ') + at(scan)
+        : '';
+  chip.hidden = !text;
+  chip.querySelector('span').textContent = text;
+}
+$('#offerScope')?.querySelector('button')?.addEventListener('click', () => {
+  state.offerSince = '';
+  state.offerPriceSince = '';
+  $('#offerScan').value = '';
+  $('#offerScanChange').value = '';
+  renderOfferScope();
+  scheduleGlobalCatalogSearch('offers');
+});
+for (const selector of ['#offerScan', '#offerScanChange']) $(selector)?.addEventListener('change', renderOfferScope);
 
 const daysAgo = (value) => {
   // Calendar days: yesterday 20:30 is "wczoraj" this morning, not "dziś".
@@ -314,16 +363,21 @@ async function loadSources() {
     `<label class="source-option is-${tone(source)}" title="${escapeHtml(note(source) || 'Działał w ostatnim skanie')}"><input type="checkbox" value="${escapeHtml(source)}" ${chosen.has(source) ? 'checked' : ''}><i class="source-dot-state" aria-hidden="true"></i><span>${escapeHtml(source)}</span>${tone(source) === 'ok' ? '' : '<small class="sr-only">' + escapeHtml(note(source)) + '</small>'}</label>`;
   const working = state.sources.filter((source) => !isDead(source));
   const dead = state.sources.filter(isDead);
-  $('#sourceGrid').innerHTML = [...working, ...dead].map(option).join('') || '<span class="loading-copy">Brak aktywnych adapterów.</span>';
   // One sentence for all dead sources instead of a note under each.
   const byNote = new Map();
   for (const source of dead) byNote.set(lastWorked(source), [...(byNote.get(lastWorked(source)) || []), source]);
-  $('#sourceDeadNote').hidden = !dead.length;
-  $('#sourceDeadNote').innerHTML = dead.length
-    ? '<i class="source-dot-state" aria-hidden="true"></i> Nie działały w ostatnim skanie: ' +
+  const deadNote = dead.length
+    ? '<p class="source-dead-note"><i class="source-dot-state" aria-hidden="true"></i> Nie działały w ostatnim skanie: ' +
       [...byNote].map(([text, names]) => '<b>' + escapeHtml(names.join(', ')) + '</b> (' + escapeHtml(text) + ')').join(', ') +
-      '. Zaznacz, jeśli chcesz spróbować.'
+      '. Zaznacz, jeśli chcesz spróbować.</p>'
     : '';
+  // Sources that do not work (CAPTCHA, 403) are folded away under "Niedostępne", not shown next
+  // to the working ones; still in #sourceGrid, so profiles and "Zaznacz wszystkie" reach them.
+  const unavailable = dead.length
+    ? `<details class="source-unavailable"${dead.some((source) => chosen.has(source)) ? ' open' : ''}><summary>Niedostępne (${dead.length}): ${escapeHtml(dead.join(', '))}</summary><div class="source-unavailable-body">${dead.map(option).join('')}${deadNote}</div></details>`
+    : '';
+  $('#sourceGrid').innerHTML = working.map(option).join('') + unavailable || '<span class="loading-copy">Brak aktywnych adapterów.</span>';
+  $('#sourceDeadNote').hidden = true;
   $('#settingsSources').innerHTML = state.sources
     // Same text as Ustawienia's own refresh (it may run first when the page opens on Ustawienia).
     .map((source) => `<span><b>${escapeHtml(source)}</b><small>${escapeHtml(sourceHealthNote(row(source)))}</small></span>`)
@@ -366,30 +420,19 @@ function fillSourceFilters() {
   }
 }
 
+let historyRequest = null;
 async function loadHistory() {
-  state.history = await json('/api/history/brief');
-  $('#offersNavCount').textContent = `${allOffers().length} zapisanych`;
-  $('#reviewNavCount').textContent = `${state.reviewQueueTotal ?? state.catalogPages.jobs.total} do decyzji`;
+  historyRequest = json('/api/history/brief');
+  try {
+    state.history = await historyRequest;
+  } finally {
+    historyRequest = null;
+  }
+  $('#reviewNavCount').textContent = `${state.reviewQueueDecisions ?? state.catalog?.reviewQueue?.decisions ?? state.catalogPages.jobs.total} do decyzji`;
   renderReview();
   renderCatalog();
   renderOffers();
-  renderScannerOffers();
-  await refreshScannerOffers();
 }
-let scannerSearchSerial=0;
-async function refreshScannerOffers() {
-  const serial=++scannerSearchSerial;
-  try {
-    const filters={limit:'12',query:$('#scannerOfferSearch').value.trim(),source:$('#scannerOfferSource').value};
-    const run=(state.scanRuns||[]).find(item=>item.indexed);
-    let data=run?.newOffers?await json('/api/offers?'+new URLSearchParams({...filters,scan:run.at,scanChange:'new',sort:'newest'})):null;
-    state.scannerScope=data?'new':'recent';
-    if(!data) data=await json('/api/offers?'+new URLSearchParams({...filters,sort:'newest'}));
-    if(serial!==scannerSearchSerial)return;
-    state.scannerOffers=data.items;state.scannerTotal=data.total;state.scannerRun=run||null;renderScannerOffers();
-  }catch(error){$('#scannerOfferCount').textContent='Nie udało się pobrać ofert. Spróbuj odświeżyć.';}
-}
-
 // API pages are limited to 250 rows. Read subsequent pages rather than silently
 // hiding catalog records after the first page. A larger dataset needs server-side UX.
 const catalogSources = {
@@ -398,6 +441,7 @@ const catalogSources = {
   offers: { endpoint: '/api/offers', stateKey: 'sqliteOffers', view: 'offers' },
 };
 const catalogPageSize = 250;
+const reviewPageSize = 50;
 const loadingCatalogPages = new Set();
 const catalogAbortControllers = new Map();
 const catalogSearchTimers = new Map();
@@ -419,6 +463,7 @@ function catalogFilters(kind) {
       scan: state.reviewScan,
       isbn: $('#reviewIsbn').value,
       status:'review_required',
+      view: 'list',
       offerId:state.reviewOffer || '',
       sort: $('#reviewSort').value,
       bucket: state.reviewBucket || '',
@@ -431,6 +476,7 @@ function catalogFilters(kind) {
     purchaseStatus:['check','negotiating','bought','rejected'].includes(state.offerView)?state.offerView:'',
     scan:$('#offerScan').value,scanChange:$('#offerScanChange').value,
     minPrice:$('#offerMinPrice').value,maxPrice:$('#offerMaxPrice').value,
+    since: state.offerSince || '', priceChangedSince: state.offerPriceSince || '',
     sort: $('#offerSort').value,
   };
 }
@@ -449,7 +495,10 @@ async function loadCatalogPage(kind, { reset = false, pageNumber = null } = {}) 
   catalogAbortControllers.set(kind, controller);
   updateCatalogLoadControls();
   try {
-    const limit = kind === 'offers' ? state.pageSize : catalogPageSize;
+    // The review queue comes in pages of 50 decisions. Reloading with unchanged filters (after a
+    // decision) keeps as many rows as were loaded, so the next offer is the one under the decided.
+    const sameFilters = reset && kind === 'jobs' && JSON.stringify(catalogFilters(kind)) === JSON.stringify(page.filters || null);
+    const limit = kind === 'offers' ? state.pageSize : kind === 'jobs' ? (sameFilters ? Math.min(250, Math.max(reviewPageSize, state.reviewJobs.length)) : reviewPageSize) : catalogPageSize;
     const requestedPage = pageNumber ?? (reset ? 1 : state.offerPage + 1);
     let offset = kind === 'offers' ? (requestedPage - 1) * limit : reset ? 0 : page.offset;
     const filters = reset ? catalogFilters(kind) : page.filters || { query: page.query || '' };
@@ -474,6 +523,11 @@ async function loadCatalogPage(kind, { reset = false, pageNumber = null } = {}) 
       state.reviewBuckets = data.buckets || null;
       // The menu counts the whole queue, not the open tab or search.
       state.reviewQueueTotal = data.queueTotal ?? data.total;
+      state.reviewQueueDecisions = data.queueDecisions ?? data.total;
+      state.reviewOffersTotal = data.offersTotal ?? data.total;
+      state.reviewGroupSizes = data.groupSizes || null;
+      state.reviewSkippedCount = data.skippedCount || 0;
+      if (reset) state.skippedReviewIds?.clear();
     }
     if (reset || kind === 'offers') {
       state[source.stateKey] = data.items;
@@ -524,7 +578,6 @@ function scheduleGlobalCatalogSearch(kind) {
         if (kind === 'offers') {
           state.offerPage = 1;
           renderOffers();
-          renderScannerOffers();
         }
       }
     } catch (error) {
@@ -538,63 +591,34 @@ function updateCatalogLoadControls() {
   for (const [kind, source] of Object.entries(catalogSources)) {
     const view = document.querySelector('#view-' + source.view);
     if (!view) continue;
-    let control = view.querySelector('[data-load-catalog-kind="' + kind + '"]');
-    if (kind === 'jobs' || kind === 'offers') {
-      control?.remove();
-      continue; // Review list loads more as it is scrolled.
-    }
-    if (!control) {
-      control = document.createElement('button');
-      control.type = 'button';
-      control.className = 'button-secondary catalog-load-more';
-      control.dataset.loadCatalogKind = kind;
-      view.append(control);
-      control.addEventListener('click', async () => {
-        control.disabled = true;
-        try {
-          if (await loadCatalogPage(kind)) {
-            if (kind === 'works') renderCatalog();
-            if (kind === 'jobs') renderReview();
-            if (kind === 'offers') {
-              renderOffers();
-              renderScannerOffers();
-            }
-          }
-        } catch (error) {
-          toast('Nie udało się pobrać kolejnej strony: ' + error.message);
-        } finally {
-          updateCatalogLoadControls();
-        }
-      });
-    }
-    const page = state.catalogPages[kind],
-      busy = loadingCatalogPages.has(kind);
-    control.hidden = page.offset >= page.total;
-    control.disabled = busy;
-    control.textContent = busy
-      ? 'Wczytywanie...'
-      : `Pokaż kolejne (wczytano ${page.offset} z ${page.total})`;
+    // No page-level "load more" button: the review list loads more as it is scrolled, the
+    // catalogue list has one button at its end (visibleCatalogRows in views/review.js) and
+    // offers are paged. Remove a control left by an older page version.
+    view.querySelector('[data-load-catalog-kind="' + kind + '"]')?.remove();
   }
 }
 
-async function loadCatalogData() {
+// List data is read when its view is first opened, not at startup; afterwards a refresh reloads
+// the lists already read plus the open view's. Navigation counts come from /api/catalog/status.
+const viewKinds = { catalog: 'works', review: 'jobs', offers: 'offers' };
+const loadedKinds = new Set();
+async function loadCatalogData({ kinds = null } = {}) {
+  const wanted = kinds || [...new Set([...loadedKinds, viewKinds[state.activeView]].filter(Boolean))];
+  if (!wanted.length) return true;
   try {
-    const loaded = await Promise.all([
-      loadCatalogPage('works', { reset: true }),
-      loadCatalogPage('jobs', { reset: true }),
-      loadCatalogPage('offers', { reset: true, pageNumber:state.offerPage }),
-    ]);
+    const loaded = await Promise.all(
+      wanted.map((kind) => loadCatalogPage(kind, { reset: true, ...(kind === 'offers' ? { pageNumber: state.offerPage } : {}) })),
+    );
+    for (const kind of wanted) loadedKinds.add(kind);
     if (loaded.some((value) => value !== true)) throw Error('CATALOG_PAGE_LOAD_IN_PROGRESS');
-    $('#offersNavCount').textContent = `${state.catalogPages.offers.total} zapisanych`;
-    $('#reviewNavCount').textContent = `${state.reviewQueueTotal ?? state.catalogPages.jobs.total} do decyzji`;
+    $('#reviewNavCount').textContent = `${state.reviewQueueDecisions ?? state.catalog?.reviewQueue?.decisions ?? state.catalogPages.jobs.total} do decyzji`;
     renderReview();
     renderCatalog();
     renderOffers();
-    renderScannerOffers();
     updateCatalogLoadControls();
     return true;
   } catch (error) {
-    $('#databaseStatus').textContent = 'SQLite: błąd odczytu katalogu';
+    $('#connectionLabel').textContent = 'Błąd odczytu katalogu';
     toast(`Nie udało się wczytać katalogu SQLite: ${error.message}`);
     return false;
   }
@@ -603,9 +627,21 @@ async function loadCatalogData() {
 async function loadCatalogStatus() {
   try {
     state.catalog = await json('/api/catalog/status');
+    if (state.catalog.reviewQueue) {
+      state.reviewQueueDecisions = state.catalog.reviewQueue.decisions;
+      state.reviewQueueTotal = state.catalog.reviewQueue.offers;
+    }
     scanInsights.refreshIsbn(state.catalog);
     const counts = state.catalog.counts || {};
-    $('#databaseStatus').textContent = `${counts.offers || 0} ofert · dane dostępne`;
+    // One offer count everywhere: saved offers without the ones rejected in review (the Oferty
+    // list hides those too). It does not follow the Oferty filters.
+    const rejected = Number(counts.offers_rejected || 0);
+    const saved = Math.max(0, Number(counts.offers || 0) - rejected);
+    const breakdown = `Zapisane oferty: ${saved}. Odrzucone w weryfikacji: ${rejected} (nie ma ich na listach). Razem w bazie: ${counts.offers || 0}.`;
+    $('#offersNavCount').textContent = `${saved} zapisanych`;
+    // The queue count is right from the start, before the queue list is read.
+    $('#reviewNavCount').textContent = `${state.reviewQueueDecisions ?? 0} do decyzji`;
+    $('#offersNavCount').title = breakdown;
     $('#catalogWorks').textContent = counts.works || 0;
     $('#catalogEditions').textContent = counts.editions || 0;
     const identification = state.catalog.identification || {};
@@ -639,12 +675,12 @@ async function loadCatalogStatus() {
       : scheduler.stopping ? 'Zatrzymywanie — kończę rozpoczętą partię'
       : active ? 'Identyfikacja w toku'
       : paused ? 'Zatrzymano'
-      : !progress.pending && total ? `Zakończono · ${progress.review} do decyzji · ${progress.failed} błędów`
+      : !progress.pending && total ? `Zakończono · ${state.catalog.reviewQueue?.decisions ?? 0} do decyzji · ${progress.failed} błędów`
       : running ? 'Oczekuje na zadania' : 'Gotowe do uruchomienia';
 
     // Nothing running: the panel shrinks to one line so the queue gets the screen.
     $('.identification-dashboard')?.classList.toggle('is-idle', !active && !scheduler.stopping && !progress.pending);
-    $('#catalogIncomplete').textContent = Number(identification.statuses?.review_required || 0);
+    $('#catalogIncomplete').textContent = state.catalog.reviewQueue?.decisions ?? 0;
     $('#settingsDatabaseCopy').textContent = state.catalog.enabled
       ? 'Baza lokalna jest dostepna.'
       : 'Integracja katalogu jest wylaczona.';
@@ -686,11 +722,10 @@ async function loadCatalogStatus() {
       .join('');
     $('#connectionDot').classList.add('online');
     $('#connectionLabel').textContent = 'Aplikacja online';
-    if(state.activeView==='scanner') void refreshWorkflowDashboard?.();
+    if(state.activeView==='today') void refreshWorkflowDashboard?.();
     return true;
   } catch {
     state.catalog = null;
-    $('#databaseStatus').textContent = 'SQLite: niedostepny';
     $('#settingsDatabaseCopy').textContent = 'Nie udało się odczytać statusu bazy.';
     $('#connectionDot').classList.remove('online');
     $('#connectionLabel').textContent = 'Błąd połączenia';
@@ -721,8 +756,7 @@ function priceStats(...args) { return catalogView.priceStats(...args); }
 
 function renderOffers(...args) {
   const result = offersView.renderOffers(...args);
-  // "Wg książki" reads the same filters: refresh the edition cards with the list.
-  if (state.activeView === 'offers') state.offerGroups?.refresh();
+  renderOfferScope();
   return result;
 }
 function openOfferDrawer(...args) { return offersView.openOfferDrawer(...args); }
@@ -864,14 +898,12 @@ $('#catalogIsbn').addEventListener('input', () => {
 });
 
 $$('.nav-item, .mobile-nav-item').forEach((button) =>
-  button.addEventListener('click', () => showView(button.dataset.view)),
+  button.addEventListener('click', () => {
+    // "Książki" again while a book page is open goes back to the list of books.
+    if (button.dataset.view === 'catalog' && state.activeView === 'catalog') catalogView.closeBookPage();
+    showView(button.dataset.view);
+  }),
 );
-$('#scannerBrowseOffers').addEventListener('click', () => showView('offers'));
-$('#scannerOfferSearch').addEventListener('input', renderScannerOffers);
-$('#scannerOfferSource').addEventListener('change', renderScannerOffers);
-let scannerSearchTimer;
-$('#scannerOfferSearch').addEventListener('input',()=>{clearTimeout(scannerSearchTimer);scannerSearchTimer=setTimeout(()=>void refreshScannerOffers(),300);});
-$('#scannerOfferSource').addEventListener('change',()=>void refreshScannerOffers());
 $('#retryIdentification').addEventListener('click', async () => {
   const button = $('#retryIdentification');
   const mode = $('#retryMode').value;
@@ -889,31 +921,6 @@ $('#retryIdentification').addEventListener('click', async () => {
     toast('Nie udało się ponowić identyfikacji: ' + error.message);
   } finally { button.disabled = false; }
 });
-$('#refreshView').addEventListener('click', async () => {
-  if(!await confirmDiscard())return;
-  const button = $('#refreshView');
-  button.disabled = true;
-  try {
-    const [historyResult, catalogResult, catalogDataOk] = await Promise.allSettled([
-      loadHistory(),
-      loadCatalogStatus(),
-      loadCatalogData(),
-    ]);
-    const errors = [historyResult, catalogResult].filter((result) => result.status === 'rejected');
-    if (
-      errors.length ||
-      catalogResult.value !== true ||
-      catalogDataOk.status !== 'fulfilled' ||
-      catalogDataOk.value !== true
-    ) {
-      toast('Nie wszystkie dane odświeżono. Sprawdź stan katalogu SQLite.');
-      return;
-    }
-    toast('Dane odświeżone.');
-  } finally {
-    button.disabled = false;
-  }
-});
 $('#toggleSources').addEventListener('click', () => {
   const boxes = $$('#sourceGrid input');
   const all = boxes.length && boxes.every((box) => box.checked);
@@ -928,7 +935,7 @@ $('#queries').addEventListener('input', updateScanPlan);
 $('#sourceGrid').addEventListener('change', updateScanPlan);
 document.addEventListener('bookflip-scan-complete', () => {
   void scanRun.refresh().then(updateScanPlan);
-  void tradingControls.refreshRuns().then(refreshScannerOffers).catch(() => {});
+  void todayView.refresh();
 });
 for (const selector of ['#reviewSource', '#reviewIsbn', '#reviewSort'])
   $(selector).addEventListener('change', () => scheduleGlobalCatalogSearch('jobs'));
@@ -1033,18 +1040,7 @@ $('#reviewList').addEventListener('scroll', async (event) => {
   if (list.scrollTop + list.clientHeight < list.scrollHeight - 180) return;
   reviewScrollLoading = true;
   try {
-    if ((state.visibleRows.jobs || 100) < state.reviewJobs.length) {
-      state.visibleRows.jobs = Math.min(state.visibleRows.jobs + 100, state.reviewJobs.length);
-      renderReview();
-    } else if (state.catalogPages.jobs.offset < state.catalogPages.jobs.total) {
-      const loaded = await loadCatalogPage('jobs');
-      if (loaded) {
-        state.visibleRows.jobs += 100;
-        renderReview();
-      }
-    }
-  } catch (error) {
-    toast('Nie udało się wczytać dalszych ofert: ' + error.message);
+    await reviewView.loadMoreReview();
   } finally {
     reviewScrollLoading = false;
   }
@@ -1053,16 +1049,28 @@ $('#reviewList').addEventListener('scroll', async (event) => {
 // Review: "select all" covers the whole filtered queue; a tab change reloads it from the server.
 const loadAllReviewRows = () => loadAllCatalogPages('jobs');
 const reloadReview = () => scheduleGlobalCatalogSearch('jobs');
-const reviewView = createReviewView({ state, $, $$, json, toast, money, date, escapeHtml, reviewOffers, loadCatalogData, renderCatalog, openCatalogForReview, loadAllReviewRows, reloadReview });
+const reviewView = createReviewView({ state, $, $$, json, toast, money, date, escapeHtml, reviewOffers, loadCatalogData, renderCatalog, openCatalogForReview, loadAllReviewRows, reloadReview, loadCatalogPage });
 const catalogView = createCatalogView({ state, $, $$, json, money, escapeHtml, visibleCatalogRows, openOfferDrawer, loadCatalogData, toast, showView });
-mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData });
-mountCatalogNames({ $, json, escapeHtml, toast, loadCatalogData });
-mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogData });
-mountCatalogSeeds({ $, json, escapeHtml, toast, loadCatalogData });
+for (const id of ['catalogConflicts', 'catalogDuplicates']) {
+  const panel = document.getElementById(id);
+  if (panel) $('#checksBody').append(panel);
+}
+const queue = installQueue({ $, json, escapeHtml, showView, state });
+const ruleSettings = mountRuleSettings({ $, json, toast, escapeHtml });
+const sourcesView = installSources({ $, json, escapeHtml, openOffers });
+// The catalogue tools read their data when Katalog is first opened.
+let catalogToolsMounted = false;
+function mountCatalogTools() {
+  if (catalogToolsMounted) return;
+  catalogToolsMounted = true;
+  mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData });
+  mountCatalogNames({ $, json, escapeHtml, toast, loadCatalogData });
+  mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogData });
+  mountCatalogSeeds({ $, json, escapeHtml, toast, loadCatalogData });
+}
 const onFiltersChange = () => void changeOfferPage(state.offerPage);
 const onAssignmentChanged = () => loadCatalogData();
 const offersView = createOffersView({ state, $, $$, json, money, date, escapeHtml, allOffers, bookFor, showView, priceStats, onFiltersChange, toast, onAssignmentChanged });
-state.offerGroups = installOfferGroups({ $, $$, json, money, escapeHtml, filters: () => catalogFilters('offers'), openOfferDrawer: (id) => offersView.openOfferDrawer(id) });
 
 async function changeOfferPage(page) {
   if(page<1 || page>Math.max(1,Math.ceil(state.catalogPages.offers.total/state.pageSize))) return;
@@ -1072,65 +1080,98 @@ async function changeOfferPage(page) {
 const tradingControls = installTradingControls({state,$,json,toast,showView,loadCatalogData,loadCatalogStatus,openOfferDrawer,
   onOfferFilters:()=>scheduleGlobalCatalogSearch('offers'),onCatalogFilters:()=>scheduleGlobalCatalogSearch('works')});
 const refreshWorkflowDashboard = installDashboard({ state, showView });
-const refreshSinceVisit = installSinceLastVisit({ state, showView });
+const todayView = installTodayView({ $, json, escapeHtml, showView, openOffers });
 const startupView = viewFromSearch(location.search);
 const startupItem = idFromSearch(location.search);
 showView(startupView);
-Promise.all([loadSources().then(() => installScanProfiles({ queriesInput: $('#queries'), sourceGrid: $('#sourceGrid'), panel: $('.scanner-form-panel'), toast, json, deadSources: () => state.deadSources, startScan: () => startSearch() }).then(() => mountScanSchedule({ panel: $('.scanner-form-panel'), json, toast, escapeHtml }))), loadHistory(), loadCatalogStatus(), loadCatalogData(), restoreLastScanStatus(), tradingControls.refreshRuns().then(refreshScannerOffers)]).catch(
+Promise.all([loadSources().then(() => installScanProfiles({ queriesInput: $('#queries'), sourceGrid: $('#sourceGrid'), panel: $('.scanner-form-panel'), toast, json, deadSources: () => state.deadSources, startScan: () => startSearch() }).then((profiles) => mountScanSchedule({ panel: $('.scanner-form-panel'), json, toast, escapeHtml, profiles }))), loadCatalogStatus(), ensureViewData(startupView), restoreLastScanStatus()]).catch(
   (error) => {
     $('#connectionLabel').textContent = 'Błąd połączenia';
     toast(`Nie udało się wczytać aplikacji: ${error.message}`);
   },
 ).then(async () => {
   await restoreItem(startupView, startupItem);
-  refreshSinceVisit();
   itemUrlReady = true;
   syncItemUrl();
 });
-
-let identificationRefreshBusy = false;
-let lastCatalogDataRefresh = 0;
-setInterval(async () => {
-  if (identificationRefreshBusy || document.hidden || state.scan.running) return;
-  identificationRefreshBusy = true;
-  try {
-    await loadCatalogStatus();
-    if (['review'].includes(state.activeView) &&
-      !(state.activeView === 'review' && state.selectedReviewId) &&
-      Date.now() - lastCatalogDataRefresh >= 12000) {
-      lastCatalogDataRefresh = Date.now();
-      await loadCatalogData();
-    }
-  } catch {
-    // Preserve current UI; manual refresh still reports connection failures.
-  } finally {
-    identificationRefreshBusy = false;
-  }
-}, 4000);
 
 // Live diagnostics are read-only and do not interfere with scan streaming.
 const scanInsightsOpen = () => state.activeView === 'settings' && $('#scanInsightsFold')?.open;
 $('#scanInsightsFold')?.addEventListener('toggle', () => {
   if (scanInsightsOpen()) void scanInsights.refresh();
 });
-setInterval(() => {
-  if (document.hidden) return;
+// Live updates from the server (one EventSource) instead of polling every few seconds.
+let lastQueueListRefresh = 0;
+function onQueueChange() {
+  void loadCatalogStatus();
+  if (QUEUE_VIEWS.includes(state.activeView)) void queue.refreshCounts();
+  if (state.activeView === 'today') void todayView.refresh();
+  // The open queue list follows the automatic identification, unless an offer is being decided.
+  if (state.activeView === 'review' && !state.selectedReviewId && !state.scan.running && Date.now() - lastQueueListRefresh >= 12000) {
+    lastQueueListRefresh = Date.now();
+    void loadCatalogData();
+  }
+}
+function onScanChange() {
+  if (!state.scan.running) void scanRun.refresh();
+  void restoreLastScanStatus();
   if (scanInsightsOpen()) void scanInsights.refresh();
-  // A scan started by the schedule or another device: the run panel picks it up within seconds.
-  if (!state.scan.running && state.activeView === 'scanner' && $('#scanRun').dataset.state !== 'running') void scanRun.refresh();
-}, 3000);
+  if (state.activeView === 'today') void todayView.refresh();
+}
+function onSourceChange() {
+  void loadSources().catch(() => {});
+  void todayView.refresh();
+  if (state.activeView === 'scanner') void sourcesView.refresh();
+}
+function setConnection(online) {
+  $('#connectionDot').classList.toggle('online', online);
+  $('#connectionLabel').textContent = online ? 'Aplikacja online' : 'Łączenie ponownie…';
+}
+connectLive({
+  onEvent: (kind) => (kind === 'queue' ? onQueueChange() : kind === 'scan' ? onScanChange() : onSourceChange()),
+  onState: (value) => setConnection(value === 'online'),
+  // Back after a break (server restart, sleep, network): read everything again.
+  onReconnect: () => {
+    void loadCatalogStatus();
+    void loadSources().catch(() => {});
+    void scanRun.refresh();
+    void restoreLastScanStatus();
+    void todayView.refresh();
+    if (loadedKinds.size) void loadCatalogData();
+  },
+});
 
 installDetailNavigation();
 installCoverFallback();
 installPreferences({
   $, $$,
-  onTradingChange: () => { renderOffers(); },
+  onTradingChange: () => { renderOffers(); void tradingControls?.refreshSettings(); },
   onCatalogViewChange: () => renderCatalog(),
 });
 $('#catalogIncompleteOnly')?.addEventListener('change', () => renderCatalog());
 installCommandPalette({
   $, json, escapeHtml, money, showView, openOfferDrawer,
   openWork: (id) => { if (showView('catalog')) void catalogView.openCatalogDetail(id); },
+  // No palette hit: scan the phrase, search for it, or add the ISBN.
+  onFallback: (kind, text, isbn) => {
+    if (kind === 'isbn') {
+      state.catalogReturnToReview = null;
+      $('#catalogDialog').showModal();
+      setCatalogMode('isbn');
+      $('#catalogIsbn').value = isbn;
+      $('#catalogIsbn').focus();
+    } else if (kind === 'scan') {
+      if (!showView('scanner')) return;
+      $('#queries').value = text;
+      updateScanPlan();
+      void startSearch();
+    } else if (kind === 'offers' || kind === 'catalog') {
+      if (!showView(kind)) return;
+      const field = $(kind === 'offers' ? '#offerSearch' : '#catalogSearch');
+      field.value = text;
+      scheduleGlobalCatalogSearch(kind === 'offers' ? 'offers' : 'works');
+    }
+  },
   actions: [
     { label: 'Rozpocznij skan', hint: 'Frazy i źródła z formularza skanera', run: () => { showView('scanner'); $('#startSearch')?.click(); } },
     { label: 'Następna oferta do weryfikacji', hint: 'Otwiera kolejkę na pierwszej pozycji', run: () => { showView('review'); document.querySelector('#reviewList [data-review-id]')?.click(); } },
@@ -1140,6 +1181,10 @@ installCommandPalette({
   ],
 });
 
+document.addEventListener('bookflip-open-work', (event) => {
+  if (!event.detail?.workId || !showView('catalog')) return;
+  void catalogView.openCatalogDetail(event.detail.workId);
+});
 document.addEventListener('bookflip-open-edition', event => {
   if (!event.detail?.editionId) return;
   showView('catalog');

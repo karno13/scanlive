@@ -12,6 +12,31 @@ export function money(value) {
 export function date(value) {
   return value ? new Date(value).toLocaleString('pl-PL') : '-';
 }
+/**
+ * Date for a list row: "dziś 20:53", "wczoraj", "8.11" (another year: "8.11.2025"). The full date
+ * and time belong in the title (dateMarkup).
+ */
+export function relativeDate(value, now = new Date()) {
+  const moment = value ? new Date(value) : null;
+  if (!moment || Number.isNaN(moment.getTime())) return '-';
+  const midnight = (day) => new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+  const days = Math.round((midnight(now) - midnight(moment)) / 86_400_000);
+  if (days === 0)
+    return 'dziś ' + moment.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+  if (days === 1) return 'wczoraj';
+  return moment.toLocaleDateString(
+    'pl-PL',
+    moment.getFullYear() === now.getFullYear()
+      ? { day: 'numeric', month: 'numeric' }
+      : { day: 'numeric', month: 'numeric', year: 'numeric' },
+  );
+}
+/** <time> with the short date shown and the full one in its title. */
+export function dateMarkup(value, now = new Date()) {
+  const moment = value ? new Date(value) : null;
+  if (!moment || Number.isNaN(moment.getTime())) return '-';
+  return `<time datetime="${escapeHtml(moment.toISOString())}" title="${escapeHtml(date(value))}">${escapeHtml(relativeDate(value, now))}</time>`;
+}
 export function shortTime(value) {
   return value
     ? new Date(value).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
@@ -124,4 +149,11 @@ export function sourceHealthNote(row, { short = false } = {}) {
   if (row.status === 'failed' || (row.status === 'partial' && !row.last_success_at && !row.offers_seen))
     return short ? 'nie działa' : 'Nie działa w ostatnim skanie: ' + problems + ' · ' + since;
   return short ? 'część zapytań zawodzi' : 'Działa częściowo, część zapytań kończy się błędem: ' + problems + ' · ostatni udany odczyt ' + (day(row.last_success_at) || 'brak');
+}
+
+/** "1 zadanie z problemami", "3 zadania z problemami", "14 zadań z problemami". */
+export function problemTasks(count) {
+  const n = Math.abs(Number(count) || 0);
+  const word = n === 1 ? 'zadanie' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'zadania' : 'zadań';
+  return `${n} ${word} z problemami`;
 }

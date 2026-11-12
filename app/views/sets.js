@@ -14,8 +14,21 @@ const TABS = [
   ['empty', 'Do uzupełnienia'],
   ['open', 'Niepotwierdzone'],
   ['confirmed', 'Potwierdzone'],
+  ['dismissed', 'Nie interesują mnie'],
 ];
-const stateOf = (set) => (set.compositionConfirmed ? 'confirmed' : set.editions.length || set.unknownItems?.length ? 'open' : 'empty');
+// "Nie interesuje mnie" (from the list, review 11.2026 stage 2) takes a set out of every other tab.
+const stateOf = (set) => (set.dismissedAt ? 'dismissed' : set.compositionConfirmed ? 'confirmed' : set.editions.length || set.unknownItems?.length ? 'open' : 'empty');
+/**
+ * Third line of a set row. An empty set already says "brak książek" on the line above, so it gets
+ * no badge; colour is kept for the states that need a look.
+ */
+function setRowNote(status, availability) {
+  const parts = [
+    status === 'empty' ? '' : `<span class="proposal-chip is-${status === 'confirmed' ? 'high' : 'medium'}">${STATE_LABEL[status]}</span>`,
+    ['not_seen', 'sold', 'unavailable'].includes(availability) ? '<span class="proposal-chip is-stale">mogła zniknąć</span>' : '',
+  ].filter(Boolean);
+  return parts.length ? `<small>${parts.join(' · ')}</small>` : '';
+}
 const STATE_LABEL = { empty: 'pusty', open: 'skład do potwierdzenia', confirmed: 'skład potwierdzony' };
 const books = (count) =>
   count === 1 ? '1 książka' : [2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100) ? `${count} książki` : `${count} książek`;
@@ -37,14 +50,19 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
   const active = () => sets.find((item) => item.offerId === activeId) || null;
   const included = () => new Set((active()?.editions || []).map((item) => item.editionId));
 
+  // Most expensive first by default (resale value); offers without a price last. "Ostatnio
+  // zmienione" keeps the server's order.
   function filtered() {
     const needle = $('#setFilter').value.trim().toLocaleLowerCase('pl');
-    return sets.filter((item) => (!tab || stateOf(item) === tab) && `${item.title} ${item.source}`.toLocaleLowerCase('pl').includes(needle));
+    const rows = sets.filter((item) => (tab ? stateOf(item) === tab : stateOf(item) !== 'dismissed') && `${item.title} ${item.source}`.toLocaleLowerCase('pl').includes(needle));
+    if ($('#setSort')?.value !== 'recent')
+      rows.sort((a, b) => (a.currentPrice == null) - (b.currentPrice == null) || (b.currentPrice ?? 0) - (a.currentPrice ?? 0));
+    return rows;
   }
 
   function renderTabs() {
-    const counts = Object.fromEntries(TABS.map(([key]) => [key, key ? sets.filter((item) => stateOf(item) === key).length : sets.length]));
-    $('#setTabs').innerHTML = TABS.map(([key, label]) =>
+    const counts = Object.fromEntries(TABS.map(([key]) => [key, key ? sets.filter((item) => stateOf(item) === key).length : sets.filter((item) => stateOf(item) !== 'dismissed').length]));
+    $('#setTabs').innerHTML = TABS.filter(([key]) => key !== 'dismissed' || counts.dismissed || tab === 'dismissed').map(([key, label]) =>
       `<button type="button" class="rv-tab${key === tab ? ' is-active' : ''}" data-set-tab="${key}" aria-pressed="${key === tab}">${safe(label)} <span>${counts[key]}</span></button>`).join('');
     $('#setTabs').querySelectorAll('[data-set-tab]').forEach((button) => button.addEventListener('click', () => {
       tab = button.dataset.setTab;
@@ -55,20 +73,70 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
 
   function renderList() {
     const rows = filtered();
-    $('#setTotal').textContent = setsWord(sets.length);
+    $('#setTotal').textContent = setsWord(sets.filter((item) => !item.dismissedAt).length);
     $('#setList').innerHTML = rows.length ? rows.map((row) => {
       const title = tidyOfferTitle(row.title);
       const count = row.editions.reduce((sum, item) => sum + (item.quantity || 1), 0) + (row.unknownItems || []).reduce((sum, item) => sum + item.quantity, 0);
       const status = stateOf(row);
-      return `<button class="review-item rv-item ${row.offerId === activeId ? 'active' : ''}" type="button" data-set-id="${safe(row.offerId)}" aria-current="${row.offerId === activeId}" title="${safe(row.title)}">
+      const dismissed = status === 'dismissed';
+      return `<div class="set-row${dismissed ? ' is-dismissed' : ''}"><button class="review-item rv-item ${row.offerId === activeId ? 'active' : ''}" type="button" data-set-id="${safe(row.offerId)}" aria-current="${row.offerId === activeId}" title="${safe(row.title)}">
         ${coverMarkup(row.image, title, { size: 'sm', escapeHtml })}
         <span class="rv-item-copy"><strong>${safe(title)}</strong>
           <small><span class="source-dot" data-source="${safe(row.source)}"></span>${safe(row.source)} · ${count ? books(count) : 'brak książek'}</small>
-          <small><span class="proposal-chip is-${status === 'confirmed' ? 'high' : status === 'open' ? 'medium' : 'stale'}">${STATE_LABEL[status]}</span>${['not_seen', 'sold', 'unavailable'].includes(row.availability) ? ' · <span class="proposal-chip is-stale">mogła zniknąć</span>' : ''}</small></span>
-        <span class="review-price">${money(row.currentPrice)}</span></button>`;
+          ${setRowNote(status, row.availability)}</span>
+        <span class="review-price">${money(row.currentPrice)}</span></button><button type="button" class="set-dismiss" data-set-dismiss="${safe(row.offerId)}" data-dismissed="${dismissed}" title="${dismissed ? 'Przywróć do kolejki' : 'Nie interesuje mnie — zestaw znika z kolejki (klawisz X)'}" aria-label="${dismissed ? 'Przywróć' : 'Nie interesuje mnie'}: ${safe(title)}">${dismissed ? 'Przywróć' : '<span aria-hidden="true">✕</span>'}</button></div>`;
     }).join('') : '<div class="empty-detail"><h3>Brak zestawów</h3><p>Zmień filtr albo oznacz ofertę jako zestaw w weryfikacji (klawisz Z).</p></div>';
     $('#setList').querySelectorAll('[data-set-id]').forEach((button) => button.addEventListener('click', () => selectSet(button.dataset.setId)));
+    $('#setList').querySelectorAll('[data-set-dismiss]').forEach((button) =>
+      button.addEventListener('click', () => void dismiss(button.dataset.setDismiss, button.dataset.dismissed !== 'true')),
+    );
   }
+
+  /** "Nie interesuje mnie" (or "Przywróć") without opening the set; the next set takes its place. */
+  async function dismiss(offerId, dismissed = true) {
+    const rows = filtered();
+    const index = rows.findIndex((row) => row.offerId === offerId);
+    const next = rows[index + 1] || rows[index - 1] || null;
+    try {
+      await request('POST', '/api/sets/' + encodeURIComponent(offerId) + '/dismiss', { dismissed });
+      await refreshSets(offerId === activeId && dismissed ? next?.offerId ?? null : activeId);
+      toast(dismissed ? 'Zestaw usunięty z kolejki.' : 'Zestaw wrócił do kolejki.', dismissed ? {
+        label: 'Cofnij',
+        onClick: async () => { await request('POST', '/api/sets/' + encodeURIComponent(offerId) + '/dismiss', { dismissed: false }); await refreshSets(offerId); },
+        onError: () => toast('Nie udało się cofnąć.'),
+      } : null);
+    } catch (error) {
+      toast('Nie zapisano: ' + error.message);
+    }
+  }
+
+  // The queue's shortcuts (same keys as Weryfikacja): ↑/↓ or K/J move, S next, Enter confirms the
+  // composition when it can be confirmed, X "Nie interesuje mnie".
+  document.addEventListener('keydown', (event) => {
+    const view = document.querySelector('#view-sets');
+    if (!view || view.hidden || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    if (document.querySelector('dialog[open]') || event.target?.closest?.('input,select,textarea,[contenteditable="true"]')) return;
+    const key = event.key.length === 1 ? event.key.toLocaleLowerCase('pl') : event.key;
+    if (key === 'Enter' && event.target?.closest?.('button,a,summary')) return;
+    const rows = filtered();
+    const index = rows.findIndex((row) => row.offerId === activeId);
+    const move = (step) => {
+      const target = rows[Math.max(0, Math.min(rows.length - 1, (index < 0 ? 0 : index + step)))];
+      if (target) void selectSet(target.offerId);
+    };
+    const actions = {
+      ArrowDown: () => move(1), j: () => move(1), s: () => move(1),
+      ArrowUp: () => move(-1), k: () => move(-1),
+      x: () => activeId && !active()?.dismissedAt && dismiss(activeId),
+      Enter: () => {
+        const box = document.querySelector('#setUnknown [data-set-confirm]');
+        if (box && !box.disabled && !box.checked) box.click();
+      },
+    };
+    if (!actions[key]) return;
+    event.preventDefault();
+    actions[key]();
+  });
 
   async function selectSet(id) {
     if (id === activeId) { openDetailView('sets'); return; }
@@ -78,6 +146,7 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
     $('#setCurrent').value = id || '';
     renderList();
     renderDetail();
+    if (matchMedia('(min-width: 901px)').matches) $('#setList .active')?.scrollIntoView({ block: 'nearest' });
     onSelect();
   }
 
@@ -127,7 +196,7 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
     }
     const known = set.editions.reduce((sum, item) => sum + (item.quantity || 1), 0);
     const unknown = (set.unknownItems || []).reduce((sum, item) => sum + item.quantity, 0);
-    $('#setSelectedMeta').textContent = `${STATE_LABEL[stateOf(set)][0].toUpperCase()}${STATE_LABEL[stateOf(set)].slice(1)} · ${books(known + unknown)}${unknown ? ` (${unknown} nierozpoznanych)` : ''}`;
+    $('#setSelectedMeta').textContent = stateOf(set) === 'empty' ? 'Skład do ustalenia — dodaj książki z propozycji albo z wyszukiwarki' : `${STATE_LABEL[stateOf(set)][0].toUpperCase()}${STATE_LABEL[stateOf(set)].slice(1)} · ${books(known + unknown)}${unknown ? ` (${unknown} nierozpoznanych)` : ''}`;
     $('#setSelectedCount').textContent = set.editions.length ? `${known} egz. z katalogu` : '';
     $('#setPhoto').innerHTML = `${coverMarkup(set.image, tidyOfferTitle(set.title), { size: 'xl', escapeHtml })}<figcaption>Zdjęcie z ogłoszenia · <a href="${safe(safeOfferHref(set.url))}" target="_blank" rel="noreferrer">pełna treść i więcej zdjęć w ogłoszeniu ↗</a></figcaption>`;
     renderMembers(set);
@@ -368,6 +437,7 @@ export function createSetsView({ $, json, escapeHtml, toast, openOfferDrawer, on
     if (details) details.open = false;
   });
   $('#setFilter').addEventListener('input', renderList);
+  $('#setSort')?.addEventListener('change', renderList);
   $('#setCurrent').addEventListener('change', () => selectSet($('#setCurrent').value));
   $('#setEditionQuery').addEventListener('input', () => {
     clearTimeout(editionSearchTimer);
