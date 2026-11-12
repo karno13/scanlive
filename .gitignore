@@ -19,3 +19,7 @@ coverage/
 .DS_Store
 Thumbs.db
 *.log
+
+# Local scratch output and generated artifacts.
+scratch/
+artifacts/

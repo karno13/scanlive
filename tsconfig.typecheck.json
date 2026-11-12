@@ -17,6 +17,9 @@
     "offer-ingest.mjs",
     "offer-observations.mjs",
     "sqlite-catalog-repository.mjs",
-    "offer-identity.mjs"
+    "offer-identity.mjs",
+    "live-events.mjs",
+    "source-status.mjs",
+    "today.mjs"
   ]
 }
