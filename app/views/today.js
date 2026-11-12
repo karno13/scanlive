@@ -30,6 +30,40 @@ export function sourceLine(row, now = new Date()) {
   return head + (row.reason ? ' — ' + row.reason : '');
 }
 
+const pl = (n) => String(n).replace('.', ',');
+const shortDay = (day) => (day ? day.slice(8, 10) + '.' + day.slice(5, 7) : '');
+
+/**
+ * The four measures under the tiles (from /api/today `measures`, computed in SQL): value, what it
+ * is out of, and the trend against the oldest snapshot of the last week. `better` says which way is
+ * good (the age of the oldest decision should fall), so the trend can be coloured honestly.
+ * Pure (tested).
+ */
+export function measureCards(measures = []) {
+  const meta = {
+    recognition: { label: 'Rozpoznane automatycznie', unit: '%', better: 'up', note: (m) => `${m.part} z ${m.total} ofert` },
+    oldestDecisionDays: { label: 'Najstarsza decyzja', unit: ' d', better: 'down', note: (m) => (m.total ? `${m.total} w kolejce` : 'kolejka pusta') },
+    completeEditions: { label: 'Kompletne wydania', unit: '%', better: 'up', note: (m) => `${m.part} z ${m.total} (wydawca i rok)` },
+    confirmedAvailability: { label: 'Dostępność potwierdzona', unit: '%', better: 'up', note: (m) => `${m.part} z ${m.total} ofert` },
+  };
+  return measures
+    .filter((m) => meta[m.id])
+    .map((m) => {
+      const info = meta[m.id];
+      const delta = m.trend?.delta;
+      let trend = 'trend od jutra';
+      let tone = 'none';
+      if (delta === 0) {
+        trend = '= bez zmian od ' + shortDay(m.trend.since);
+        tone = 'flat';
+      } else if (typeof delta === 'number') {
+        trend = (delta > 0 ? '▲ +' : '▼ ') + pl(delta) + (info.unit === '%' ? ' pp' : ' d') + ' od ' + shortDay(m.trend.since);
+        tone = (delta > 0) === (info.better === 'up') ? 'good' : 'bad';
+      }
+      return { id: m.id, label: info.label, value: m.id === 'oldestDecisionDays' && m.value === 0 ? 'dziś' : pl(m.value) + info.unit, note: info.note(m), trend, tone };
+    });
+}
+
 /**
  * Tiles of the view from the /api/today answer. Pure (tested); `go` names what a tile opens:
  * { offers: filters } | { view: name }.
@@ -109,12 +143,16 @@ export function installTodayView({ $, json, escapeHtml, showView, openOffers }) 
       : data.lastScan ? 'liczby z ostatniego skanu' : 'jeszcze nie było skanu';
     const reviewButton = $('#todayReview');
     reviewButton.textContent = data.queue?.decisions ? `Weryfikuj (${data.queue.decisions})` : 'Weryfikacja';
+    const measures = measureCards(data.measures)
+      .map((card) => `<div class="today-measure is-${card.tone}" data-measure="${escapeHtml(card.id)}"><span class="today-tile-label">${escapeHtml(card.label)}</span><strong>${escapeHtml(card.value)}</strong><small>${escapeHtml(card.note)}</small><small class="today-trend">${escapeHtml(card.trend)}</small></div>`)
+      .join('');
     root.innerHTML = `${scan}<div class="today-tiles">${tiles
       .map(
         (tile, index) =>
           `<button type="button" class="today-tile${tile.attention ? ' is-attention' : ''}${tile.warn ? ' is-warn' : ''}" data-tile="${index}"><span class="today-tile-label">${escapeHtml(tile.label)}</span><strong>${escapeHtml(String(tile.value))}</strong><small>${escapeHtml(tile.note)}</small></button>`,
       )
       .join('')}</div>
+      ${measures ? `<section class="today-measures" aria-label="Miary katalogu">${measures}</section>` : ''}
       <section class="today-sources" id="todaySources" aria-labelledby="todaySourcesTitle">
         <h3 id="todaySourcesTitle">Źródła</h3>
         <ul>${(data.sources || [])

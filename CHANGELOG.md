@@ -2,6 +2,17 @@
 
 BookFlip uses small pull requests and GitHub Actions on Ubuntu/Windows to track changes.
 
+## 2026-11-12 (56) — Dziś: cztery miary z trendem
+
+Pod kafelkami „Dziś” są cztery liczby liczone w SQL (`catalog-measures.mjs`, `GET /api/today` → `measures`). Wartości na kopii bazy:
+
+- **Rozpoznane automatycznie: 70,2%** (1796 z 2558 ofert; bez odrzuconych jako „nie książka”). Automatycznie to aktywne przypisanie, którego nie zrobił człowiek (ISBN, metadane, reguła Empiku). Samo rozpoznanie, także ręczne, to 2173 z 2558 = 84,9%.
+- **Najstarsza decyzja w kolejce: 1 d** (111 decyzji; od 11.11, 09:54; Empik jako wzbogacanie cen nie liczy się do kolejki).
+- **Kompletne wydania: 85,6%** (471 z 550; wydawca i rok, bez „Wydań nieustalonych”) — po uzupełnieniu braków (wpis 54) 89,6%.
+- **Dostępność potwierdzona: 10,8%** (288 z 2660) — po wpisie 55 24,8%.
+
+Trend to różnica względem najstarszego zapisu z ostatnich 7 dni. Zapis powstaje raz na dzień i miarę (migracja **132**, `metric_snapshots`), więc przez pierwszy dzień karta pokazuje „trend od jutra”. Strzałka jest zielona, gdy zmiana idzie w dobrą stronę (dla wieku najstarszej decyzji dobra jest zniżka).
+
 ## 2026-11-12 (55) — Skaner: Allegro i OLX bez błędów, więcej ofert z potwierdzoną dostępnością
 
 - **Allegro i OLX:** stały stan „brak legalnego dostępu do wyszukiwania ofert” (powody w `docs/SOURCES-ACCESS-2026-11.md`). Są szare, nie czerwone; nie wchodzą do liczników „Źródła 4/5” na „Dziś”, do „źródeł z błędami” ostatniego skanu ani do formularza skanu; skan, harmonogram i szybki skan ich nie pytają (do tej pory każdy skan wysyłał do nich jedno zapytanie, które kończyło się CAPTCHA albo 403).

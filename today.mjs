@@ -6,6 +6,7 @@ import { countCatalogOffers, reviewQueueSummary } from './catalog-api.mjs';
 import { getScanSchedule, nextQuickRunAt, nextRunAt } from './scan-schedule.mjs';
 import { sourceStatus } from './source-status.mjs';
 import { hasNoLegalAccess } from './source-blocks.mjs';
+import { todayMeasures } from './catalog-measures.mjs';
 
 /**
  * @param {{ database: any }} repository
@@ -49,6 +50,7 @@ export function todaySummary(repository, { since = null, sources }) {
       ? { count: countCatalogOffers(repository, priceFilters), filters: priceFilters }
       : null,
     queue: reviewQueueSummary(repository),
+    measures: todayMeasures(repository),
     sources: sourceStatus(repository, sources),
     lastScan: last
       ? {
