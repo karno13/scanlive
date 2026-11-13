@@ -3,8 +3,11 @@ scan-results/
 coverage/
 fixtures/
 package-lock.json
-# Frontend: tests read the exact text of app.css and the views (source-shape checks); formatted separately.
-app/
+# Frontend scripts and HTML: tests read their exact text (source-shape checks), so they are not
+# reformatted. The stylesheets are formatted (tests parse them, see app-styles.mjs).
+app/**
+!app/**/
+!app/**/*.css
 # Generated measurements (scripts/measure-network.mjs, scripts/ux-shots.mjs).
 artifacts/network/
 artifacts/ux-shots/

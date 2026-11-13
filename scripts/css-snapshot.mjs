@@ -394,7 +394,10 @@ function captureInPage({ root }) {
     } catch {}
   }
   const props = [...standard.sort(), ...[...custom].sort()];
-  const read = (style) => props.map((name) => style.getPropertyValue(name));
+  // A custom property keeps its text as written, line breaks included; a line break is whitespace,
+  // and the stored form is one "name:value" per line.
+  const read = (style) =>
+    props.map((name) => style.getPropertyValue(name).replace(/\s*\n\s*/g, ' '));
   const encode = (values, base) => {
     const parts = [];
     for (let i = 0; i < values.length; i++)
@@ -482,12 +485,16 @@ function coverageInPage() {
     return parts;
   };
   // Dynamic states are not in the DOM when the snapshot runs: match without them.
+  // ":not(:hover)" may hold too: dropped; other dynamic states and pseudo-elements match anything.
+  const dynamic = '(?::(?:hover|focus-visible|focus-within|focus|active|visited))';
   const loosen = (selector) =>
     selector
-      .replace(/::?(?:before|after|marker|placeholder|backdrop|-webkit-[a-z-]+)\b/g, '')
-      .replace(/:(?:hover|focus-visible|focus-within|focus|active|visited)\b/g, '')
-      .replace(/:not\(\s*\)/g, '')
-      .replace(/(^|[\s>+~(,])(?=$|[\s>+~),])/g, '$1*');
+      .replace(new RegExp(':not\\(' + dynamic + '+\\)', 'g'), '')
+      .replace(new RegExp(dynamic + '(?![\\w-])', 'g'), ':where(*)')
+      .replace(
+        /::?(?:before|after|marker|placeholder|backdrop|selection|-webkit-[a-z-]+)(?![\w-])/g,
+        ':where(*)',
+      );
   const all = [];
   const matched = [];
   const walk = (rules, context, active) => {
@@ -542,7 +549,7 @@ function coverageInPage() {
 // ---------------------------------------------------------------------------------------------
 // Capture driver
 
-async function capture({ base, out, rev, coverage, only, workers }) {
+async function capture({ base, out, rev, coverage, only, workers, coverageOnly = false }) {
   const revFiles = new Map();
   const fromRev = (path) => {
     if (!revFiles.has(path))
@@ -672,7 +679,7 @@ async function capture({ base, out, rev, coverage, only, workers }) {
           }
         });
         const root = subtree?.asElement ? subtree.asElement() : null;
-        const list = await page.evaluate(captureInPage, { root });
+        const list = coverageOnly ? [] : await page.evaluate(captureInPage, { root });
         states[job.id] = list.map(([key, label, own, pseudo]) => [
           key,
           label,
@@ -795,6 +802,22 @@ function report(diffs, dir, limit, total = null) {
   );
 }
 
+const STRING = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/.source;
+/**
+ * A value without the whitespace CSS ignores: runs collapse to one space, none after "(", before
+ * ")" or around ",". Custom properties keep their text as written, so a long value that Prettier
+ * wraps over lines would otherwise differ; strings are kept as they are.
+ */
+function normalizeValue(value) {
+  if (typeof value !== 'string') return value;
+  return value
+    .replace(new RegExp(STRING + '|\\s+', 'g'), (match, string) => string ?? ' ')
+    .replace(new RegExp(STRING + '|\\(\\s+|\\s+\\)|\\s*,\\s*', 'g'), (match, string) =>
+      string ? string : match.trim(),
+    )
+    .trim();
+}
+
 /**
  * Captures the revision (before) and the working tree (after) and compares them. The app has a few
  * asynchronous races (which request answers first, e.g. the counts on the scan result card); a
@@ -877,7 +900,7 @@ async function differences(beforeDir, afterDir) {
           continue;
         }
         for (const name of new Set([...allProps(p), ...allProps(q)]))
-          if (p[name] !== q[name]) {
+          if (p[name] !== q[name] && normalizeValue(p[name]) !== normalizeValue(q[name])) {
             differs = true;
             diffs.push({
               state: id,
@@ -891,7 +914,8 @@ async function differences(beforeDir, afterDir) {
       if (differs) changed.add(key);
     }
   }
-  await writeFile(`${afterDir}/diff.json`, JSON.stringify(diffs, null, 1) + '\n');
+  // The file keeps the first 20000 differences (a broken layout would not fit in one string).
+  await writeFile(`${afterDir}/diff.json`, JSON.stringify(diffs.slice(0, 20000), null, 1) + '\n');
   return diffs;
 }
 
@@ -919,7 +943,8 @@ if (args.includes('--verify')) {
     base: `http://127.0.0.1:${port}`,
     out,
     rev: option('--rev'),
-    coverage: args.includes('--coverage'),
+    coverage: args.includes('--coverage') || args.includes('--coverage-only'),
+    coverageOnly: args.includes('--coverage-only'),
     only: option('--only') ? new RegExp(option('--only')) : null,
     workers: Number(option('--workers') || 4),
   });
