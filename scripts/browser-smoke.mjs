@@ -217,6 +217,11 @@ try {
     );
     assert.equal(await page.locator('.view:visible').getAttribute('id'), 'view-' + view);
   }
+  assert.equal(
+    await page.locator('.mobile-bottom-nav').isVisible(),
+    false,
+    'phone navigation hidden on desktop',
+  );
   // Exercise real P0 flows instead of merely checking that views appear.
   // Edition buttons must work before the slower series editor has finished loading.
   await page.route('**/api/catalog/series', async (route) => {
@@ -317,6 +322,23 @@ try {
     true,
     'nonempty review',
   );
+  // Elements with the hidden attribute stay hidden whatever layout rule targets them (the pinned
+  // review buttons: only one of "Zatwierdź" and "Utwórz wydanie i przypisz" shows).
+  const hiddenButVisible = (target) =>
+    target.evaluate(() =>
+      [...document.querySelectorAll('[hidden]')]
+        .filter((element) => element.checkVisibility())
+        .map((element) => element.id || element.className || element.tagName),
+    );
+  await page.locator('#reviewList .review-item').filter({ hasText: 'Solaris' }).first().click();
+  await page.locator('#reviewDetail #approveReview').waitFor();
+  assert.equal(
+    (await page.locator('#reviewDetail #approveReview:visible').count()) +
+      (await page.locator('#reviewDetail #createOfferEdition:visible').count()),
+    1,
+    'one primary review button',
+  );
+  assert.deepEqual(await hiddenButVisible(page), [], 'desktop review: hidden elements stay hidden');
   await page.setViewportSize({ width: 390, height: 844 });
   for (const view of ['today', 'review', 'sets', 'catalog', 'offers', 'settings']) {
     const navView = QUEUE_TAB[view] ? 'queue' : view;
@@ -344,7 +366,76 @@ try {
     true,
     'no horizontal page overflow on phone',
   );
+  // Phone form fields: 16 px text (iOS Safari zooms into smaller ones) and 44 px touch height.
+  for (const view of ['review', 'sets', 'catalog', 'offers', 'settings']) {
+    await goTo(page, view, '.mobile-bottom-nav');
+    await settle(page);
+    const small = await page.evaluate(() =>
+      [
+        ...document.querySelectorAll(
+          '.view:not([hidden]) :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]), select, textarea)',
+        ),
+      ]
+        .filter((field) => field.checkVisibility())
+        .filter(
+          (field) =>
+            parseFloat(getComputedStyle(field).fontSize) < 16 ||
+            field.getBoundingClientRect().height < 43.5,
+        )
+        .map(
+          (field) =>
+            `#${field.id} ${getComputedStyle(field).fontSize} ${Math.round(field.getBoundingClientRect().height)}px`,
+        ),
+    );
+    assert.deepEqual(small, [], `phone ${view}: form fields of 16 px text and 44 px height`);
+    assert.deepEqual(
+      await hiddenButVisible(page),
+      [],
+      `phone ${view}: hidden elements stay hidden`,
+    );
+  }
+  // Phone offer drawer: disclosures are 44 px touch targets with a visible keyboard focus.
+  await goTo(page, 'offers', '.mobile-bottom-nav');
+  await page
+    .locator('#offersMobileList [data-mobile-offer-id]')
+    .filter({ hasText: 'Solaris' })
+    .first()
+    .click();
+  const disclosure = page
+    .locator('#offerDrawerContent .detail-disclosure > summary')
+    .filter({ hasText: 'Jak interpretować historię cen?' });
+  await disclosure.waitFor();
+  assert.ok((await disclosure.boundingBox()).height >= 43.5, 'drawer disclosure is 44 px tall');
+  await page.keyboard.press('Shift');
+  await disclosure.focus();
+  const ring = await disclosure.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { style: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+  });
+  assert.ok(
+    ring.style !== 'none' && ring.width >= 2,
+    'visible keyboard focus: ' + JSON.stringify(ring),
+  );
+  await page.locator('#closeOfferDrawer').click();
   assert.deepEqual(errors, [], 'Unexpected frontend exceptions');
+
+  // Reduced motion: nothing animates or transitions.
+  const calm = await browser.newContext({ reducedMotion: 'reduce' });
+  const still = await calm.newPage();
+  await gotoSettled(still, url);
+  const moving = await still.evaluate(() =>
+    [...document.querySelectorAll('*')]
+      .filter((element) => {
+        const style = getComputedStyle(element);
+        return (
+          style.animationName !== 'none' ||
+          style.transitionDuration.split(',').some((duration) => parseFloat(duration) > 0)
+        );
+      })
+      .map((element) => element.tagName + '.' + [...element.classList].join('.')),
+  );
+  assert.deepEqual(moving, [], 'prefers-reduced-motion: no animation or transition');
+  await calm.close();
 
   // Both themes, every view, desktop and phone, with every disclosure open: no text may sit on a
   // background it barely differs from (the dark theme once had white tiles under light text).

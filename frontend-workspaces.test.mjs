@@ -10,11 +10,6 @@ const reviewScript = await readFile(new URL('./app/views/review.js', import.meta
 const catalogScript = await readFile(new URL('./app/views/catalog.js', import.meta.url), 'utf8');
 const offersScript = await readFile(new URL('./app/views/offers.js', import.meta.url), 'utf8');
 const script = [shellScript, scannerScript, reviewScript, catalogScript, offersScript].join('\n');
-const styles = (
-  await Promise.all(
-    ['app.css'].map((file) => readFile(new URL('./app/' + file, import.meta.url), 'utf8')),
-  )
-).join('\n');
 
 // Stage 1 of the 11.2026 review: "Dziś" is the start view; the scan form is the "Skan" view.
 test('desktop shell starts on Dziś and keeps every workspace in order', () => {
@@ -61,19 +56,11 @@ test('frontend uses SQLite catalog APIs', () => {
   assert.match(script, /state\.catalogPreview/);
 });
 
-test('layout has fixed desktop navigation and responsive workspaces', () => {
-  assert.match(styles, /\.nav-list\{display:flex/);
-  assert.match(styles, /@media\(max-width:900px\)/);
-  assert.match(styles, /\.mobile-bottom-nav\{display:grid/);
-  assert.match(styles, /\.detail-is-open #reviewDetail/);
-});
-
 test('review catalog picker filters by typed title or ISBN before selection', () => {
   assert.match(script, /id=\"reviewBookSearch\"/);
   assert.match(script, /renderReviewBookChoices\(event\.target\.value\)/);
   assert.match(script, /work\.title[\s\S]*edition\.identifiers/);
   assert.match(script, /dataset\.reviewEditionId/);
-  assert.match(styles, /\.book-options/);
 });
 
 test('catalog loads beyond the first SQLite page without silent JSON substitution', () => {
@@ -98,8 +85,6 @@ test('book-centric UI exposes comparison and mobile offers without external imag
   assert.match(script, /offersMobileList/);
   assert.match(script, /data-mobile-offer-id/);
   assert.match(html, /id="offersMobileList"/);
-  assert.match(styles, /\.mobile-offer/);
-  assert.match(styles, /\.book-spine/);
 });
 
 // Stage 1: "Nowe z ostatniego skanu" repeated the last-scan card; Dziś counts new offers and
@@ -121,21 +106,11 @@ test('review compares observed ISBN against candidate edition and warns on confl
   assert.match(script, /RÓŻNE ISBN — sprawdź wydanie/);
   assert.match(script, /Konflikt ISBN — wybierz wydanie ręcznie/);
   assert.match(script, /input\.dataset\.editionId = ''/);
-  assert.match(styles, /\.verification-conflict/);
-  assert.match(styles, /\.verification-match/);
 });
 
 test('desktop workspace preserves functional scanner controls and adds editorial shell', () => {
   for (const id of ['sourceGrid', 'startSearch', 'scanRun', 'scanRunSources'])
     assert.ok(html.includes('id=\"' + id + '\"'));
-  assert.match(styles, /#view-scanner\{display:grid/);
-});
-
-test('mobile repairs keep scanner filters usable and catalog avoids cramped headers', () => {
-  assert.match(styles, /\.filterbar \.search-field\{flex-basis:100%/);
-  assert.match(styles, /\.catalog-table-header,\.catalog-isbn\{display:none/);
-  assert.match(styles, /\.catalog-row\{display:grid/);
-  assert.match(styles, /\.stats-grid\{display:flex/);
 });
 
 test('edition price statistics reflect saved asking prices without projecting ROI', () => {
@@ -144,7 +119,6 @@ test('edition price statistics reflect saved asking prices without projecting RO
   assert.match(script, /sorted\.length % 2/);
   assert.match(script, /offerPriceSummaryMarkup\(row\.offers\)/);
   assert.match(script, /Nie są to ceny sprzedaży ani prognoza zysku/);
-  assert.match(styles, /\.edition-price-summary/);
 });
 test('review requires explicit edition decision with bibliographic context', () => {
   assert.match(script, /Sprawdź ISBN/);
@@ -170,7 +144,6 @@ test('resale simulator requires user costs and a manually assumed resale price',
   assert.match(script, /scenarioResale/);
   assert.match(script, /Uzupełnij wszystkie pola/);
   assert.match(script, /Przed podatkiem, bez gwarancji sprzedaży/);
-  assert.match(styles, /\.scenario-fields/);
 });
 
 test('covers use ISBN checksum and show neutral spine until real image loads', () => {
@@ -182,8 +155,6 @@ test('covers use ISBN checksum and show neutral spine until real image loads', (
     'naturalWidth>1',
   ])
     assert.ok(compact.includes(expression), expression);
-  assert.match(styles, /\.cover-preview\.has-cover/);
-  assert.match(styles, /\.edition-identity/);
 });
 
 // Stage 1: the live channel replaced the "Odśwież" button; a failed list read still says so.

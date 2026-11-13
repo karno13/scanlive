@@ -202,8 +202,10 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `eslint.config.mjs`, `tsconfig.typecheck.json` | Reguły lintu (z `no-undef`) i lista plików `// @ts-check` |
 | `typecheck-coverage.test.mjs` | Pilnuje, by każdy plik `// @ts-check` był w `tsconfig.typecheck.json` |
 | `theme-tokens.test.mjs`, `documentation-current.test.mjs` | Kolory tylko przez tokeny; wymagane frazy dokumentacji |
+| `app-styles.mjs` | Arkusze stylów z `index.html` (w kolejności `<link>`) jako sparsowane reguły — dla testów zasad struktury, niezależnie od formatowania |
 | `fixtures/` | Zapisane strony źródeł dla testów parserów |
-| `scripts/browser-smoke.mjs` | Test Chromium: widoki, oba motywy, kontrast (Playwright) |
+| `scripts/browser-smoke.mjs` | Test Chromium: widoki, oba motywy, kontrast, ukryte elementy, pola 16 px / 44 px na telefonie, widoczny fokus, ograniczenie ruchu (Playwright) |
+| `scripts/css-snapshot.mjs` | Style obliczone każdego elementu we wszystkich widokach i stanach; `--verify` porównuje rewizję z drzewem roboczym (zmiany CSS bez zmiany wyglądu) |
 
 ### Narzędzia i pomiary
 

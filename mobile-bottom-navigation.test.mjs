@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { appStyleRules } from './app-styles.mjs';
 
 // Stage 1 of the 11.2026 review: Dziś takes the scan form's place; "Nowy skan" on Dziś opens it.
 test('mobile bottom navigation reaches every BookFlip view', async () => {
@@ -18,14 +19,15 @@ test('mobile bottom navigation reaches every BookFlip view', async () => {
   assert.doesNotMatch(nav, /data-view="(?:review|sets)"/);
   assert.match(app, /if \(name === 'settings'\)/);
 });
-test('mobile navigation supports safe area and visible focus', async () => {
-  const css = (
-    await Promise.all(
-      ['app.css'].map((file) => readFile(new URL('./app/' + file, import.meta.url), 'utf8')),
-    )
-  ).join('\n');
-  assert.match(css, /\.mobile-bottom-nav\{display:grid/);
-  assert.match(css, /env\(safe-area-inset-bottom/);
-  assert.match(css, /:focus-visible/);
-  assert.match(css, /\.sidebar\{display:none/);
+// Layout and visible focus are checked in the browser (scripts/browser-smoke.mjs); the safe area of
+// a notched phone cannot be emulated there, so this rule is checked on the parsed stylesheets.
+test('mobile navigation keeps clear of the safe area at the bottom of the screen', async () => {
+  const rules = await appStyleRules();
+  assert.ok(
+    rules.some(
+      (rule) =>
+        rule.selectors.some((selector) => /\.mobile-bottom-nav$/.test(selector)) &&
+        rule.declarations.some(({ value }) => value.includes('env(safe-area-inset-bottom')),
+    ),
+  );
 });

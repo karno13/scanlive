@@ -6,7 +6,6 @@ const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
 test('the pinned review button follows the case: create the edition, approve, or say what is missing', async () => {
   const review = await read('./app/views/review.js');
-  const css = await read('./app/app.css');
   assert.match(
     review,
     /id="createOfferEdition" type="button" hidden>Utwórz wydanie i przypisz <kbd>Enter<\/kbd>/,
@@ -26,10 +25,7 @@ test('the pinned review button follows the case: create the edition, approve, or
     review,
     /press\(\$\('#createOfferEdition:not\(\[hidden\]\)'\) \? '#createOfferEdition' : '#approveReview'\)/,
   );
-  assert.match(
-    css,
-    /#reviewDetail #approveReview\[hidden\], #reviewDetail #createOfferEdition\[hidden\]/,
-  );
+  // That the hidden one stays hidden is checked in the browser (scripts/browser-smoke.mjs).
 });
 
 test('one name for an offer state in the table, the phone list and the drawer', async () => {

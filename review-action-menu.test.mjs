@@ -69,8 +69,6 @@ test('the listing photo zooms; the chosen proposal cover is shown beside it', as
     review,
     /box\.querySelectorAll\('\.rv-cand'\)\.forEach\(\(other\) => other\.classList\.toggle\('is-chosen', other === button\)\);\n\s+(?:chooseCatalogEdition|pendingRecordId|useProposal)/,
   );
-  const css = await read('./app/app.css');
-  assert.match(css, /#reviewDetail \.rv-compare-item img \{ display: block; height: 240px;/);
 });
 
 test('zoom and comparison use the full-size image', () => {
