@@ -52,6 +52,9 @@ const nodeGlobals = readonly([
 const browserGlobals = readonly([
   ...webCommon,
   'CSS',
+  'CSSMediaRule',
+  'CSSStyleRule',
+  'CSSSupportsRule',
   'Element',
   'EventSource',
   'FileReader',
@@ -89,6 +92,7 @@ const browserGlobals = readonly([
 // Node scripts that drive Chromium: their page.evaluate callbacks use browser globals.
 const playwrightScripts = [
   'scripts/browser-smoke.mjs',
+  'scripts/css-snapshot.mjs',
   'scripts/measure-network.mjs',
   'scripts/measure-quick-tab.mjs',
   'scripts/page-settle.mjs',
