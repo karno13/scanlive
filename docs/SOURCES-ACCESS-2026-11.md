@@ -91,3 +91,44 @@ Do czasu decyzji nic się nie zmienia; nowych funkcji na wyszukiwarce Tezeusza (
 **Skupszop — co zwraca `GET https://skupszop.pl/api/search/listing`** (jedna odpowiedź, 30 pozycji na stronę, lista stron w `data.pages`): dla każdej książki `isbn`, `name`, `author_raw`, `publisher.name`, `release_date`, `binding`, `price`, `price_regular`, `condition` (`nowa`, `jak nowa`, `dobry`, `widoczne ślady używania`), `is_available`, `on_stock`, `quantity_total`, `url`, `cover` oraz `variants` — osobna cena i liczba sztuk dla każdego stanu. Liczniki z odpowiedzi: 125 443 nowych i 200 678 używanych pozycji. To są dokładnie dane, których brakuje pozostałym źródłom: ISBN przy każdej ofercie (identyfikacja bez kolejki decyzji) i cena zależna od stanu.
 
 Czego nie ustaliłem: **jak przekazać frazę albo ISBN** (zwykłe `?query=`, `?q=`, `?search=`, `?phrase=`, `?keyword=` nie filtrują wyników; filtr nazywa się `keyword`, ale jego zapis w adresie jest inny). Dalsze zgadywanie parametrów cudzego API przerwałem. Następny krok, jeśli właściciel chce to źródło: otworzyć sklep w przeglądarce, wyszukać frazę i odczytać adres zapytania do `/api/search/listing` z narzędzi deweloperskich (jedno kliknięcie), przeczytać regulamin sklepu, a potem dodać adapter według przepisu „Source” z `CLAUDE.md` (zapytania przez bramkę, zapisana odpowiedź w `fixtures/marketplaces/`).
+
+## Antykwariaty internetowe — lista do wdrożenia (rozpoznanie, 14.11.2026)
+
+Dla każdego serwisu odczytany `robots.txt` i jedna strona (kategoria fantastyki albo strona główna). **Regulaminów nie czytałem; kształtu strony produktu nie sprawdzałem** — liczby pochodzą z tej jednej strony. Żadne źródło nie jest dodane.
+
+Wspólna cecha: wyszukiwarka bywa zakazana albo niepotrzebna, za to **strony kategorii są dozwolone i małe**. Dlatego te źródła czyta się po kategorii (fantastyka / SF), strona po stronie, a dopiero potem filtruje frazami profilu — nie przez zapytanie na każdą frazę.
+
+### Do wdrożenia (w tej kolejności)
+
+| #   | Serwis              | Miasto, platforma    | Adres listy                                                                                                               | Na liście                                                                             | robots.txt                                                                                     | Uwagi                                                                                                       |
+| --- | ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1   | Skupszop.pl         | sklep ogólnopolski   | `GET /api/search/listing`                                                                                                 | ISBN, stan, cena dla każdego stanu, dostępność                                        | API wprost dozwolone                                                                           | opis w sekcji wyżej; brakuje zapisu frazy w adresie                                                         |
+| 2   | BlackBooks.pl       | Gdańsk, PrestaShop   | `https://blackbooks.pl/525-fantasy?page=N` (SF: `/527-science-fiction`, nadrzędna: `/524-fantasy-science-fiction-horror`) | tytuł z autorem, cena, dostępność; 24 na stronę                                       | kategorie i `?page=` dozwolone; zakazane `/szukaj`, `search_query`, `orderby`, `orderway`, `n` | fantasy: 1573 pozycje (66 stron) — największy zasób w niszy; ISBN i stan do sprawdzenia na stronie produktu |
+| 3   | Antykwariat Conroy  | Kraków, osCommerce   | `https://www.antykwariat-conroy.pl/fantastyka-c-7.html?page=N`                                                            | tytuł, autor, wydawca, rok, **ISBN**, stan, wady, cena; 10 na stronę                  | kategorie i stronicowanie dozwolone; zakazane `/advanced_search.php`                           | 507 pozycji (51 stron); komplet danych już na liście, strony produktów niepotrzebne                         |
+| 4   | Szarlatan           | Wrocław, WooCommerce | `https://szarlatan.pl/kategoria-produktu/ksiazki-wspolczesne/fantastyka/page/N/`                                          | tytuł z autorem, cena; do 150 na stronę                                               | kategorie, produkty i `?s=` dozwolone                                                          | 335 pozycji (3 strony); ma Warhammera; ISBN i stan na stronie produktu (do sprawdzenia)                     |
+| 5   | Stara Dobra Książka | Gdynia, RedCart      | `https://staradobraksiazka.pl/1100-fantasy-science-fiction-horror`; wyszukiwarka `/q/?keywords=…`                         | tytuł i autor, cena, dostępność z liczbą egzemplarzy, znacznik „Egzemplarz sprzedany” | wszystko dozwolone; **`Crawl-delay: 1`**                                                       | sprzedane egzemplarze zostają na liście z ceną — gotowy sygnał sprzedaży; liczby pozycji nie znam           |
+| 6   | Antykwariat NWS     | Kraków, własny sklep | `https://www.antykwariatnws.pl/antykwariat-27---N-Fantasy.html` (N od 0; SF: `antykwariat-28-…`)                          | autor, tytuł, wydanie z rokiem, cena; 15 na stronę                                    | `Allow: /`                                                                                     | fantasy 171, SF ok. 250; bez ISBN na liście; strony w starym kodowaniu znaków (nie UTF-8)                   |
+
+### Możliwe później
+
+- **Antykwariat Gelber** (Warszawa, WordPress): `https://antykwariatgelber.pl/category/fantastyka-i-horror-polska/page/N/`, ok. 200 pozycji, na liście ISBN, stan, cena i „Pozycja dostępna”; `robots.txt` niczego nie zakazuje. Bez koszyka — zamówienie e-mailem lub telefonicznie, więc to raczej odniesienie cenowe niż miejsce zakupu.
+- **Bookbot.pl**: wyszukiwarka i filtry zakazane, strony wydawców (`/p/publisher/*`) i mapa strony dozwolone — dopiero gdy będzie skan po wydawcy.
+- **Tezeusz po stronach autorów** (`https://tezeusz.pl/autor/terry-pratchett`): dozwolony zamiennik zakazanej wyszukiwarki.
+
+### Odrzucone
+
+| Serwis                                         | Powód                                                                                               |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Atticus (atticus.pl)                           | starodruki, mapy, grafika — nie nasz towar (wcześniej oceniony za wysoko, przed obejrzeniem oferty) |
+| Antyk Sobieski                                 | książki sprzed 1945 r. i kolekcjonerskie; fantastyka tylko po angielsku                             |
+| antykwariat.waw.pl                             | ma Warhammera, ale serwer odpowiada 403 na automatyczny odczyt                                      |
+| czytam.pl                                      | `robots.txt` zakazuje `/sklep/*`                                                                    |
+| Kwadryga, TakCzytam, TaniaKsiazka, Sprzedajemy | wyszukiwarka zakazana, oferta nie nasza albo niesprawdzona                                          |
+| EnglishBooks.pl                                | książki po angielsku („Tylko polskie wydania”)                                                      |
+| antykwariat.biz.pl                             | giełda ogłoszeń, brak `robots.txt`; niesprawdzona                                                   |
+
+### Jak wdrażać
+
+- Tryb „kategoria”: źródło ma listę adresów kategorii zamiast wzoru zapytania; skan czyta kolejne strony w tempie bramki, a oferty przechodzą przez ten sam filtr fraz co pozostałe. Pełny odczyt wszystkich pięciu antykwariatów to ok. 160 stron — przy odstępie kilku sekund kilkanaście minut, więc raz na dobę, nie przy każdym skanie.
+- Oferta, która zniknęła z kategorii, jest sprzedana albo wycofana; Stara Dobra Książka mówi to wprost.
+- Każde źródło: host w `localSourceHosts`, parser i zapisany fragment strony w `fixtures/marketplaces/` z testem, rodzaj oferty „antykwariat” w `offer-kinds.mjs`.
