@@ -7,7 +7,7 @@ Current focus: scanner, catalogue, verification (trading features are parked) �
 ## Commands
 
 - **`npm run verify` before finishing work**: lint, typecheck, `format:check`, tests — in that order, stops at the first failure (`scripts/verify.mjs`). There is no git remote, so `.github/workflows` never run — this is the check.
-- `npm test` — all tests (isolated temp data dir, never the user's DB). One file: `npm test -- rejected-offers.test.mjs`.
+- `npm test` — all tests (isolated temp data dir, never the user's DB). One file: `npm test -- test/rejected-offers.test.mjs`. Tests live in `test/` (frontend unit tests next to their module in `app/`, script tests in `scripts/`).
 - `npm run lint` (incl. `no-undef`; globals listed by hand in `eslint.config.mjs`) · `npm run typecheck` (files with `// @ts-check`; each must be listed in `tsconfig.typecheck.json`, a test enforces it) · `npm run format:check` (needs `npm install` once; do not commit a `package-lock.json`).
 - CSS changes: `node scripts/css-snapshot.mjs <port> <dir> --verify` compares the computed styles of every view and state (4 widths, both themes, trading on/off) for HEAD against the working tree; server on a copy of the data, other port than 4317 (command in the script header; ~1.5 h, `--only <regex>` for a subset). Zero differences = the look did not change.
 - UI smoke: `node scripts/browser-smoke.mjs` (needs `npm install --no-save --no-package-lock playwright@1.55.1` and `npx playwright install chromium`).

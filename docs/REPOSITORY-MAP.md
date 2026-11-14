@@ -36,7 +36,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `catalog-production.mjs` | Otwiera bazę, składa źródła metadanych, uruchamia `startup-jobs.mjs` |
 | `catalog-migrations.mjs` | Stosuje migracje z `migrations/` z kontrolą sum |
 | `migrations/NNN_*.sql` | **Niezmienne** migracje (`001`–`007`, `099`–`132`); nowa zmiana = kolejny numer |
-| `docs/SCHEMA.sql`, `scripts/dump-schema.mjs`, `schema-doc.test.mjs` | Aktualny schemat bazy w jednym pliku (generowany z migracji); test pilnuje, by był aktualny |
+| `docs/SCHEMA.sql`, `scripts/dump-schema.mjs`, `test/schema-doc.test.mjs` | Aktualny schemat bazy w jednym pliku (generowany z migracji); test pilnuje, by był aktualny |
 | `startup-jobs.mjs` | Naprawy danych przy starcie jako zadania jednorazowe z flagą (`runOnce`) |
 | `catalog-data-location.mjs` | Ścieżka bazy w `%LOCALAPPDATA%` i kopia przed migracjami |
 | `auto-backup.mjs` | Codzienna kopia bazy w `backups` (7 najnowszych), opcjonalnie druga lokalizacja |
@@ -203,13 +203,13 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 
 | Plik | Rola |
 | --- | --- |
-| `*.test.mjs`, `test/*.test.js`, `app/**/*.test.mjs` | Testy Node (`node:test`) |
+| `test/*.test.mjs`, `test/*.test.js`, `app/**/*.test.mjs`, `scripts/*.test.mjs` | Testy Node (`node:test`); wszystkie testy serwera są w `test/` |
 | `scripts/run-tests.mjs`, `scripts/isolated-runtime.mjs` | `npm test`: każdy proces testowy na tymczasowym katalogu danych |
 | `sqlite-concurrency-worker.mjs` | Proces pomocniczy testu równoległego zapisu SQLite |
 | `scripts/verify.mjs` | `npm run verify`: lint, typy, formatowanie, testy; stop na pierwszym błędzie |
 | `eslint.config.mjs`, `tsconfig.typecheck.json` | Reguły lintu (z `no-undef`) i lista plików `// @ts-check` |
-| `typecheck-coverage.test.mjs` | Pilnuje, by każdy plik `// @ts-check` był w `tsconfig.typecheck.json` |
-| `theme-tokens.test.mjs`, `documentation-current.test.mjs` | Kolory tylko przez tokeny; wymagane frazy dokumentacji |
+| `test/typecheck-coverage.test.mjs` | Pilnuje, by każdy plik `// @ts-check` był w `tsconfig.typecheck.json` |
+| `test/theme-tokens.test.mjs`, `test/documentation-current.test.mjs` | Kolory tylko przez tokeny; wymagane frazy dokumentacji |
 | `app-styles.mjs` | Arkusze stylów z `index.html` (w kolejności `<link>`) jako sparsowane reguły — dla testów zasad struktury, niezależnie od formatowania |
 | `fixtures/` | Zapisane strony źródeł dla testów parserów |
 | `scripts/browser-smoke.mjs` | Test Chromium: widoki, oba motywy, kontrast, ukryte elementy, pola 16 px / 44 px na telefonie, widoczny fokus, ograniczenie ruchu (Playwright) |

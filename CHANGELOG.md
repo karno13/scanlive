@@ -7,11 +7,12 @@ Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; lic
 Bez zmian w wyglądzie i działaniu aplikacji.
 
 - **`npm run verify`: 70 s → 33 s.** Usunięty krok `check:syntax` (osobny proces `node --check` na każdy plik, 33 s); błędy składni i tak zatrzymuje lint, który parsuje każdy plik.
-- **`docs/SCHEMA.sql`**: aktualny schemat bazy (57 tabel z indeksami i wyzwalaczami) w jednym pliku zamiast w 41 migracjach. Generuje go `node scripts/dump-schema.mjs`; test `schema-doc.test.mjs` nie przejdzie, gdy po nowej migracji plik jest nieaktualny.
+- **`docs/SCHEMA.sql`**: aktualny schemat bazy (57 tabel z indeksami i wyzwalaczami) w jednym pliku zamiast w 41 migracjach. Generuje go `node scripts/dump-schema.mjs`; test `test/schema-doc.test.mjs` nie przejdzie, gdy po nowej migracji plik jest nieaktualny.
 - **Typy:** `// @ts-check` w 67 modułach zamiast 9 — 58 dodanych przeszły bez poprawek.
 - **Trasy:** `trading-api.mjs` nazywa się `api-routes.mjs` (tabela `apiRoutes`) — większość jego tras to katalog, kolejka i ustawienia, nie handel. W `local-app.mjs` 57 tras nie powtarza już sprawdzenia „katalog otwarty”: handler, który bierze `catalog`, dostaje otwarty katalog albo żądanie kończy się 503 `CATALOG_DISABLED` (plik krótszy o 43 linie).
 - **Usunięte** nieużywane moduły sprzed SQLite: `feed.mjs`, `rss.mjs`, `local-batch-scan.mjs` z testami (740 linii; zostają w historii Git). Narzędzia importu dawnej historii JSON zostały.
 - **`local-app.mjs`: 2410 → 432 linie.** Skan jest w `scan-engine.mjs`, zadania w tle w `background-jobs.mjs`, wspólne elementy procesu w `app-runtime.mjs`, a 67 tras w pięciu plikach `routes/` (zdjęcia, weryfikacja, katalog, oferty, źródła). Żadne dwie trasy nie dopasowują tego samego żądania, więc kolejność tabel nie ma znaczenia. Sprawdzone na serwerze z pustą bazą: 21 adresów z każdego pliku tras odpowiada tak jak przedtem.
+- **Testy serwera w `test/`:** 149 plików `*.test.mjs` przeniesionych z katalogu głównego, w którym zostało 113 plików zamiast 264. Jeden plik uruchamia `npm test -- test/nazwa.test.mjs`.
 - Test importów pomija `scratch/` (pliki robocze spoza Git).
 
 ## 2026-11-14 (59) — Style: plik na obszar, każdy selektor w jednym miejscu

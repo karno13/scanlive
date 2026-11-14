@@ -1,6 +1,6 @@
 # Fixtures parserów serwisów ogłoszeniowych
 
-Pliki `*.json` są odczytywane przez `marketplace-fixtures.test.mjs`. Testy działają offline, bez pobierania danych z serwisów.
+Pliki `*.json` są odczytywane przez `test/marketplace-fixtures.test.mjs`. Testy działają offline, bez pobierania danych z serwisów.
 
 ## Pochodzenie
 

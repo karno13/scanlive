@@ -89,7 +89,7 @@ Nie commituj prawdziwych baz SQLite, historii skanów, cookies, kluczy ani innyc
 ```powershell
 npm install          # jednorazowo: ESLint, Prettier, TypeScript (devDependencies)
 npm run verify       # lint, typy, formatowanie i testy — po kolei, stop na pierwszym błędzie
-npm test             # same testy; jeden plik: npm test -- rejected-offers.test.mjs
+npm test             # same testy; jeden plik: npm test -- test/rejected-offers.test.mjs
 # test przeglądarkowy; jednorazowo: npm install --no-save --no-package-lock playwright@1.55.1 && npx playwright install chromium
 node scripts/browser-smoke.mjs
 ```

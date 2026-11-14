@@ -1,7 +1,7 @@
 // The current database schema in one file: every migration applied to an empty in-memory database,
 // then the resulting tables, indexes, triggers and views printed in a stable order.
 //   node scripts/dump-schema.mjs          writes docs/SCHEMA.sql
-// schema-doc.test.mjs fails when docs/SCHEMA.sql no longer matches the migrations.
+// test/schema-doc.test.mjs fails when docs/SCHEMA.sql no longer matches the migrations.
 import { DatabaseSync } from 'node:sqlite';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';

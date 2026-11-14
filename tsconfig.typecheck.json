@@ -1,5 +1,5 @@
 {
-  "//": "Type checking without a build step: JSDoc types, only files that start with // @ts-check (most backend modules; the rest still have type errors to fix first). npm run typecheck. typecheck-coverage.test.mjs fails when a // @ts-check file is missing from 'files'.",
+  "//": "Type checking without a build step: JSDoc types, only files that start with // @ts-check (most backend modules; the rest still have type errors to fix first). npm run typecheck. test/typecheck-coverage.test.mjs fails when a // @ts-check file is missing from 'files'.",
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
