@@ -76,6 +76,10 @@
     "universes.mjs",
     "vinted-detail-cache.mjs",
     "vinted-detail-sqlite-cache.mjs",
-    "work-series-api.mjs"
+    "work-series-api.mjs",
+    "routes/catalog-routes.mjs",
+    "routes/review-routes.mjs",
+    "routes/offer-routes.mjs",
+    "routes/source-routes.mjs"
   ]
 }

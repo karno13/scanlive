@@ -100,7 +100,7 @@ Test przeglądarkowy (`scripts/browser-smoke.mjs`) uruchamia Chromium na izolowa
 
 ## Architektura i dalsza dokumentacja
 
-- `local-app.mjs` — serwer i API; `app/` — interfejs.
+- `local-app.mjs` — serwer; `routes/` i `api-routes.mjs` — trasy API; `scan-engine.mjs` — skan; `app/` — interfejs.
 - `marketplaces.mjs`, `local-scan.mjs` — źródła skanowania (każde zapytanie przez `marketplace-gate.mjs`).
 - `catalog-production.mjs`, `sqlite-catalog-repository.mjs`, `catalog-api.mjs`, `offer-sets.mjs` — zapis i odczyt katalogu oraz zestawów.
 - `catalog-resolver.mjs`, `identification-worker.mjs`, `metadata-sources/` — dopasowanie ISBN i metadane.

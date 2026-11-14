@@ -13,9 +13,17 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `Uruchom BookFlip Scanner.cmd` | Start serwera na Windows (to samo co `npm start`) |
 | `Uruchom BookFlip przez Tailscale.cmd`, `scripts/start-tailscale.ps1` | Start z prywatnym dostępem z telefonu przez Tailscale Serve |
 | `scripts/windows-autostart.ps1` | Opcjonalny autostart przy logowaniu (Status/Enable/Disable); aplikacja nigdy go sama nie włącza |
-| `local-app.mjs` | Serwer HTTP: tabela tras `localRoutes` (handler z parametrem `catalog` dostaje otwarty katalog albo żądanie kończy się 503), skan, zadania w tle po każdym przebiegu identyfikacji |
+| `local-app.mjs` | Serwer HTTP: rozdział żądań, pliki interfejsu, start procesu i trasy zależne od stanu trwającego skanu (`/api/search`, `/api/today`, `/api/events`) |
+| `routes/image-routes.mjs` | Trasy zdjęć ofert i okładek |
+| `routes/review-routes.mjs` | Trasy kolejki weryfikacji: zadania identyfikacji, decyzje, decyzje wsadowe, sprawdzanie ISBN |
+| `routes/catalog-routes.mjs` | Trasy katalogu: dzieła, wydania, warianty, serie, osoby, zasilanie z BN, skup, eksport historii |
+| `routes/offer-routes.mjs` | Trasy ofert i zestawów |
+| `routes/source-routes.mjs` | Trasy widoku „Źródła”: stan źródeł i profile skanowania |
+| `app-runtime.mjs` | Wspólne dla procesu: otwarty katalog, usługa skupu, dziennik zdarzeń, stan skanu w pliku, blokada zapisu historii, `send` / `readJson` |
+| `scan-engine.mjs` | Przebieg skanu: walidacja żądania, odczyt źródeł z ponowieniami i stronicowaniem, kontrola języka Vinted, zapis ofert w trakcie skanu |
+| `background-jobs.mjs` | Zadania w tle po każdym przebiegu identyfikacji (`schedule*`): strony ofert, propozycje, ISBN, zestawy, cykl życia ofert, braki wydań |
 | `router.mjs` | Tabela tras: wzorce `/api/x/:id`, pierwsze dopasowanie wygrywa |
-| `api-routes.mjs` | Proste trasy JSON `/api/...` (tabela `apiRoutes`, handler zwraca wynik): katalog, kolejka, reguły, ustawienia, kopie, tryb handlu |
+| `api-routes.mjs` | Proste trasy JSON `/api/...` (tabela `apiRoutes`, handler zwraca wynik): katalog, kolejka, reguły, ustawienia, kopie, tryb handlu. Trasa z parametrem `catalog` w handlerze dostaje otwarty katalog albo żądanie kończy się 503 |
 | `static-asset-path.mjs` | Które ścieżki plików interfejsu wolno serwować |
 | `static-files.mjs` | Pliki interfejsu z gzip, `ETag` i odpowiedzią 304 |
 | `tailscale-access.mjs` | Dopuszcza tylko host Tailscale Serve i tożsamość właściciela |

@@ -21,7 +21,7 @@ test('manual ISBN lookup recognizes an existing local edition including ISBN-10 
 
 test('review lookup is read-only and does not silently approve an edition', async () => {
   const frontend = await readFile(new URL('./app/views/review.js', import.meta.url), 'utf8');
-  const server = await readFile(new URL('./local-app.mjs', import.meta.url), 'utf8');
+  const server = await readFile(new URL('./routes/review-routes.mjs', import.meta.url), 'utf8');
   assert.match(frontend, /id="reviewIsbnMatchButton"/);
   assert.match(frontend, /preview:true/);
   assert.match(frontend, /response\.canConfirm/);
@@ -35,7 +35,7 @@ test('review lookup is read-only and does not silently approve an edition', asyn
 
 test('top ISBN matching uses the offer-aware catalog resolver', async () => {
   const frontend = await readFile(new URL('./app/views/review.js', import.meta.url), 'utf8');
-  const server = await readFile(new URL('./local-app.mjs', import.meta.url), 'utf8');
+  const server = await readFile(new URL('./routes/review-routes.mjs', import.meta.url), 'utf8');
   assert.match(frontend, /id="reviewIsbnMatchButton"/);
   const handler = frontend
     .split("$('#reviewIsbnMatchButton').addEventListener('click'")[1]

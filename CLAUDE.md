@@ -17,7 +17,8 @@ Current focus: scanner, catalogue, verification (trading features are parked) �
 
 Full table: `docs/REPOSITORY-MAP.md`. The short version:
 
-- `local-app.mjs` — HTTP server: route table `localRoutes` in `createLocalAppServer` (`router.mjs`: `.add(method, '/api/x/:id', handler)`, first match wins, params already decoded), background jobs (`schedule*` functions run after each identification pass). Smaller routes live in the `apiRoutes` table of `api-routes.mjs`; requests whose path that table knows are forwarded to it automatically.
+- `local-app.mjs` — HTTP server: dispatcher, static files and the routes that need the running scan's state (`/api/search`, `/api/today`, `/api/events`). Other routes: `routes/<area>-routes.mjs` (image, review, catalog, offer, source), each an `add…Routes(routes, context)` function over `router.mjs` (`.add(method, '/api/x/:id', handler)`, params already decoded; a handler that names `catalog` gets the open catalogue or the request ends with 503). No two routes may match the same request. One-line JSON routes whose handler returns the result live in the `apiRoutes` table of `api-routes.mjs`.
+- `scan-engine.mjs` — the scan (`searchOffers`, `searchAndStore`); `background-jobs.mjs` — `schedule*` jobs that run after each identification pass; `app-runtime.mjs` — the open catalogue (`getProductionCatalog`), `send`/`readJson`, event log, history write lock.
 - `catalog-api.mjs` — read models for lists (works, offers, offer groups, review queue, buckets).
 - `catalog-production.mjs` — opens the DB and runs `startup-jobs.mjs`: data repairs are **one-time jobs** with a flag in `app_preferences` (`runOnce`, versioned key when rules can change); only in-memory loads and series aliases run every start. Scanned offers enter through `offer-ingest.mjs` (`ScannedOffer`, one shape).
 - `catalog-resolver.mjs` + `identification-worker.mjs` — ISBN → edition; `metadata-sources/*` adapters.
