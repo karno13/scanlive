@@ -11,6 +11,8 @@ import { mountRuleSettings } from './views/reject-rule.js';
 import { installSources } from './views/sources.js';
 import { createScanRun } from './views/scan-run.js';
 import { installScanProfiles } from './views/scan-profiles.js';
+import { installScanSeries } from './views/scan-series.js';
+import { MAX_SCAN_QUERIES } from './core/scan-limits.js';
 import { createScanInsights } from './views/scan-insights.js';
 import { createSetsView } from './views/sets.js';
 import { createReviewView } from './views/review.js';
@@ -401,7 +403,7 @@ function updateScanPlan() {
   const queries = readQueries();
   const sources = selectedSources();
   const parts = [];
-  if (queries.length > 10) parts.push(`<b class="is-warn">${queries.length} fraz — maksymalnie 10</b>`);
+  if (queries.length > MAX_SCAN_QUERIES) parts.push(`<b class="is-warn">${queries.length} fraz — maksymalnie ${MAX_SCAN_QUERIES}</b>`);
   if (queries.length && sources.length) {
     const tasks = queries.length * sources.length;
     const perTask = scanRun?.secondsPerTask?.();
@@ -939,6 +941,7 @@ $('#toggleSources').addEventListener('click', () => {
 $('#startSearch').addEventListener('click', startSearch);
 $('#cancelSearch').addEventListener('click', () => requestScanCancellation({ $, toast }));
 $('#queries').addEventListener('input', updateScanPlan);
+installScanSeries({ $, toast });
 $('#sourceGrid').addEventListener('change', updateScanPlan);
 document.addEventListener('bookflip-scan-complete', () => {
   void scanRun.refresh().then(updateScanPlan);

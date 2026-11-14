@@ -2,6 +2,11 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (67) — Skan po serii, do 200 fraz
+
+- Nad polem fraz jest wybór **„Szukaj po serii”**: Świat Dysku (41 powieści), Herezja Horusa (tomy 1–48, z zapowiedziami) i Gotrek i Felix (17 głównych tomów). Wybór wstawia tytuły serii jako frazy; można je poprawić przed kliknięciem „Skanuj” i zapisać jako profil.
+- Limit fraz w skanie i w profilu wzrósł z 10 do **200**. Więcej fraz to dłuższy skan: każda fraza jest osobnym zapytaniem w każdym wybranym źródle (antykwariaty czytają kategorię raz).
+
 ## 2026-11-14 (66) — Pięć antykwariatów internetowych jako nowe źródła
 
 Nowe źródła do wyboru w skanerze: **BlackBooks.pl** (Gdańsk), **Antykwariat Conroy** (Kraków), **Szarlatan.pl** (Wrocław), **Stara Dobra Książka** (Gdynia) i **Antykwariat NWS** (Kraków). Ich oferty mają rodzaj „Antykwariat” i wspólny kolor.

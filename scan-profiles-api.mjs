@@ -1,4 +1,5 @@
 // @ts-check
+import { MAX_SCAN_QUERIES } from './app/core/scan-limits.js';
 const allowedSources = new Set([
   'Allegro',
   'Empik',
@@ -24,7 +25,7 @@ function validate(name, input) {
     !Array.isArray(input.queries) ||
     !Array.isArray(input.sources) ||
     input.queries.length < 1 ||
-    input.queries.length > 10 ||
+    input.queries.length > MAX_SCAN_QUERIES ||
     input.sources.length < 1 ||
     input.sources.length > allowedSources.size ||
     input.queries.some((q) => typeof q !== 'string' || q !== q.trim() || !q || q.length > 120) ||

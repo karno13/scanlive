@@ -21,6 +21,7 @@ import {
 } from './sqlite-single-store.mjs';
 import { getProductionCatalog, withHistoryWriteLock } from './app-runtime.mjs';
 import { scheduleCatalogResolution } from './background-jobs.mjs';
+import { MAX_SCAN_QUERIES } from './app/core/scan-limits.js';
 
 export function validateSearchInput(input) {
   const queries = [
@@ -31,7 +32,11 @@ export function validateSearchInput(input) {
     ),
   ];
   const requested = [...new Set((Array.isArray(input?.sources) ? input.sources : []).map(String))];
-  if (!queries.length || queries.length > 10 || queries.some((query) => query.length > 120))
+  if (
+    !queries.length ||
+    queries.length > MAX_SCAN_QUERIES ||
+    queries.some((query) => query.length > 120)
+  )
     throw Object.assign(Error('INVALID_QUERIES'), { statusCode: 400 });
   if (
     !requested.length ||
@@ -47,7 +52,7 @@ export function validateSearchInput(input) {
     if (
       !Array.isArray(input.tasks) ||
       !input.tasks.length ||
-      input.tasks.length > 70 ||
+      input.tasks.length > MAX_SCAN_QUERIES * Object.keys(localSourceHosts).length ||
       input.tasks.some((task) => !queries.includes(task?.query) || !sources.includes(task?.source))
     )
       throw Object.assign(Error('INVALID_SCAN_TASKS'), { statusCode: 400 });

@@ -1,6 +1,7 @@
 // Browser storage is read only for explicit legacy migration; live profiles are in SQLite.
 import { confirmDialog } from '../core/dialogs.js';
 import { escapeHtml } from '../core/formatters.js';
+import { MAX_SCAN_QUERIES } from '../core/scan-limits.js';
 const KEY = 'bookflip-scan-profiles-v1';
 function readLegacyProfiles() {
   try {
@@ -78,7 +79,7 @@ export async function installScanProfiles({ queriesInput, sourceGrid, panel, toa
     const stale = stalePhrases(queries, freshness.items);
     staleNote.hidden = !stale.length;
     staleNote.innerHTML = stale.length
-      ? `Bez nowych ofert od ${Number(freshness.days)} dni: <b>${escapeHtml(stale.join(', '))}</b>. Rozważ zamianę ${stale.length === 1 ? 'tej frazy' : 'tych fraz'} na inne — limit to 10 fraz.`
+      ? `Bez nowych ofert od ${Number(freshness.days)} dni: <b>${escapeHtml(stale.join(', '))}</b>. Rozważ zamianę ${stale.length === 1 ? 'tej frazy' : 'tych fraz'} na inne — limit to ${MAX_SCAN_QUERIES} fraz.`
       : '';
   }
   let staleTimer = null;
@@ -149,7 +150,7 @@ export async function installScanProfiles({ queriesInput, sourceGrid, panel, toa
     if (!profileName) return toast('Wpisz nazwę profilu.');
     if (profiles.some(profile=>profile.name===profileName)) return toast('Ta nazwa już istnieje. Wybierz profil i użyj Aktualizuj.');
     const queries = phrasesOf(queriesInput.value);
-    if(queries.length>10) return toast('Profil może zawierać najwyżej 10 fraz.');
+    if(queries.length>MAX_SCAN_QUERIES) return toast(`Profil może zawierać najwyżej ${MAX_SCAN_QUERIES} fraz.`);
     const sources = [...sourceGrid.querySelectorAll('input:checked')].map(input => input.value);
     if (!queries.length || !sources.length) return toast('Profil wymaga fraz i wybranych źródeł.');
     save.disabled = true;
@@ -205,7 +206,7 @@ export async function installScanProfiles({ queriesInput, sourceGrid, panel, toa
     if(!picker.value) return toast('Wybierz profil do aktualizacji.');
     const queries=phrasesOf(queriesInput.value);
     const sources=[...sourceGrid.querySelectorAll('input:checked')].map(input=>input.value);
-    if(!queries.length||queries.length>10||!sources.length) return toast('Wymagane od 1 do 10 fraz i przynajmniej jedno źródło.');
+    if(!queries.length||queries.length>MAX_SCAN_QUERIES||!sources.length) return toast(`Wymagane od 1 do ${MAX_SCAN_QUERIES} fraz i przynajmniej jedno źródło.`);
     update.disabled=true;
     try{await json('/api/scan-profiles/'+encodeURIComponent(picker.value),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries,sources})});await reload(picker.value);toast('Zaktualizowano profil.');}catch{toast('Nie zapisano profilu. Spróbuj ponownie.');}finally{update.disabled=false;}
   });

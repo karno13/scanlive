@@ -1,5 +1,6 @@
 import { problemTasks } from '../core/formatters.js';
 import { readSearchStream } from '../scan-stream.js';
+import { MAX_SCAN_QUERIES } from '../core/scan-limits.js';
 
 export async function requestScanCancellation({ $, toast }) {
   const button = $('#cancelSearch');
@@ -90,7 +91,7 @@ async function startSearch(options = {}) {
   const queries = tasks ? [...new Set(tasks.map(task=>task.query))] : readQueries(),
     sources = tasks ? [...new Set(tasks.map(task=>task.source))] : selectedSources();
   if (!queries.length) return toast('Dodaj przynajmniej jedną frazę.');
-  if (queries.length > 10) return toast('Wpisano '+queries.length+' fraz. Maksymalnie 10 — usuń nadmiar lub podziel je na profile.');
+  if (queries.length > MAX_SCAN_QUERIES) return toast(`Wpisano ${queries.length} fraz. Maksymalnie ${MAX_SCAN_QUERIES} — usuń nadmiar lub podziel je na profile.`);
   if (!sources.length) return toast('Wybierz przynajmniej jedno źródło.');
   const fingerprint = JSON.stringify({ queries, sources: [...sources].sort() });
   if (state.scan.fingerprint === fingerprint && Date.now() - state.scan.lastStart < 5000)

@@ -166,6 +166,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `app/core/identification-progress.js` | Postęp kolejki identyfikacji |
 | `app/core/live.js` | Połączenie ze strumieniem `/api/events`, ponowne łączenie |
 | `app/core/preferences.js` | Preferencje interfejsu w `localStorage` |
+| `app/core/scan-limits.js` | Limit fraz skanu i profilu (wspólny dla interfejsu i serwera) |
 | `app/core/ux.js` | Etykiety stanów, niezapisane zmiany, odczyt kwot |
 | `app/core/view-history.js` | Widok ↔ adres URL (bez DOM) |
 | `app/views/today.js` | Ekran „Dziś”: kafle, źródła, skany, miary |
@@ -196,6 +197,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `app/views/scan-run.js` | Panel „Przebieg skanu” |
 | `app/views/scan-insights.js` | Diagnostyka lokalnego skanu |
 | `app/views/scan-profiles.js` | Zapisane wyszukiwania (profile) |
+| `app/views/scan-series.js` | „Szukaj po serii”: uzgodnione listy tytułów wstawiane jako frazy |
 | `app/views/scan-schedule.js` | Automatyczny skan profilu co N godzin |
 | `app/views/trading-controls.js` | Przyciski następnych kroków pod panelem przebiegu |
 | `app/views/settings.js` | Ustawienia, skuteczność fraz, diagnostyka identyfikacji |
