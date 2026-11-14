@@ -133,6 +133,8 @@ test('Dziś counts what changed since the visit, with the filters of the list it
     assert.equal(listCatalogOffers(repository, visit.priceChanges.filters).items[0].id, old.id);
     assert.equal(visit.lastScan.at, '2026-11-11T19:00:00.000Z');
     assert.deepEqual(visit.lastScan.failedSources, ['Dedalus.pl']);
+    // Runs saved before the duration was recorded have none.
+    assert.equal(visit.lastScan.durationMs, null);
     assert.equal(visit.nextScan.enabled, false);
 
     // No previous visit in this browser: "new" means new in the last scan.

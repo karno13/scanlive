@@ -62,6 +62,9 @@ export function todaySummary(repository, { since = null, sources }) {
             ...new Set(errors.map((/** @type {any} */ error) => error?.source).filter(Boolean)),
           ].filter((source) => !hasNoLegalAccess(source)),
           queries: Array.isArray(summary.context?.queries) ? summary.context.queries.length : null,
+          durationMs: Number.isFinite(summary.context?.durationMs)
+            ? Number(summary.context.durationMs)
+            : null,
           filters: { scan: last.scanned_at },
         }
       : null,

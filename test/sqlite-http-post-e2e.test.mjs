@@ -100,6 +100,8 @@ test('HTTP POST scan, ISBN resolution, manual assignment and restart use SQLite 
     });
     assert.equal(changed.status, 200);
     assert.equal(changed.data.summary.priceChanges, 1);
+    // The run records how long the scan took (shown on „Dziś”).
+    assert.ok(changed.data.lastScan.context.durationMs >= 0);
     const prices = catalog.repository.database
       .prepare('SELECT price FROM offer_price_history WHERE offer_id=? ORDER BY observed_at')
       .all(offerId);

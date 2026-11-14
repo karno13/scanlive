@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (63) — Czas skanu, cena sprzedaży z małej próby, test parsera Tezeusza
+
+- **Dziś → „Ostatni skan”** pokazuje, ile trwał skan („· trwał 12 min”). Czas jest zapisywany przy każdym nowym skanie; starsze skany go nie mają. Pozwala ocenić koszt dodania frazy albo źródła.
+- **Strona książki:** przy „Sprzedane na Vinted” z mniej niż 3 sprzedaży stoi „mało danych” (na kopii bazy 351 z 415 książek z ofertami nie ma żadnej zaobserwowanej sprzedaży, 55 ma jedną).
+- **Tezeusz:** sprawdzone jednym zapytaniem przez bramkę — wyszukiwarka sklepu pokazuje z ceną egzemplarze, które strona produktu ma już jako „Produkt niedostępny”, więc oferta może być „nowa” i po chwili „Niedostępna”; to poprawne zachowanie, nie błąd. Karty bez ceny („Niedostępny”) nie są ofertami. Parser ma teraz test na zapisanym fragmencie strony (`fixtures/marketplaces/tezeusz-cards-captured.json`).
+
 ## 2026-11-14 (62) — Poprawki po przeglądzie aplikacji (część 1)
 
 - **Błąd:** dzieło w katalogu nazwane samym nazwiskiem autora (np. „Terry Pratchett”, utworzone z ogłoszenia bez tytułu) było proponowane jako „pewne dopasowanie” (95%) dla każdej oferty tego autora — na kopii bazy 2 z 3 kart w siatce „Szybkie”. Taki wpis nie jest już nigdy propozycją po tytule.

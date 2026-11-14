@@ -504,6 +504,7 @@ export async function searchAndStore(
   // Offers of each finished source+query are saved at once and identification starts, so results
   // appear while the scan continues. The final save adds the scan summary and statistics.
   const scanAt = new Date();
+  const startedMs = Date.now();
   const scanState = createScanState();
   let savedDuringScan = 0;
   // Offers saved by finished tasks, so that a cancelled scan is still recorded as a (partial) run.
@@ -581,6 +582,8 @@ export async function searchAndStore(
         queries: input.queries,
         sources: input.sources,
         results: result.results,
+        // How long the whole scan took: the cost of a phrase or a source, shown on „Dziś”.
+        durationMs: Date.now() - startedMs,
         ...(result.mode ? { mode: result.mode } : {}),
       },
     });

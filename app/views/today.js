@@ -111,7 +111,7 @@ export function todayTiles(data, now = new Date()) {
       id: 'last-scan',
       label: 'Ostatni skan',
       value: whenLabel(data.lastScan.at, now),
-      note: `${data.lastScan.found} ${plural(data.lastScan.found, 'wynik', 'wyniki', 'wyników')} · ${data.lastScan.newOffers} ${plural(data.lastScan.newOffers, 'nowa', 'nowe', 'nowych')}${data.lastScan.failedSources.length ? ' · błąd: ' + data.lastScan.failedSources.join(', ') : ''}`,
+      note: `${data.lastScan.found} ${plural(data.lastScan.found, 'wynik', 'wyniki', 'wyników')} · ${data.lastScan.newOffers} ${plural(data.lastScan.newOffers, 'nowa', 'nowe', 'nowych')}${data.lastScan.durationMs != null ? ' · trwał ' + (data.lastScan.durationMs < 90000 ? Math.max(1, Math.round(data.lastScan.durationMs / 1000)) + ' s' : Math.round(data.lastScan.durationMs / 60000) + ' min') : ''}${data.lastScan.failedSources.length ? ' · błąd: ' + data.lastScan.failedSources.join(', ') : ''}`,
       go: { offers: data.lastScan.filters },
     });
   const next = [data.nextScan?.at, data.nextScan?.quickAt].filter(Boolean).sort()[0];

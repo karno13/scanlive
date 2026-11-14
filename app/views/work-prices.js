@@ -60,7 +60,7 @@ function comparableMarkup(overview, { money, escapeHtml }) {
   const sold = overview.vintedSold || { count: 0 };
   // A tile without data ("Sprzedane na Vinted —") says nothing: only tiles with a value are shown.
   const tiles = [
-    sold.count && `<div class="wp-sold"><small>Sprzedane na Vinted</small><strong>${sold.count ? money(sold.median) : '–'}</strong><small>${sold.count ? `${sold.count} ${plural(sold.count, 'sprzedaż', 'sprzedaże', 'sprzedaży')}${sold.count > 1 ? ` · ${money(sold.min)}–${money(sold.max)}` : ''}` : 'brak potwierdzonych sprzedaży'}</small></div>`,
+    sold.count && `<div class="wp-sold"><small>Sprzedane na Vinted</small><strong>${sold.count ? money(sold.median) : '–'}</strong><small>${sold.count ? `${sold.count} ${plural(sold.count, 'sprzedaż', 'sprzedaże', 'sprzedaży')}${sold.count > 1 ? ` · ${money(sold.min)}–${money(sold.max)}` : ''}${sold.count < 3 ? ' · mało danych' : ''}` : 'brak potwierdzonych sprzedaży'}</small></div>`,
     ...(overview.kinds || []).filter((row) => row.median != null).map((row) => `<div><small>${escapeHtml(row.label)}</small><strong>${row.median != null ? money(row.median) : '–'}</strong><small>${row.live} ${plural(row.live, 'dostępna', 'dostępne', 'dostępnych')}${row.min != null && row.live > 1 ? ` · od ${money(row.min)}` : ''}</small></div>`),
   ].filter(Boolean);
   const kindRows = (overview.kinds || []).map((row) => `<tr><th scope="row">${escapeHtml(row.label)}</th>${statCells(row, money)}</tr>`).join('');
