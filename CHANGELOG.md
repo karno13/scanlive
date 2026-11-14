@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (68) — Usuwanie pozycji z katalogu
+
+- Na dole strony książki („Książki” → wybrana książka) jest **„Usuń z katalogu”** — dla pozycji, które nie należą do kolekcji. Po potwierdzeniu (okno podaje liczbę wydań i ofert) książka znika z list razem z wydaniami, a wszystkie jej oferty są odrzucane i znikają z weryfikacji i z „Ofert”.
+- Śmieć nie wraca: nowa oferta, która trafi na wydanie usuniętej książki albo ma jeden z jej numerów ISBN, jest odrzucana sama po każdym przebiegu identyfikacji.
+- Wszystko da się cofnąć: „Cofnij” w powiadomieniu albo „Narzędzia katalogu → Usunięte z katalogu → Przywróć” przywraca książkę i każdą jej ofertę z przypisanym wydaniem. Pojedynczą ofertę można też otworzyć ponownie w „Ostatnich decyzjach” — blokada jej nie odrzuci drugi raz. Ręczne przypisanie ma pierwszeństwo przed blokadą.
+- Nic nie jest kasowane z bazy: decyzje weryfikacji są niezmienne, więc usunięcie to ukrycie z blokadą. Oferty-zestawy, w których ta książka jest jednym z tomów, zostają.
+
 ## 2026-11-14 (67) — Skan po serii, do 200 fraz
 
 - Nad polem fraz jest wybór **„Szukaj po serii”**: Świat Dysku (41 powieści), Herezja Horusa (tomy 1–48, z zapowiedziami) i Gotrek i Felix (17 głównych tomów). Wybór wstawia tytuły serii jako frazy; można je poprawić przed kliknięciem „Skanuj” i zapisać jako profil.

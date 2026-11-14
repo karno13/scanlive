@@ -72,7 +72,7 @@ export function catalogSeries(repository) {
       `SELECT w.id, w.title,
          (SELECT count(*) FROM editions e WHERE e.work_id=w.id) AS editions,
          (SELECT count(*) FROM offer_matches m JOIN editions e ON e.id=m.edition_id WHERE e.work_id=w.id AND m.status='active') AS offers
-       FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id=w.id)`,
+       FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id=w.id) AND NOT EXISTS (SELECT 1 FROM removed_works rw WHERE rw.work_id=w.id)`,
     )
     .all();
   const editionTitles = new Map();

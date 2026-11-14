@@ -60,7 +60,7 @@ function liveWorks(repository) {
          (SELECT count(*) FROM offer_matches m JOIN editions e ON e.id = m.edition_id
             WHERE e.work_id = w.id AND m.status = 'active') AS offers
        FROM works w
-       WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id = w.id)`,
+       WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id = w.id) AND NOT EXISTS (SELECT 1 FROM removed_works rw WHERE rw.work_id=w.id)`,
     )
     .all();
 }
@@ -161,7 +161,7 @@ export function findWorkByKey(repository, title, authors, originalTitle = null) 
             WHERE e.work_id = w.id AND m.status = 'active') AS offers
        FROM works w
        WHERE w.id IN (SELECT work_id FROM work_keys WHERE key IN (SELECT value FROM json_each(?)))
-         AND NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id = w.id)`,
+         AND NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id = w.id) AND NOT EXISTS (SELECT 1 FROM removed_works rw WHERE rw.work_id=w.id)`,
     )
     .all(JSON.stringify(wanted));
   // Ambiguous (several works already share the key): leave the decision to the operator.

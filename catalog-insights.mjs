@@ -86,7 +86,7 @@ export function catalogInsights(repository) {
   const works = Number(
     db
       .prepare(
-        'SELECT count(*) AS c FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id)',
+        'SELECT count(*) AS c FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id) AND NOT EXISTS (SELECT 1 FROM removed_works rw WHERE rw.work_id=w.id)',
       )
       .get().c,
   );
@@ -156,7 +156,8 @@ export function catalogInsights(repository) {
  */
 export function catalogGaps(repository) {
   const db = repository.database;
-  const live = 'NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id)';
+  const live =
+    'NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id) AND NOT EXISTS (SELECT 1 FROM removed_works rw WHERE rw.work_id=w.id)';
   const count = (gap) =>
     Number(
       db.prepare(`SELECT count(*) AS c FROM works w WHERE ${live} AND ${WORK_GAP_SQL[gap]}`).get()
@@ -166,7 +167,7 @@ export function catalogGaps(repository) {
     .prepare(
       `SELECT count(*) AS real,
          sum(CASE WHEN coalesce(trim(publisher),'')<>'' AND publication_year IS NOT NULL THEN 1 ELSE 0 END) AS complete
-       FROM editions WHERE is_unknown=0`,
+       FROM editions WHERE is_unknown=0 AND work_id NOT IN (SELECT work_id FROM removed_works)`,
     )
     .get();
   const real = Number(editions.real || 0);

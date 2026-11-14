@@ -3,6 +3,7 @@
 // once at a time, has its own pacing and pauses a source that blocked it.
 import { assignEmpikReferences } from './empik-references.mjs';
 import { applyRejectionRules } from './rejection-rules.mjs';
+import { rejectOffersOfRemovedWorks } from './catalog-removal.mjs';
 import { enrichOffers } from './offer-enrichment.mjs';
 import { DETAIL_SOURCES } from './source-details.mjs';
 import { checkOfferLifecycle } from './offer-lifecycle.mjs';
@@ -260,6 +261,8 @@ export function scheduleCatalogResolution(catalogStore) {
         rejectForeignEditions(catalogStore.repository);
         // "Odrzucaj takie zawsze" rules (rejection-rules.mjs), on the offers this pass left in review.
         applyRejectionRules(catalogStore.repository);
+        // New offers of a work the operator removed from the catalogue leave at once.
+        rejectOffersOfRemovedWorks(catalogStore.repository);
         assignEmpikReferences(catalogStore.repository);
       }
       return result;

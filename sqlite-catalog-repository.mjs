@@ -540,7 +540,14 @@ export class SqliteCatalogRepository extends CatalogRepository {
         Number(
           this.database
             .prepare(
-              `SELECT count(*) AS count FROM ${table}${table === 'works' ? ' WHERE id NOT IN (SELECT source_id FROM catalog_work_merges)' : ''}`,
+              // Works merged into another or removed from the catalogue (catalog-removal.mjs) are not counted.
+              `SELECT count(*) AS count FROM ${table}${
+                table === 'works'
+                  ? ' WHERE id NOT IN (SELECT source_id FROM catalog_work_merges) AND id NOT IN (SELECT work_id FROM removed_works)'
+                  : table === 'editions'
+                    ? ' WHERE work_id NOT IN (SELECT work_id FROM removed_works)'
+                    : ''
+              }`,
             )
             .get().count,
         ),

@@ -8,6 +8,7 @@ import { safeOfferHref , availabilityLabel, isPurchasable } from '../core/format
 import { urlForView } from '../core/view-history.js';
 import { mountSeriesEditor, readSeries, seriesSummary } from './series.js';
 import { confirmDialog } from '../core/dialogs.js';
+import { mountWorkRemoval } from './removed-works.js';
 import { coverMarkup, isbnCover, tidyWorkTitle, parseBnPeople, splitBnTitle, cleanPublisher } from '../core/bibliography.js';
 
 const firstIsbn = (editions = []) =>
@@ -544,6 +545,7 @@ async function openCatalogDetail(id, { fromHistory = false } = {}) {
     try { await loadSeries(); } catch (error) { /* The editor reports a save error if storage is unavailable. */ }
     if (request !== detailRequest) return;
     mountWorkActions(row,detail);
+    mountWorkRemoval({ row, detail, json, toast, loadCatalogData, onRemoved: () => closeBookPage() });
     const reloadWork = () => { if (state.selectedCatalogId === row.id) void openCatalogDetail(row.id); };
     wireEditionVariantSelects(detail, { json, toast, reload: reloadWork });
     void mountWorkPrices({ row, detail, json, money, escapeHtml, toast, reload: reloadWork, isCurrent: () => request === detailRequest });

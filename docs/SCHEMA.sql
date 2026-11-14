@@ -1,5 +1,5 @@
 -- BookFlip: current SQLite schema (generated, do not edit).
--- All migrations up to 132_metric_snapshots.sql applied to an empty database.
+-- All migrations up to 133_removed_works.sql applied to an empty database.
 -- Regenerate after adding a migration: node scripts/dump-schema.mjs
 
 -- app_preferences
@@ -529,6 +529,13 @@ CREATE TABLE rejection_rules (
 ) STRICT;
 CREATE UNIQUE INDEX idx_rejection_rules_live ON rejection_rules(kind, coalesce(source, ''), value)
   WHERE deleted_at IS NULL;
+
+-- removed_works
+CREATE TABLE removed_works (
+  work_id TEXT PRIMARY KEY REFERENCES works(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  removed_at TEXT NOT NULL
+) STRICT;
 
 -- review_batch_decisions
 CREATE TABLE review_batch_decisions (

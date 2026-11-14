@@ -24,6 +24,7 @@ import { reviewQueueSummary } from './catalog-api.mjs';
 import { getScanSchedule, saveScanSchedule, nextRunAt, nextQuickRunAt } from './scan-schedule.mjs';
 import { getPolishOnly, setPolishOnly } from './language-policy.mjs';
 import { listNames, mergeNames, removeNameAlias } from './name-aliases.mjs';
+import { listRemovedWorks, removeCatalogWork, restoreCatalogWork } from './catalog-removal.mjs';
 function fail(code, statusCode = 400) {
   throw Object.assign(Error(code), { statusCode });
 }
@@ -556,6 +557,17 @@ export const apiRoutes = createRouter()
   )
   .add('GET', '/api/catalog/gaps', ({ repo }) => catalogGaps(repo))
   .add('GET', '/api/queue/summary', ({ repo }) => queueSummary(repo))
+  // "Usuń z katalogu" (catalog-removal.mjs): GET previews what goes, POST removes; restorable.
+  .add('GET', '/api/catalog/works/:id/removal', ({ repo, params }) =>
+    removeCatalogWork(repo, params.id),
+  )
+  .add('POST', '/api/catalog/works/:id/removal', ({ repo, params }) =>
+    removeCatalogWork(repo, params.id, { confirm: true }),
+  )
+  .add('GET', '/api/catalog/removed-works', ({ repo }) => ({ items: listRemovedWorks(repo) }))
+  .add('POST', '/api/catalog/removed-works/:id/restore', ({ repo, params }) =>
+    restoreCatalogWork(repo, params.id),
+  )
   .add('GET', '/api/catalog/works/:id/sets', ({ repo, params }) => ({
     items: workSets(repo, params.id),
   }))

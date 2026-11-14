@@ -39,7 +39,7 @@ export function createCatalogBundleDetector(repository) {
   const db = repository.database;
   const rows = db
     .prepare(
-      'SELECT id, title, authors_json FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id=w.id)',
+      'SELECT id, title, authors_json FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id=w.id) AND NOT EXISTS (SELECT 1 FROM removed_works rw WHERE rw.work_id=w.id)',
     )
     .all();
   const parse = (text) => {

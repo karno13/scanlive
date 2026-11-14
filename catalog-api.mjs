@@ -162,7 +162,9 @@ export function listCatalogWorks(repository, options = {}) {
   const { database } = repository,
     { limit, offset, query } = page(options),
     like = likeLiteral(query);
-  const conditions = ['NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id)'];
+  const conditions = [
+    'NOT EXISTS (SELECT 1 FROM catalog_work_merges cm WHERE cm.source_id=w.id) AND NOT EXISTS (SELECT 1 FROM removed_works rw WHERE rw.work_id=w.id)',
+  ];
   const params = [];
   if (query) {
     // Also finds translators and original titles ("Cholewa", "Light fantastic").
@@ -1417,7 +1419,7 @@ export function decideIdentificationJob(
 export function createLocalWorkMatcher(repository) {
   const works = repository.database
     .prepare(
-      'SELECT id, title, authors_json FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id=w.id)',
+      'SELECT id, title, authors_json FROM works w WHERE NOT EXISTS (SELECT 1 FROM catalog_work_merges x WHERE x.source_id=w.id) AND NOT EXISTS (SELECT 1 FROM removed_works rw WHERE rw.work_id=w.id)',
     )
     .all()
     .map((work) => ({

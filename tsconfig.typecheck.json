@@ -16,6 +16,7 @@
   "files": [
     "offer-ingest.mjs",
     "antiquarian-sources.mjs",
+    "catalog-removal.mjs",
     "html-text.mjs",
     "offer-observations.mjs",
     "sqlite-catalog-repository.mjs",

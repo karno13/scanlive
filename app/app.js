@@ -18,6 +18,7 @@ import { createSetsView } from './views/sets.js';
 import { createReviewView } from './views/review.js';
 import { createCatalogView } from './views/catalog.js';
 import { mountDuplicates } from './views/duplicates.js';
+import { mountRemovedWorks } from './views/removed-works.js';
 import { mountCatalogNames } from './views/catalog-names.js';
 import { mountCatalogSeeds } from './views/catalog-seeds.js';
 import { mountTitleConflicts } from './views/title-conflicts.js';
@@ -1074,6 +1075,9 @@ function mountCatalogTools() {
   if (catalogToolsMounted) return;
   catalogToolsMounted = true;
   mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData });
+  mountRemovedWorks({ $, json, escapeHtml, toast, loadCatalogData });
+  // Removing or restoring a book changes the counts above the list and in the menu.
+  document.addEventListener('bookflip-catalog-removed', () => void loadCatalogStatus());
   mountCatalogNames({ $, json, escapeHtml, toast, loadCatalogData });
   mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogData });
   mountCatalogSeeds({ $, json, escapeHtml, toast, loadCatalogData });
