@@ -16,7 +16,7 @@ export function mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData })
         (work) =>
           `<li${work.id === group.targetId ? ' class="is-target"' : ''}><span>${escapeHtml(work.title.split(' / ')[0])}</span><small>${escapeHtml(
             work.authors[0] || 'autor nieznany',
-          )} · ${work.editions} wyd. · ${work.offers} ofert${work.id === group.targetId ? ' · zostaje' : ''}</small></li>`,
+          )} · ${work.editions} wyd. · ${work.offers} ${work.offers === 1 ? 'oferta' : [2, 3, 4].includes(work.offers % 10) && ![12, 13, 14].includes(work.offers % 100) ? 'oferty' : 'ofert'}${work.id === group.targetId ? ' · zostaje' : ''}</small></li>`,
       )
       .join('');
     return `<article class="duplicate-group"><ul>${rows}</ul><button class="button secondary" type="button" data-merge-group="${index}" aria-label="Połącz ${group.works.length} dzieł w „${escapeHtml(

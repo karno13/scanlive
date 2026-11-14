@@ -7,7 +7,10 @@ Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; lic
 - **Błąd:** dzieło w katalogu nazwane samym nazwiskiem autora (np. „Terry Pratchett”, utworzone z ogłoszenia bez tytułu) było proponowane jako „pewne dopasowanie” (95%) dla każdej oferty tego autora — na kopii bazy 2 z 3 kart w siatce „Szybkie”. Taki wpis nie jest już nigdy propozycją po tytule.
 - **Błąd:** oferty z ceną 10 000 zł i więcej zapisane przed wprowadzeniem limitu zachowywały tę cenę (2 oferty na kopii bazy, jedna otwierała listę zestawów). Jednorazowa naprawa przy starcie czyści takie ceny i ich odczyty w historii.
 - **Błąd:** tytuł w formularzu „Utwórz wydanie z ogłoszenia” nie zostawia już samotnego cudzysłowu po usunięciu autora.
-- **Błąd:** lista „Książki” pisała „1 ofert” i „3 ofert” zamiast „1 oferta”, „3 oferty”; na telefonie plakietka „Niezweryfikowane” nie zasłania już tytułu, a liczniki nie nachodzą na „brak: rok / wydawca” (niesprawdzone w przeglądarce po zmianie).
+- **Błąd:** lista „Książki” pisała „1 ofert” i „3 ofert” zamiast „1 oferta”, „3 oferty” (to samo w „Możliwych duplikatach”); na telefonie plakietka „Niezweryfikowane” nie zasłania już tytułu, a liczniki nie nachodzą na „brak: rok / wydawca”.
+- **Błąd:** na stronie książki przycisk „Dodaj książkę” nachodził na róg karty — jest tylko nad listą.
+- **Źródła:** od 1100 px „Stan źródeł” stoi obok formularza skanu zamiast nad nim (formularz zajmował 620 z 1440 px, reszta była pusta). **Błąd:** kropki przy niedziałających źródłach były zielone — są czerwone jak na „Dziś”, przy Allegro i OLX szare.
+- **Oferty:** kolumna „Stan” nazywa się „Katalog · ogłoszenie” i oprócz stanu w katalogu pokazuje stan ogłoszenia, gdy nie jest zwykły (Sprzedana, Niedostępna, Mogła zniknąć) — dotąd widać go było tylko na telefonie. Plakietka „Usunięta” nazywa się „Niedostępna”, tak jak w szczegółach oferty.
 
 ## 2026-11-14 (61) — Dokumentacja: jedno miejsce z ustaleniami i przepisami
 

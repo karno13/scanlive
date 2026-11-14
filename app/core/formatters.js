@@ -100,7 +100,7 @@ export function availabilityBadge(offer = {}, now = Date.now()) {
     case 'reserved':
       return { label: 'Zarezerwowana', tone: 'warning' };
     case 'unavailable':
-      return { label: 'Usunięta', tone: 'neutral' };
+      return { label: 'Niedostępna', tone: 'neutral' };
     case 'available':
       return { label: 'Aktywna', tone: 'success' };
     case 'not_seen':

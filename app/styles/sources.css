@@ -2195,6 +2195,23 @@ input:focus {
 #view-scanner > .sources-status .panel-heading {
   margin-bottom: 6px;
 }
+/* Wide screens: the state of the sources stands beside the scan form instead of above it. */
+@media (min-width: 1100px) {
+  #view-scanner > .sources-status {
+    grid-column: 2;
+    grid-row: 1 / span 6;
+  }
+}
+/* The dot says the same as on "Dziś" (the id rule above paints every dot green). */
+#view-scanner .sources-status :is(.is-down, .is-never) .source-dot-state {
+  background: var(--bad);
+}
+#view-scanner .sources-status .is-unknown .source-dot-state {
+  background: var(--line);
+}
+#view-scanner .sources-status .is-no_access .source-dot-state {
+  background: var(--muted);
+}
 #view-scanner > .sources-status .panel-heading p {
   margin: 2px 0 0;
   color: var(--muted);

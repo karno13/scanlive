@@ -39,7 +39,9 @@ test('one name for an offer state in the table, the phone list and the drawer', 
     offers,
     /\['retry_wait', 'failed'\]\.includes\(job\)\) return \{ label: statusLabel\(job\), tone: 'warning' \}/,
   );
-  assert.match(html, /<th>Przypisanie<\/th><th>Stan<\/th>/);
+  // The column holds the catalogue state and, when it is not plain, the listing state; „Stan” in
+  // the drawer is the condition of the copy.
+  assert.match(html, /<th>Przypisanie<\/th><th>Katalog · ogłoszenie<\/th>/);
 });
 
 test('queue and set rows do not repeat the state every row shares', async () => {
