@@ -1,0 +1,18 @@
+{
+  "kind": "captured",
+  "source": "Tezeusz.pl",
+  "host": "tezeusz.pl",
+  "searchQuery": "Wiedźmikołaj",
+  "category": "Wiedźmikołaj",
+  "capturedAt": "2026-11-14T17:18:00.000Z",
+  "sanitized": true,
+  "reviewedForPersonalData": true,
+  "note": "Two product cards from https://tezeusz.pl/szukaj?szukaj=Wiedźmikołaj (one request through the gate): a copy in stock with its price, and a sold-out title — no price, button \"Niedostępny\" — which is not an offer. The search index lags behind the stock: a priced card may lead to a product page that says OutOfStock; offer-lifecycle marks such offers.",
+  "html": "<div class='tezeusz-product-spacer'>\n<a\n\t\tclass='tezeusz-product-card js-ga-select-item' data-ga-product-id=\"3308678\" href='wiedzmikolaj-pratchett-terry-3308678'>\n\t\t\t\t<div class='tezeusz-product-card-labels'>\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t</div>\n\t\t<div class='tezeusz-product-card-image'>\n<img\n        loading=\"lazy\"\n        src=\"https://storage.tezeusz.pl/product_show/2aec07105bac2a2b55e7cfceb5f5b7371504c88d.jpeg\"\n        onerror=\"this.src='/img/empty-photo.svg'\"\n        alt=\"Wiedźmikołaj\">\t\t\t\t\t</div>\n\t\t\t\t<div class='tezeusz-product-card-author'>\n\t\t\t\t\t\t\tTerry Pratchett\n\t\t\t\t\t</div>\n\t\t\t\t<h5 class='tezeusz-product-card-title'>\n\t\t\tWiedźmikołaj\n\t\t\t\t\t\t<span style='color: #4f4f4f; font-family:RajdhaniMedium; font-weight: 100'> - Terry Pratchett</span>\n\t\t\t\t\t</h5>\n\t\t\t\t\t\t\t<div class='tezeusz-product-card-available-variants'>\n\t\t\t\t\t\t\t\t\t<span>Dostępne warianty:\n\t\t\t\t\t</span>\n\t\t\t\t\t<span>1</span>\n\t\t\t\t\t\t\t</div>\n\t\t\t\t\t\t\t\t\t\t\t\t\t<div class='tezeusz-product-card-price'>\n\t\t\t\t\t21,19 zł\n\t\t\t\t\t<div class='tezeusz-product-card-oldprice'>\n\t\t\t\t\t\t\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t\t\t\t</a>\n\t\t<div class='addCart books__single-addCart'>\n\t\t\t\t\t\t\t\t\t\t\t\t<a class='tezeusz-product-card-button tezeusz-product-card-button-details' href='wiedzmikolaj-pratchett-terry-3308678'>Szczegóły</a>\n\t\t\t\t\t\t</div>\n</div>\n<div class='tezeusz-product-spacer'>\n<a\n\t\tclass='tezeusz-product-card js-ga-select-item' data-ga-product-id=\"356611\" href='wiedzmikolaj-pratchett-terry-356611'>\n\t\t\t\t<div class='tezeusz-product-card-labels'>\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t</div>\n\t\t<div class='tezeusz-product-card-image'>\n<img\n        loading=\"lazy\"\n        src=\"https://static7.tezeusz.pl/product_show/images/fb/59/c8/wiedmikoaj-terry-pratchett.jpeg\"\n        onerror=\"this.src='/img/empty-photo.svg'\"\n        alt=\"Wiedźmikołaj\">\t\t\t\t\t</div>\n\t\t\t\t<div class='tezeusz-product-card-author'>\n\t\t\t\t\t\t\tTerry Pratchett\n\t\t\t\t\t</div>\n\t\t\t\t<h5 class='tezeusz-product-card-title'>\n\t\t\tWiedźmikołaj\n\t\t\t\t\t\t<span style='color: #4f4f4f; font-family:RajdhaniMedium; font-weight: 100'> - Terry Pratchett</span>\n\t\t\t\t\t</h5>\n\t\t\t\t\t\t\t<div class='tezeusz-product-card-available-variants'>\n\t\t\t\t\t\t\t</div>\n\t\t\t\t\t\t\t\t\t<div class='tezeusz-product-card-price tezeusz-product-card-price-empty' aria-hidden='true'>\n\t\t\t\t&nbsp;\n\t\t\t\t<div class='tezeusz-product-card-oldprice'></div>\n\t\t\t</div>\n\t\t\t</a>\n\t\t<div class='addCart books__single-addCart'>\n\t\t\t\t\t\t\t\t\t\t\t\t<button type=\"button\" class='tezeusz-product-card-button tezeusz-product-card-button-disabled' disbled>Niedostępny</button>\n\t\t\t\t\t\t</div>\n</div>",
+  "expected": [
+    {
+      "url": "https://tezeusz.pl/wiedzmikolaj-pratchett-terry-3308678",
+      "price": 2119
+    }
+  ]
+}
