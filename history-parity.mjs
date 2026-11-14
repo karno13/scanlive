@@ -1,3 +1,4 @@
+// @ts-check
 import { normalizeOfferUrl } from './offer-identity.mjs';
 
 // Read-only migration gate. JSON and SQLite have different ownership semantics:

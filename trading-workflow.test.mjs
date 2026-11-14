@@ -22,8 +22,8 @@ import {
   saveTradingDefaults,
   mergeCatalogWorks,
   reopenReviewDecision,
-  tradingRoute,
-} from './trading-api.mjs';
+  apiRoute,
+} from './api-routes.mjs';
 import { verifyCatalogBackup } from './scripts/restore-catalog.mjs';
 
 function catalog() {
@@ -250,7 +250,7 @@ test('work edits and confirmed merges retain editions, offers and old work links
       c.repository.createEdition({ workId: source.id, title: 'Later' }).work_id,
       target.id,
     );
-    const updated = await tradingRoute({
+    const updated = await apiRoute({
       repo: c.repository,
       method: 'PUT',
       path: '/api/catalog/works/' + target.id,
@@ -278,8 +278,7 @@ test('bundle quantities, unknown items and composition confirmation have persist
       edition = c.repository.createEdition({ workId: work.id, title: 'Book' });
     markOfferAsSet(c.repository, item.id);
     updateSetEdition(c.repository, item.id, edition.id, true);
-    const route = (method, path, input) =>
-      tradingRoute({ repo: c.repository, method, path, input });
+    const route = (method, path, input) => apiRoute({ repo: c.repository, method, path, input });
     await route('PUT', '/api/set-items/' + item.id + '/' + edition.id, {
       quantity: 3,
       resalePrice: 15,
@@ -360,7 +359,7 @@ test('backup action creates a verified new catalog and reports its date', async 
   const c = createProductionCatalog({ databasePath: join(directory, 'catalog.sqlite') });
   try {
     offer(c.repository, 1);
-    const result = await tradingRoute({
+    const result = await apiRoute({
       repo: c.repository,
       method: 'POST',
       path: '/api/data/backup',
@@ -369,7 +368,7 @@ test('backup action creates a verified new catalog and reports its date', async 
     assert.equal(existsSync(result.path), true);
     assert.equal(verifyCatalogBackup(result.path).valid, true);
     assert.ok(result.lastBackupAt);
-    const second = await tradingRoute({
+    const second = await apiRoute({
       repo: c.repository,
       method: 'POST',
       path: '/api/data/backup',

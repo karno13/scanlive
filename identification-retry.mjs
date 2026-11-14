@@ -1,3 +1,4 @@
+// @ts-check
 // Review reasons that only mean "this ISBN is not in the catalogue yet". Once an edition with the
 // ISBN exists (resolver, manual addition, seeding, an approval of a sibling offer) the resolver can
 // match such offers by itself.

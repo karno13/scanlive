@@ -1,3 +1,4 @@
+// @ts-check
 // Serve only known public app-shell files, first-party browser JavaScript modules and the
 // stylesheets in app/styles/. Paths are resolved relative to app/ and never accept a user-selected
 // directory.

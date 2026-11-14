@@ -1,3 +1,4 @@
+// @ts-check
 import { existsSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,3 +1,4 @@
+// @ts-check
 export const cleanISBN = (value) =>
   String(value || '')
     .replace(/^(?:ISBN(?:-1[03])?\s*:?\s*)/i, '')

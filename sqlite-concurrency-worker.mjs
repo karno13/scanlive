@@ -1,3 +1,4 @@
+// @ts-check
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 
 const [databasePath, workId, isbn, title] = process.argv.slice(2),

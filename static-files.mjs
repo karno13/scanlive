@@ -1,3 +1,4 @@
+// @ts-check
 // Static files of the app (app/*): gzip when the browser accepts it and an ETag so a reload
 // answers 304 instead of sending the file again. `Cache-Control: no-cache` makes the browser
 // revalidate every time, so a changed file is visible after a normal page refresh.

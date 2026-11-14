@@ -1,3 +1,4 @@
+// @ts-check
 // A rejected listing must not come back to review with the next scan. The same offer keeps its
 // closed job; but sellers re-list (new Vinted item id), shops list one product under several
 // addresses and the same item shows up in another source. A new offer whose title or ISBN equals

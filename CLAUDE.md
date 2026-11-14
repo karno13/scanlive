@@ -6,9 +6,9 @@ Current focus: scanner, catalogue, verification (trading features are parked) �
 
 ## Commands
 
-- **`npm run verify` before finishing work**: lint, `check:syntax`, typecheck, `format:check`, tests — in that order, stops at the first failure (`scripts/verify.mjs`). There is no git remote, so `.github/workflows` never run — this is the check.
+- **`npm run verify` before finishing work**: lint, typecheck, `format:check`, tests — in that order, stops at the first failure (`scripts/verify.mjs`). There is no git remote, so `.github/workflows` never run — this is the check.
 - `npm test` — all tests (isolated temp data dir, never the user's DB). One file: `npm test -- rejected-offers.test.mjs`.
-- `npm run lint` (incl. `no-undef`; globals listed by hand in `eslint.config.mjs`) · `npm run check:syntax` · `npm run typecheck` (files with `// @ts-check`; each must be listed in `tsconfig.typecheck.json`, a test enforces it) · `npm run format:check` (needs `npm install` once; do not commit a `package-lock.json`).
+- `npm run lint` (incl. `no-undef`; globals listed by hand in `eslint.config.mjs`) · `npm run typecheck` (files with `// @ts-check`; each must be listed in `tsconfig.typecheck.json`, a test enforces it) · `npm run format:check` (needs `npm install` once; do not commit a `package-lock.json`).
 - CSS changes: `node scripts/css-snapshot.mjs <port> <dir> --verify` compares the computed styles of every view and state (4 widths, both themes, trading on/off) for HEAD against the working tree; server on a copy of the data, other port than 4317 (command in the script header; ~1.5 h, `--only <regex>` for a subset). Zero differences = the look did not change.
 - UI smoke: `node scripts/browser-smoke.mjs` (needs `npm install --no-save --no-package-lock playwright@1.55.1` and `npx playwright install chromium`).
 - Shell: Git Bash / PowerShell on Windows; **no Python** — write helper scripts in Node.
@@ -17,7 +17,7 @@ Current focus: scanner, catalogue, verification (trading features are parked) �
 
 Full table: `docs/REPOSITORY-MAP.md`. The short version:
 
-- `local-app.mjs` — HTTP server: route table `localRoutes` in `createLocalAppServer` (`router.mjs`: `.add(method, '/api/x/:id', handler)`, first match wins, params already decoded), background jobs (`schedule*` functions run after each identification pass). Smaller routes live in the `tradingRoutes` table of `trading-api.mjs`; requests whose path that table knows are forwarded to it automatically.
+- `local-app.mjs` — HTTP server: route table `localRoutes` in `createLocalAppServer` (`router.mjs`: `.add(method, '/api/x/:id', handler)`, first match wins, params already decoded), background jobs (`schedule*` functions run after each identification pass). Smaller routes live in the `apiRoutes` table of `api-routes.mjs`; requests whose path that table knows are forwarded to it automatically.
 - `catalog-api.mjs` — read models for lists (works, offers, offer groups, review queue, buckets).
 - `catalog-production.mjs` — opens the DB and runs `startup-jobs.mjs`: data repairs are **one-time jobs** with a flag in `app_preferences` (`runOnce`, versioned key when rules can change); only in-memory loads and series aliases run every start. Scanned offers enter through `offer-ingest.mjs` (`ScannedOffer`, one shape).
 - `catalog-resolver.mjs` + `identification-worker.mjs` — ISBN → edition; `metadata-sources/*` adapters.
@@ -26,7 +26,7 @@ Full table: `docs/REPOSITORY-MAP.md`. The short version:
 
 ## Rules
 
-- **Migrations are immutable** (`migrations/NNN_*.sql`, checksums stored in user DBs). New schema = next number (currently 132 is the last).
+- **Migrations are immutable** (`migrations/NNN_*.sql`, checksums stored in user DBs). New schema = next number (currently 132 is the last). The whole current schema is in `docs/SCHEMA.sql` (generated — read it instead of the migrations; after a new migration run `node scripts/dump-schema.mjs`, a test enforces it).
 - Automatic decisions must be reversible and visible in „Ostatnie decyzje” (write a `review_decisions` row with a `created_by` marker); manual assignments and sets always win over automation.
 - Never touch the user's DB (`%LOCALAPPDATA%\BookFlip\data`). To measure on real data, copy it: `node scripts/backup-catalog.mjs <scratch>/copy.sqlite`.
 - Trading UI is hidden unless `body.trading-mode` (localStorage `bookflip.tradingMode=1`).

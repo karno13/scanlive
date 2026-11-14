@@ -1,3 +1,4 @@
+// @ts-check
 // Cycle and volume for editions that BN has not described: from the publisher's own series
 // statement in the e-ISBN record, and from the titles of the listings assigned to the work
 // ("Duchy Gaunta. Tom 2. Komisarz Gaunt", "Kolor magii. Świat Dysku. Tom 1").

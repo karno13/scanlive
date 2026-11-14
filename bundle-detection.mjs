@@ -1,3 +1,4 @@
+// @ts-check
 // A listing that sells several books often shows the ISBN of only one of them ("DragonLance MEGA
 // zestaw Trylogia Bohaterowie + Legendy + Kroniki", ISBN of one volume). Assigning that ISBN would
 // record a six-book offer as one edition, so such listings go to review where the operator marks

@@ -10,7 +10,7 @@ import { checkOfferLifecycle, pendingLifecycleChecks } from './offer-lifecycle.m
 import { detectRelists, saleWindow, undoRelist } from './offer-status.mjs';
 import { persistSqliteScan } from './sqlite-single-store.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
-import { recentReviewDecisions } from './trading-api.mjs';
+import { recentReviewDecisions } from './api-routes.mjs';
 
 const soldPage = (id) =>
   `self.__next_f.push([1,"91:[\\"$\\",\\"$L14b\\",null,{\\"plugins\\":[{\\"data\\":{\\"item_id\\":\\"${id}\\",\\"seller_id\\":\\"1\\",\\"theme\\":\\"SUCCESS\\",\\"title\\":\\"Sprzedane\\"},\\"exposures\\":[],\\"name\\":\\"buyer_item_status\\",\\"section\\":\\"sidebar\\"}]}]"])`;

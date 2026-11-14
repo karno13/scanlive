@@ -1,9 +1,10 @@
+// @ts-check
 // Data repairs at start-up. Most of them fix data saved before a rule existed: they run once and
 // leave a flag in app_preferences (the pattern of `bibliography_upgrade_v1`); a job whose rules can
 // change later carries a version in its key, so a new rule runs it once more. Only what has to run
 // on every start does so, each with the reason.
 import { upgradeCatalogBibliography } from './catalog-bibliography.mjs';
-import { mergeWorkGroup } from './trading-api.mjs';
+import { mergeWorkGroup } from './api-routes.mjs';
 import { findDuplicateWorkGroups } from './work-grouping.mjs';
 import { reviewAutomaticBundleMatches } from './bundle-detection.mjs';
 import { ensureStarterProfiles } from './starter-profiles.mjs';

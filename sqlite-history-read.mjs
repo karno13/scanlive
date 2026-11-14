@@ -1,3 +1,4 @@
+// @ts-check
 // Read-only compatibility adapter for the legacy /api/history contract. Only history tools use it
 // (the "Historia ofert" export, /api/book, the full /api/catalog response); scans and price
 // statistics read SQL directly (price-stats.mjs).

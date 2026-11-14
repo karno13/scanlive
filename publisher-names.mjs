@@ -1,3 +1,4 @@
+// @ts-check
 // One spelling per publisher. BN writes 'Dom Wydawniczy "Rebis"', '"ISA"', 'Zysk i S-ka. Wydaw';
 // Open Library and listings write 'Proszynski Media', 'REBIS', 'Wydawnictwo MAG'. Different
 // spellings of one publisher split the publisher filter and make editions look different.

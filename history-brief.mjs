@@ -1,3 +1,4 @@
+// @ts-check
 // Lightweight data for the app shell. Preserve the full /api/history endpoint for legacy callers.
 // Only labels for actively linked editions are needed for offer-list fallbacks.
 export function historyBookLabels(repository) {

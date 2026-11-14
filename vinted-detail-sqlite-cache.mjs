@@ -1,3 +1,4 @@
+// @ts-check
 import { identifyOffer } from './offer-identity.mjs';
 
 // TTL-backed, bounded cache in the same SQLite catalog as scanned offers.

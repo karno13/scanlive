@@ -1,3 +1,4 @@
+// @ts-check
 // Universes (Świat Dysku, Warhammer, Warcraft…) as data: the `universes` table (migration 126),
 // edited in Katalog → „Wydawcy i serie”. Their names are on every cover and in every listing, so
 // many parts of the app need them: to strip branding from titles, to tell a universe from a story

@@ -1,10 +1,10 @@
-// One command before finishing work: lint, syntax, types, formatting, tests — in that order,
+// One command before finishing work: lint (which also parses every file), types, formatting, tests — in that order,
 // stopping at the first failure. Node only, so it behaves the same in PowerShell and Git Bash.
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const steps = ['lint', 'check:syntax', 'typecheck', 'format:check', 'test'];
+const steps = ['lint', 'typecheck', 'format:check', 'test'];
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const started = Date.now();
 

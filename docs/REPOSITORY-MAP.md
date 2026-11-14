@@ -13,9 +13,9 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `Uruchom BookFlip Scanner.cmd` | Start serwera na Windows (to samo co `npm start`) |
 | `Uruchom BookFlip przez Tailscale.cmd`, `scripts/start-tailscale.ps1` | Start z prywatnym dostępem z telefonu przez Tailscale Serve |
 | `scripts/windows-autostart.ps1` | Opcjonalny autostart przy logowaniu (Status/Enable/Disable); aplikacja nigdy go sama nie włącza |
-| `local-app.mjs` | Serwer HTTP: tabela tras `localRoutes`, skan, zadania w tle po każdym przebiegu identyfikacji |
+| `local-app.mjs` | Serwer HTTP: tabela tras `localRoutes` (handler z parametrem `catalog` dostaje otwarty katalog albo żądanie kończy się 503), skan, zadania w tle po każdym przebiegu identyfikacji |
 | `router.mjs` | Tabela tras: wzorce `/api/x/:id`, pierwsze dopasowanie wygrywa |
-| `trading-api.mjs` | Mniejsze trasy `/api/...` (tabela `tradingRoutes`), także podsumowanie kolejki i ostatnie decyzje |
+| `api-routes.mjs` | Proste trasy JSON `/api/...` (tabela `apiRoutes`, handler zwraca wynik): katalog, kolejka, reguły, ustawienia, kopie, tryb handlu |
 | `static-asset-path.mjs` | Które ścieżki plików interfejsu wolno serwować |
 | `static-files.mjs` | Pliki interfejsu z gzip, `ETag` i odpowiedzią 304 |
 | `tailscale-access.mjs` | Dopuszcza tylko host Tailscale Serve i tożsamość właściciela |
@@ -28,6 +28,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `catalog-production.mjs` | Otwiera bazę, składa źródła metadanych, uruchamia `startup-jobs.mjs` |
 | `catalog-migrations.mjs` | Stosuje migracje z `migrations/` z kontrolą sum |
 | `migrations/NNN_*.sql` | **Niezmienne** migracje (`001`–`007`, `099`–`132`); nowa zmiana = kolejny numer |
+| `docs/SCHEMA.sql`, `scripts/dump-schema.mjs`, `schema-doc.test.mjs` | Aktualny schemat bazy w jednym pliku (generowany z migracji); test pilnuje, by był aktualny |
 | `startup-jobs.mjs` | Naprawy danych przy starcie jako zadania jednorazowe z flagą (`runOnce`) |
 | `catalog-data-location.mjs` | Ścieżka bazy w `%LOCALAPPDATA%` i kopia przed migracjami |
 | `auto-backup.mjs` | Codzienna kopia bazy w `backups` (7 najnowszych), opcjonalnie druga lokalizacja |
@@ -197,8 +198,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `*.test.mjs`, `test/*.test.js`, `app/**/*.test.mjs` | Testy Node (`node:test`) |
 | `scripts/run-tests.mjs`, `scripts/isolated-runtime.mjs` | `npm test`: każdy proces testowy na tymczasowym katalogu danych |
 | `sqlite-concurrency-worker.mjs` | Proces pomocniczy testu równoległego zapisu SQLite |
-| `scripts/verify.mjs` | `npm run verify`: lint, składnia, typy, formatowanie, testy; stop na pierwszym błędzie |
-| `scripts/check-syntax.mjs` | `npm run check:syntax`: `node --check` każdego pliku |
+| `scripts/verify.mjs` | `npm run verify`: lint, typy, formatowanie, testy; stop na pierwszym błędzie |
 | `eslint.config.mjs`, `tsconfig.typecheck.json` | Reguły lintu (z `no-undef`) i lista plików `// @ts-check` |
 | `typecheck-coverage.test.mjs` | Pilnuje, by każdy plik `// @ts-check` był w `tsconfig.typecheck.json` |
 | `theme-tokens.test.mjs`, `documentation-current.test.mjs` | Kolory tylko przez tokeny; wymagane frazy dokumentacji |
@@ -244,18 +244,16 @@ Moduły nieosiągalne z `local-app.mjs`, zachowane do diagnostyki dawnych danych
 
 | Plik | Rola |
 | --- | --- |
-| `feed.mjs`, `rss.mjs` | Dawne odczyty kanałów ofert (Atom sprzedajemy.pl) |
 | `import-json-v2-to-sqlite.mjs` | Import dawnej historii JSON do SQLite |
 | `migration-rehearsal.mjs`, `scripts/rehearse-history-migration.mjs` | Próba migracji historii na kopii bazy |
 | `history-parity.mjs`, `scripts/check-history-parity.mjs` | Porównanie historii JSON i SQLite (tylko odczyt) |
 | `historical-reidentification.mjs`, `scripts/catalog-resolver.mjs` | Ponowna identyfikacja dawnych ofert z wiersza poleceń |
-| `local-batch-scan.mjs` | Dawny skan wsadowy wielu fraz do plików |
 
-Nieaktywny runner GitHub (`run.mjs`, `process.mjs`, `continuation.mjs`, `enrich.mjs`, `page-cursor.mjs`) został usunięty. Pliki w `.github/workflows/` są pozostałością: repozytorium nie ma zdalnej kopii, więc nic ich nie uruchamia. Stare raporty i dokumenty jednorazowe są w `docs/archive/`; usunięte materiały pozostają w historii Git.
+Nieaktywny runner GitHub (`run.mjs`, `process.mjs`, `continuation.mjs`, `enrich.mjs`, `page-cursor.mjs`) oraz dawne odczyty kanałów i skan wsadowy (`feed.mjs`, `rss.mjs`, `local-batch-scan.mjs`) zostały usunięte. Pliki w `.github/workflows/` są pozostałością: repozytorium nie ma zdalnej kopii, więc nic ich nie uruchamia. Stare raporty i dokumenty jednorazowe są w `docs/archive/`; usunięte materiały pozostają w historii Git.
 
 ## Bezpieczne sprzątanie
 
 1. Usuwaj tylko nieużywane komponenty z potwierdzonym brakiem importów w aplikacji, testach i skryptach.
 2. **Nigdy nie usuwaj ani nie modyfikuj historycznych migracji SQL**.
 3. Nie publikuj plików SQLite, skanów, danych użytkownika, plików WAL ani tokenów.
-4. Każda zmiana musi przejść `npm run verify` (lint, składnia, typy, formatowanie, testy), a zmiana interfejsu także `node scripts/browser-smoke.mjs`.
+4. Każda zmiana musi przejść `npm run verify` (lint, typy, formatowanie, testy), a zmiana interfejsu także `node scripts/browser-smoke.mjs`.

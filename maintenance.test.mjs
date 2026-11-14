@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createRouter } from './router.mjs';
-import { tradingRoutes } from './trading-api.mjs';
+import { apiRoutes } from './api-routes.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import { createProductionCatalog } from './catalog-production.mjs';
 import { listIdentificationJobs } from './catalog-api.mjs';
@@ -33,13 +33,13 @@ test('the router matches in order, decodes parameters once and tells a wrong met
   assert.ok(router.match('GET', '/api/buyback/quotes').handler);
   assert.deepEqual(router.match('PUT', '/api/catalog/works/x'), { methodNotAllowed: true });
   assert.equal(router.match('GET', '/api/nothing'), null);
-  // trading-api's own table: what used to be a prefix regex in local-app.mjs.
-  assert.ok(tradingRoutes.match('PUT', '/api/catalog/works/w1').handler);
+  // api-routes's own table: what used to be a prefix regex in local-app.mjs.
+  assert.ok(apiRoutes.match('PUT', '/api/catalog/works/w1').handler);
   assert.ok(
-    !tradingRoutes.match('GET', '/api/catalog/works/w1').handler,
+    !apiRoutes.match('GET', '/api/catalog/works/w1').handler,
     'GET of a work is served by local-app',
   );
-  assert.ok(tradingRoutes.match('POST', '/api/offer-relists/Vinted%3A1/undo').handler);
+  assert.ok(apiRoutes.match('POST', '/api/offer-relists/Vinted%3A1/undo').handler);
 });
 
 test('offer_queries follows matched_queries_json on every write', () => {

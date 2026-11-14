@@ -1,3 +1,4 @@
+// @ts-check
 export class CatalogRepository {
   findEditionByISBN() {
     throw Error('NOT_IMPLEMENTED');

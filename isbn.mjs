@@ -1,3 +1,4 @@
+// @ts-check
 import { cleanISBN, isbnKeys, isbnValid } from './isbn-normalization.mjs';
 export { cleanISBN, isbnKeys, isbnValid, normalizeISBN } from './isbn-normalization.mjs';
 

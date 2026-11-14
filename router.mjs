@@ -1,3 +1,4 @@
+// @ts-check
 // A table of HTTP routes instead of a chain of path conditions. A route is a method (or a list, or
 // '*') and a path pattern: '/api/sets/:offerId/candidates' (":name" matches one path segment and is
 // URL-decoded here, once), optionally ending in '/*' for a prefix ('/api/buyback/*' also matches

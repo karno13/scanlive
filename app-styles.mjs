@@ -1,3 +1,4 @@
+// @ts-check
 // The app's stylesheets as data, for tests that guard rules of structure (colour tokens, the dark
 // theme, hidden views). The files are the <link rel=stylesheet> entries of app/index.html, in
 // order; rules are parsed, so the checks do not depend on formatting or on the order of rules.

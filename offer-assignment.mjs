@@ -1,3 +1,4 @@
+// @ts-check
 // Operator changes an offer's edition, or removes the assignment, from the catalogue or the offer
 // panel. Every change is a manual decision kept in the match history and review decisions; a
 // removed edition is recorded as rejected so the resolver never puts the offer back on it.

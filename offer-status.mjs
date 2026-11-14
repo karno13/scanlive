@@ -1,3 +1,4 @@
+// @ts-check
 // The sale signal. Each observed state of an offer is kept with its moment (offer_status_history),
 // so a sale has an interval: after the last time the listing was seen on sale, before the check
 // that found it sold. A listing the seller took down and put up again (Vinted gives it a new

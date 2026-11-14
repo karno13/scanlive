@@ -1,3 +1,4 @@
+// @ts-check
 // Batch approval in the review queue: "Szybkie" (sure catalogue / title matches, from
 // sureReviewPlan) and "Do dodania" (ISBN unknown to BN and Open Library, edition form entirely
 // filled from a page with this exact ISBN). Each offer is decided on its own, with its own
@@ -6,7 +7,7 @@
 import { randomUUID } from 'node:crypto';
 import { applySureReviewPlan, listIdentificationJobs, sureReviewPlan } from './catalog-api.mjs';
 import { createEditionFromOffer, offerEditionDraft } from './offer-editions.mjs';
-import { reopenReviewDecision } from './trading-api.mjs';
+import { reopenReviewDecision } from './api-routes.mjs';
 import { proxiedImage } from './offer-images.mjs';
 
 const ADD_REASONS = [

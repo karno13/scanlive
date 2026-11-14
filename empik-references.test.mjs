@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import { assignEmpikReferences, EMPIK_AUTO_AUTHOR } from './empik-references.mjs';
-import { reopenReviewDecision } from './trading-api.mjs';
+import { reopenReviewDecision } from './api-routes.mjs';
 
 test('Empik automation assigns unknown edition and undo prevents another automatic decision', () => {
   const r = new SqliteCatalogRepository(':memory:');

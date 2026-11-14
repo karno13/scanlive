@@ -407,7 +407,7 @@ export async function dataOverview(repo) {
 }
 // The routes of this module, as a table (router.mjs). local-app.mjs forwards a request here when
 // this table knows its path, so a new route needs no change there.
-export const tradingRoutes = createRouter()
+export const apiRoutes = createRouter()
   .add('GET', '/api/trading-summary', ({ repo }) => {
     const summary = repo.database
       .prepare(
@@ -635,8 +635,8 @@ export function queueSummary(repo) {
   };
 }
 
-export async function tradingRoute({ repo, method, path, input }) {
-  const found = tradingRoutes.match(method, path);
+export async function apiRoute({ repo, method, path, input }) {
+  const found = apiRoutes.match(method, path);
   if (!found?.handler) return undefined;
   return found.handler({ repo, method, input, params: found.params });
 }

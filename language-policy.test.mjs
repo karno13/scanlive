@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import { getPolishOnly, setPolishOnly, rejectForeignEditions } from './language-policy.mjs';
-import { tradingRoute } from './trading-api.mjs';
+import { apiRoute } from './api-routes.mjs';
 import { searchOffers } from './local-app.mjs';
 
 function queue(repository) {
@@ -62,11 +62,11 @@ test('switched off, foreign editions stay in review; switching on through the AP
     setPolishOnly(repository, false);
     assert.deepEqual(rejectForeignEditions(repository), { rejected: 0 });
     assert.deepEqual(
-      await tradingRoute({ repo: repository, method: 'GET', path: '/api/scan-language' }),
+      await apiRoute({ repo: repository, method: 'GET', path: '/api/scan-language' }),
       { polishOnly: false },
     );
     assert.deepEqual(
-      await tradingRoute({
+      await apiRoute({
         repo: repository,
         method: 'PUT',
         path: '/api/scan-language',

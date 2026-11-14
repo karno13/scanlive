@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
-import { mergeWorkGroup } from './trading-api.mjs';
+import { mergeWorkGroup } from './api-routes.mjs';
 import {
   findDuplicateWorkGroups,
   findWorkByKey,

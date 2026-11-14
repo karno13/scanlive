@@ -2,6 +2,17 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (60) — Tańsza praca nad kodem: szybsze `verify`, schemat bazy w jednym pliku, więcej typów
+
+Bez zmian w wyglądzie i działaniu aplikacji.
+
+- **`npm run verify`: 70 s → 33 s.** Usunięty krok `check:syntax` (osobny proces `node --check` na każdy plik, 33 s); błędy składni i tak zatrzymuje lint, który parsuje każdy plik.
+- **`docs/SCHEMA.sql`**: aktualny schemat bazy (57 tabel z indeksami i wyzwalaczami) w jednym pliku zamiast w 41 migracjach. Generuje go `node scripts/dump-schema.mjs`; test `schema-doc.test.mjs` nie przejdzie, gdy po nowej migracji plik jest nieaktualny.
+- **Typy:** `// @ts-check` w 63 modułach zamiast 9 — 54 dodane przeszły bez poprawek.
+- **Trasy:** `trading-api.mjs` nazywa się `api-routes.mjs` (tabela `apiRoutes`) — większość jego tras to katalog, kolejka i ustawienia, nie handel. W `local-app.mjs` 57 tras nie powtarza już sprawdzenia „katalog otwarty”: handler, który bierze `catalog`, dostaje otwarty katalog albo żądanie kończy się 503 `CATALOG_DISABLED` (plik krótszy o 43 linie).
+- **Usunięte** nieużywane moduły sprzed SQLite: `feed.mjs`, `rss.mjs`, `local-batch-scan.mjs` z testami (740 linii; zostają w historii Git). Narzędzia importu dawnej historii JSON zostały.
+- Test importów pomija `scratch/` (pliki robocze spoza Git).
+
 ## 2026-11-14 (59) — Style: plik na obszar, każdy selektor w jednym miejscu
 
 Bez zmian w wyglądzie i działaniu. Style obliczone każdego elementu (także `::before`, `::after`, `::marker`, `::placeholder`, `::backdrop`) w 976 stanach — 61 widoków i stanów (okna, paleta poleceń, tryb skupienia, siatka wsadowa, „Odrzuć z regułą…”, puste listy, najechanie i fokus) × 390/1100/1440/1920 px × motyw jasny i ciemny × tryb handlu — są takie same przed i po każdym kroku (`node scripts/css-snapshot.mjs <port> <katalog> --verify`).

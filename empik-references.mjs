@@ -1,4 +1,5 @@
-﻿// Conservative reference-price assignments: a known book, never a guessed edition.
+// @ts-check
+// Conservative reference-price assignments: a known book, never a guessed edition.
 import { randomUUID } from 'node:crypto';
 import { sureReviewPlan } from './catalog-api.mjs';
 import { ensureUnknownEdition } from './edition-variants.mjs';

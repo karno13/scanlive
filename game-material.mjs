@@ -1,3 +1,4 @@
+// @ts-check
 // Listings that are not books for the Polish catalogue: Games Workshop rules and campaign books
 // (Codex, Battletome, Arcane Journal…) and editions explicitly in another language. No Polish
 // bibliographic source describes them, so they would wait in review forever. The resolver files

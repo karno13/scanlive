@@ -1,3 +1,4 @@
+// @ts-check
 export function scanCancelled(signal) {
   if (signal?.aborted) throw Object.assign(Error('SCAN_CANCELLED'), { statusCode: 409 });
 }

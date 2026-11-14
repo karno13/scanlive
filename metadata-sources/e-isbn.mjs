@@ -1,3 +1,4 @@
+// @ts-check
 // e-ISBN (e-isbn.pl): the national ISBN registry run by the National Library. Publishers register
 // a book there when they get its ISBN, often long before BN catalogues the printed copy, so it
 // knows recent Polish books that BN, Open Library and Google Books do not (Pratchett reprints from

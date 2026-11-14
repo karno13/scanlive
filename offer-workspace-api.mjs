@@ -1,3 +1,4 @@
+// @ts-check
 const statuses = new Set(['watching', 'check', 'negotiating', 'bought', 'rejected']);
 export function listOfferWorkspace(repository) {
   return repository.database

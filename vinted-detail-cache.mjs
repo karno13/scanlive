@@ -1,3 +1,4 @@
+// @ts-check
 // Process-local positive cache; avoids refetching unchanged Vinted detail pages on each scan.
 // Entries expire and the map is bounded so memory cannot grow indefinitely.
 export function createVintedDetailCache({

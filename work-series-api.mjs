@@ -1,3 +1,4 @@
+// @ts-check
 // Series are user annotations, not automatically validated bibliographic facts.
 export function listWorkSeries(repository) {
   return repository.database

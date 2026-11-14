@@ -1,3 +1,4 @@
+// @ts-check
 // Editions without publisher or year (verified from a source that did not carry them): the
 // national ISBN registry (e-ISBN) and, with the operator's key, Google Books are asked directly,
 // because the normal lookup stops at the first source that knows the ISBN. Only empty fields of

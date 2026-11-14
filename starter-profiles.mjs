@@ -1,3 +1,4 @@
+// @ts-check
 // First-run scan profiles for the operator's niche (fantasy and game tie-in novels). Created once,
 // only when no profile exists yet; afterwards the operator edits or deletes them freely.
 // Allegro (CAPTCHA) and OLX (HTTP 403) block automated reads on every scan, so they are left out.

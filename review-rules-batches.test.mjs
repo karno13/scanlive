@@ -21,7 +21,7 @@ import {
 } from './rejection-rules.mjs';
 import { decideIdentificationJob } from './catalog-api.mjs';
 import { dismissOfferSet, listOfferSets, markOfferAsSet } from './offer-sets.mjs';
-import { queueSummary, reopenReviewDecision } from './trading-api.mjs';
+import { queueSummary, reopenReviewDecision } from './api-routes.mjs';
 
 const offline = async () => {
   throw new Error('NETWORK_NOT_EXPECTED');

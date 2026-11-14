@@ -63,7 +63,7 @@ Jedyna pełna lista zmiennych środowiskowych (README tylko tu odsyła). Wartoś
 
 ## Diagnostyka i testy
 
-Log serwera: `%LOCALAPPDATA%\BookFlip\data\local-app.log`. Przed zakończeniem pracy uruchom `npm run verify` (lint, składnia, typy, formatowanie, testy); start interfejsu w Chromium sprawdza `node scripts/browser-smoke.mjs`. Te testy nie gwarantują, że zewnętrzny portal aktualnie pozwala na skanowanie.
+Log serwera: `%LOCALAPPDATA%\BookFlip\data\local-app.log`. Przed zakończeniem pracy uruchom `npm run verify` (lint, typy, formatowanie, testy); start interfejsu w Chromium sprawdza `node scripts/browser-smoke.mjs`. Te testy nie gwarantują, że zewnętrzny portal aktualnie pozwala na skanowanie.
 
 ## Weryfikacja i katalog (od 2026-11-07)
 

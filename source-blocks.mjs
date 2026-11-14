@@ -1,3 +1,4 @@
+// @ts-check
 // Sources that refused automated reads in every recent scan (Allegro answers with a CAPTCHA, OLX
 // with HTTP 403). Shown honestly in the scanner instead of being retried silently; BookFlip never
 // tries to get around such a block.

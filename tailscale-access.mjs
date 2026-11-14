@@ -1,3 +1,4 @@
+// @ts-check
 // Tailscale Serve is the ONLY supported remote entry point. Never bind the
 // BookFlip HTTP server to LAN/tailnet interfaces or accept Funnel traffic.
 const hostPattern = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.[a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net$/;

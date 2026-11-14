@@ -1,3 +1,4 @@
+// @ts-check
 import { migrateOfferHistory } from './offer-history.mjs';
 
 export const PRICE_CLASSIFICATION = {

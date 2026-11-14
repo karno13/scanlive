@@ -1,3 +1,4 @@
+// @ts-check
 // Read-only overview of how complete the collected data is: the offer → ISBN → catalog funnel,
 // data quality per source, completeness of catalog editions and progress per scan phrase.
 

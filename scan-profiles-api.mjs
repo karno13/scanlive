@@ -1,3 +1,4 @@
+// @ts-check
 const allowedSources = new Set([
   'Allegro',
   'Empik',

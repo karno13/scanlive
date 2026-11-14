@@ -1,3 +1,4 @@
+// @ts-check
 // ISBN ↔ title consistency. Sellers often type the ISBN of a different book (or a scanner reads
 // one from "recommended offers"), so an ISBN alone can file "Logik der Forschung" under Warcraft.
 // The check is deliberately lenient: one shared word (title, series, universe or author surname)

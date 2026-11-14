@@ -1,3 +1,4 @@
+// @ts-check
 import { createHash } from 'node:crypto';
 
 import { isbnKeys, normalizeISBN } from './isbn-normalization.mjs';

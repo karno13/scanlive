@@ -3,7 +3,7 @@ import test from 'node:test';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import { findDuplicateWorkGroups } from './work-grouping.mjs';
 import { listDistinctDecisions, markDistinct, undoDistinct } from './distinct-works.mjs';
-import { mergeWorkGroup, recentReviewDecisions, tradingRoute } from './trading-api.mjs';
+import { mergeWorkGroup, recentReviewDecisions, apiRoute } from './api-routes.mjs';
 
 function twoWorks(repository) {
   for (const id of ['w1', 'w2']) {
@@ -35,7 +35,7 @@ test('"To różne książki" hides the group, is listed, can be undone and block
     assert.deepEqual(listed.works.map((work) => work.id).sort(), ['w1', 'w2']);
     assert.equal(listed.undone, false);
     // The route lists it for "Ostatnie decyzje".
-    const routed = await tradingRoute({
+    const routed = await apiRoute({
       repo: repository,
       method: 'GET',
       path: '/api/catalog/work-duplicates/distinct',

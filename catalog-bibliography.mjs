@@ -1,3 +1,4 @@
+// @ts-check
 // Structured bibliographic details of catalogue editions: people with roles, series with volume
 // numbers, original title, physical description. Read from the BN MARC record kept in
 // external_records, so existing editions can be upgraded without asking BN again.

@@ -1,3 +1,4 @@
+// @ts-check
 // "To różne książki": works that the duplicate finder groups, but the operator knows are different
 // books. Stored per group as one decision (migration 130), reversible, listed in "Ostatnie decyzje".
 import { randomUUID } from 'node:crypto';

@@ -16,7 +16,6 @@
     "restore": "node scripts/restore-catalog.mjs",
     "check:history": "node scripts/check-history-parity.mjs",
     "rehearse:history": "node scripts/rehearse-history-migration.mjs",
-    "check:syntax": "node scripts/check-syntax.mjs",
     "lint": "eslint .",
     "format:check": "prettier --check \"**/*.{mjs,js,json,css,html}\"",
     "format": "prettier --write \"**/*.{mjs,js,json,css,html}\"",

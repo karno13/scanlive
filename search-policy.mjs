@@ -1,3 +1,4 @@
+// @ts-check
 import { searchFamilies, topicTerms } from './universes.mjs';
 // Retrieval aliases never confer edition identity or bibliographic verification.
 export const normalizeSearch = (s) =>

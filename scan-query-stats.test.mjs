@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { scanQueryStats } from './trading-api.mjs';
+import { scanQueryStats } from './api-routes.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 
 test('query stats count offers, catalogue matches and waiting jobs per phrase and source', () => {

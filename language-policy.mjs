@@ -1,3 +1,4 @@
+// @ts-check
 // "Tylko polskie wydania": a switch in the scanner form, on by default. With it on, the scan keeps
 // only listings that do not name a foreign edition (title markers, Vinted's language field), and an
 // offer found to be a foreign edition later (Empik's product page, the offer's own language) is

@@ -1,3 +1,4 @@
+// @ts-check
 // Reads structured facts from an offer's own detail page. Only machine-readable markup of the
 // product itself is trusted (schema.org JSON-LD and labelled attribute rows). Free text, image
 // URLs and "recommended offers" blocks are never scanned: they routinely contain other books'

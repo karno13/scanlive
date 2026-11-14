@@ -5,7 +5,8 @@ import { join, dirname, resolve, extname, relative, isAbsolute, sep } from 'node
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
-const ignored = new Set(['.git', 'node_modules', 'scan-results', 'artifacts', 'docs']);
+// scratch/ is local throwaway work outside git: its scripts are not part of the repository.
+const ignored = new Set(['.git', 'node_modules', 'scan-results', 'artifacts', 'docs', 'scratch']);
 function modules(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((item) => {
     if (item.isDirectory()) return ignored.has(item.name) ? [] : modules(join(dir, item.name));

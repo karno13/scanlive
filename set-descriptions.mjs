@@ -1,3 +1,4 @@
+// @ts-check
 // Sets fill themselves from the listing description. A set listing usually lists its books in the
 // description; the operator used to open the listing and paste it into "Dodaj z opisu ogłoszenia".
 // Now the description is read from the listing page in the background (paced like every other

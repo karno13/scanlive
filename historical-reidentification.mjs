@@ -1,3 +1,4 @@
+// @ts-check
 export function planHistoricalReidentification(repository, { limit = 100 } = {}) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10_000)
     throw new Error('INVALID_HISTORY_LIMIT');

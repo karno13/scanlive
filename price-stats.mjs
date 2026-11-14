@@ -1,3 +1,4 @@
+// @ts-check
 // Price statistics in SQL, in grosze (integers). Offers are compared only with comparable offers:
 // per kind of offer (new in a shop / antiquarian / private copy) and per condition class, with the
 // copies sold on Vinted as a value of their own — the resale price the owner cares about.

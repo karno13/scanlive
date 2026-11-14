@@ -1,3 +1,4 @@
+// @ts-check
 // Compact, bounded scan diagnostics. Never persist offer bodies or credentials.
 export function createScanDiagnostics({
   queries = [],

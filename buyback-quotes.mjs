@@ -1,3 +1,4 @@
+// @ts-check
 // Wholesale buyback floor per catalogue ISBN: cached quotes, on-demand checks and a slow background
 // pass over the catalogue. Quotes are preliminary and expire after a week.
 const SOURCE = 'skupksiazek';

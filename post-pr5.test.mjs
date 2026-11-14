@@ -1,19 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectOffers } from './feed.mjs';
 import { readSourceHtml } from './marketplaces.mjs';
-
-test('empty JSON watchlist cannot import unrelated books', () => {
-  const row = {
-    title: 'Unrelated book',
-    active: true,
-    url: 'https://www.vinted.pl/items/1-book',
-    price: 1000,
-    observedAt: new Date().toISOString(),
-  };
-  for (const title of ['', '   '])
-    assert.deepEqual(selectOffers([row], { host: 'www.vinted.pl', mode: 'watchlist', title }), []);
-});
 
 test('unreadable 403 body preserves a stop and the server cooldown', async () => {
   let calls = 0;

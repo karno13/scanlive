@@ -1,3 +1,4 @@
+// @ts-check
 // Catalogue titles that came in shouted or without Polish letters ("PROSPERO W PLOMIENIACH",
 // "VULKAN ZYJE" from Open Library) are rewritten from a listing assigned to the same edition,
 // but only when the listing contains exactly the same words once diacritics and case are
