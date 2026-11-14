@@ -68,6 +68,26 @@ function integerPrice(value) {
     : null;
 }
 
+/**
+ * Prices saved before the limit above existed: an offer keeps its last known price when a scan
+ * brings none, so a placeholder stored once would stay for ever. One-time repair at start.
+ * @param {import('./sqlite-catalog-repository.mjs').SqliteCatalogRepository} repository
+ */
+export function clearImplausiblePrices(repository) {
+  const db = repository.database;
+  return repository.transaction(() => ({
+    offers: Number(
+      db
+        .prepare('UPDATE offers SET current_price=NULL WHERE current_price>=?')
+        .run(MAX_PLAUSIBLE_PRICE_GROSZE).changes,
+    ),
+    observations: Number(
+      db.prepare('DELETE FROM offer_price_history WHERE price>=?').run(MAX_PLAUSIBLE_PRICE_GROSZE)
+        .changes,
+    ),
+  }));
+}
+
 /** @param {string} prefix @param {...unknown} values */
 function stableId(prefix, ...values) {
   return `${prefix}_${createHash('sha256').update(JSON.stringify(values)).digest('hex').slice(0, 32)}`;

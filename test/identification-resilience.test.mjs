@@ -124,3 +124,36 @@ test('a placeholder price is stored as unknown instead of polluting price histor
     catalog.repository.close();
   }
 });
+
+test('a placeholder price saved before the limit is cleared once at start', async () => {
+  const { runStartupJobs } = await import('../startup-jobs.mjs');
+  const catalog = createProductionCatalog({ databasePath: ':memory:' });
+  try {
+    const at = new Date('2026-01-01T10:00:00Z');
+    catalog.ingestOffers(
+      [
+        {
+          source: 'fixture',
+          url: 'https://example.test/items/401',
+          title: 'Old joke',
+          price: 3200,
+        },
+      ],
+      at,
+    );
+    const db = catalog.repository.database;
+    db.prepare('UPDATE offers SET current_price=1000000').run();
+    db.prepare('UPDATE offer_price_history SET price=1000000').run();
+    db.prepare("DELETE FROM app_preferences WHERE key='implausible_prices_v1'").run();
+    const report = runStartupJobs(catalog.repository, { env: { BOOKFLIP_STARTER_PROFILES: '0' } });
+    assert.deepEqual(report.prices, { offers: 1, observations: 1 });
+    assert.equal(db.prepare('SELECT current_price p FROM offers').get().p, null);
+    assert.equal(
+      runStartupJobs(catalog.repository, { env: { BOOKFLIP_STARTER_PROFILES: '0' } }).prices
+        .skipped,
+      true,
+    );
+  } finally {
+    catalog.repository.close();
+  }
+});

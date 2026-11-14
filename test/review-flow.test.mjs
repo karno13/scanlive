@@ -308,6 +308,11 @@ test('listing titles lose universe names, authors, initials and volume numbers',
     'Zabójca smoków',
   );
   assert.equal(titleFromListing('HONOR WILKA tom VI Warhammer 40k'), 'Honor wilka');
+  // The closing quote of a title whose opening one the seller left out.
+  assert.equal(
+    titleFromListing('Jezus uzdrawia twoje serce” Tumino'),
+    'Jezus uzdrawia twoje serce Tumino',
+  );
 });
 
 test('queue tabs cover the whole queue and the sure plan only takes unambiguous decisions', () => {

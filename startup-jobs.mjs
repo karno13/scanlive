@@ -17,6 +17,7 @@ import { normalizeStoredPublishers, PUBLISHER_RULES_VERSION } from './publisher-
 import { applyNameAliases, loadNameAliases } from './name-aliases.mjs';
 import { backfillConditionsFromEnrichment } from './offer-observations.mjs';
 import { loadUniverses } from './universes.mjs';
+import { clearImplausiblePrices } from './offer-ingest.mjs';
 
 /** Runs `job` once per `key`; the flag stores what it reported. */
 export function runOnce(repository, key, job, { now = () => new Date() } = {}) {
@@ -100,6 +101,10 @@ export function runStartupJobs(repository, { now = () => new Date(), env = proce
   if (String(env.BOOKFLIP_STARTER_PROFILES ?? '1') !== '0') ensureStarterProfiles(repository);
   // Once (own flag inside): condition of offers whose page was read before migration 124.
   report.conditions = backfillConditionsFromEnrichment(repository, { now });
+  // Once: placeholder prices (10 000 zł and more) saved before the ingest limit existed.
+  report.prices = runOnce(repository, 'implausible_prices_v1', () =>
+    clearImplausiblePrices(repository),
+  );
   // Not here any more: cycle and volume from listing titles (edition-series.mjs) are recomputed
   // every ten minutes by the server, the first time right after start.
   return report;

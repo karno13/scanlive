@@ -1681,6 +1681,32 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
   > span:nth-child(3)::after {
   content: ' ofert';
 }
+#view-catalog#view-catalog
+  #catalogList:not(.is-grid):not(.is-series)
+  .work-row
+  > span:nth-child(3)[data-plural='one']::after {
+  content: ' oferta';
+}
+#view-catalog#view-catalog
+  #catalogList:not(.is-grid):not(.is-series)
+  .work-row
+  > span:nth-child(3)[data-plural='few']::after {
+  content: ' oferty';
+}
+/* The status pill and the counts lie over the right edge of the copy: keep the text clear of them. */
+#view-catalog#view-catalog
+  #catalogList:not(.is-grid):not(.is-series)
+  .work-row:has(.status-pill)
+  .catalog-book-copy
+  > strong {
+  padding-right: 132px;
+}
+#view-catalog#view-catalog
+  #catalogList:not(.is-grid):not(.is-series)
+  .catalog-book-copy
+  > .missing-facts {
+  padding-right: 110px;
+}
 body.density-compact
   #view-catalog#view-catalog
   #catalogList:not(.is-grid):not(.is-series)

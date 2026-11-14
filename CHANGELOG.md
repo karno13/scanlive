@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (62) — Poprawki po przeglądzie aplikacji (część 1)
+
+- **Błąd:** dzieło w katalogu nazwane samym nazwiskiem autora (np. „Terry Pratchett”, utworzone z ogłoszenia bez tytułu) było proponowane jako „pewne dopasowanie” (95%) dla każdej oferty tego autora — na kopii bazy 2 z 3 kart w siatce „Szybkie”. Taki wpis nie jest już nigdy propozycją po tytule.
+- **Błąd:** oferty z ceną 10 000 zł i więcej zapisane przed wprowadzeniem limitu zachowywały tę cenę (2 oferty na kopii bazy, jedna otwierała listę zestawów). Jednorazowa naprawa przy starcie czyści takie ceny i ich odczyty w historii.
+- **Błąd:** tytuł w formularzu „Utwórz wydanie z ogłoszenia” nie zostawia już samotnego cudzysłowu po usunięciu autora.
+- **Błąd:** lista „Książki” pisała „1 ofert” i „3 ofert” zamiast „1 oferta”, „3 oferty”; na telefonie plakietka „Niezweryfikowane” nie zasłania już tytułu, a liczniki nie nachodzą na „brak: rok / wydawca” (niesprawdzone w przeglądarce po zmianie).
+
 ## 2026-11-14 (61) — Dokumentacja: jedno miejsce z ustaleniami i przepisami
 
 Bez zmian w aplikacji.
@@ -105,7 +112,7 @@ Pomiar na kopii bazy (550 prawdziwych wydań, bez 93 „Wydań nieustalonych”,
   - Zestawy (niepotwierdzone) — 139, w tym 92 puste;
   - Podejrzane przypisania — 20;
   - Możliwe duplikaty — 5.
-  Dawne ekrany są osadzone bez przepisywania; podejrzane przypisania i duplikaty przeszły z „Narzędzi katalogu” do kolejki. Skróty są wspólne: ↑/↓ (J/K) wybór, Enter akcja, X odrzuć, S pomiń.
+    Dawne ekrany są osadzone bez przepisywania; podejrzane przypisania i duplikaty przeszły z „Narzędzi katalogu” do kolejki. Skróty są wspólne: ↑/↓ (J/K) wybór, Enter akcja, X odrzuć, S pomiń.
 - **Tryb wsadowy** w „Szybkie” i „Do dodania”: siatka kart „zdjęcie oferty obok okładki propozycji” (albo danych nowego wydania). Wszystkie karty są zaznaczone; odznaczasz wyjątki i zatwierdzasz resztę jednym Enterem.
   - Każda oferta dostaje własną decyzję w historii.
   - Partia jest zapisana razem (migracja 129). Cofa się ją przyciskiem w powiadomieniu albo „Cofnij całą partię” w „Ostatnich decyzjach”.
@@ -131,7 +138,7 @@ Pomiar na kopii bazy (550 prawdziwych wydań, bez 93 „Wydań nieustalonych”,
   - decyzje w kolejce;
   - stan źródeł;
   - ostatni i następny skan.
-  Każdy kafel otwiera listę z tymi samymi filtrami co licznik. Na kopii danych: 17 nowych w ostatnim skanie, 4 zmiany cen, 240 decyzji (284 oferty), źródła 4/7, następny skan jutro 08:16. Kafel „Nowe oferty” otwiera Oferty z 17 pozycjami i znacznikiem „Nowe w skanie 11.11, 20:10 ✕”. Na dole jest zwinięty „Stan katalogu” (dawniej w Skanerze).
+    Każdy kafel otwiera listę z tymi samymi filtrami co licznik. Na kopii danych: 17 nowych w ostatnim skanie, 4 zmiany cen, 240 decyzji (284 oferty), źródła 4/7, następny skan jutro 08:16. Kafel „Nowe oferty” otwiera Oferty z 17 pozycjami i znacznikiem „Nowe w skanie 11.11, 20:10 ✕”. Na dole jest zwinięty „Stan katalogu” (dawniej w Skanerze).
 - Stan źródeł bez rozwijania. Niedziałające są na górze i wyróżnione, z datą pierwszej nieudanej próby po ostatnim sukcesie i powodem: „Dedalus.pl — nie działa od dziś 09:30 — serwis żąda CAPTCHA”, „Allegro — nigdy nie zadziałał (próby od 1.11) — CAPTCHA”, „OLX — nigdy nie zadziałał — HTTP 403”. Kliknięcie źródła otwiera jego oferty (`GET /api/source-status`, `source-status.mjs`).
 - Formularz skanu to osobny widok **Skan** (w palecie i przycisk „Nowy skan” na ekranie Dziś). Panel „Nowe z ostatniego skanu” powtarzał kartę ostatniego skanu i został usunięty; zastępują go kafle Dziś.
 - Oba liczniki czasu w przeglądarce (co 4 s stan katalogu, co 3 s skan) i samoodpytywanie przebiegu skanu (co 1,5 s) zastąpił jeden kanał zdarzeń z serwera (`GET /api/events`, server-sent events). Zdarzenia: zmiana skanu, kolejki i źródła.
@@ -147,7 +154,7 @@ Pomiar na kopii bazy (550 prawdziwych wydań, bez 93 „Wydań nieustalonych”,
   - siedem widoków;
   - brak podglądu ofert w Skanie;
   - brak „Odśwież” i `setInterval`.
-  Lint, typecheck, format:check i browser-smoke (siedem widoków, kontrast w obu motywach) przechodzą. Zrzuty Dziś, Skanu i przefiltrowanych Ofert przy 1440×900 i 390×844 w obu motywach: bez poziomego przewijania, bez celów dotykowych poniżej 44 px.
+    Lint, typecheck, format:check i browser-smoke (siedem widoków, kontrast w obu motywach) przechodzą. Zrzuty Dziś, Skanu i przefiltrowanych Ofert przy 1440×900 i 390×844 w obu motywach: bez poziomego przewijania, bez celów dotykowych poniżej 44 px.
 
 ## 2026-11-11 (50) — Stanowisko decyzyjne 0: lżejsze obrazy i pliki, mniej zapytań, krótszy pasek weryfikacji
 
@@ -179,13 +186,11 @@ Pomiar na kopii bazy (550 prawdziwych wydań, bez 93 „Wydań nieustalonych”,
 - 640 testów przeszło; test tokenów motywu i browser-smoke z kontrastem również. Każdy punkt ma osobne zrzuty wszystkich sześciu widoków w obu motywach: artifacts/ux-review/stage6-1 do stage6-5. Kontrola ścieżek obejmuje dodatkowo 1920×1080 i 1100×900. Szczegóły: docs/UX-REVIEW-2026-11.md.
 - **Błąd:** widoczne przyciski wydań czekały na zakończenie pobierania serii. Obsługa kliknięcia jest teraz gotowa przed pobraniem danych pomocniczych; browser-smoke sprawdza ten przypadek ze sztucznym opóźnieniem.
 
-
 ## 2026-11-11 (47) — UX 5: zwarty katalog i schowane narzędzia
 
 - 1440×900: 9 dzieł zamiast 5; zwykły wiersz 70 zamiast 143 px. Zwarta gęstość zmniejsza odstępy i okładki. Domyślna plakietka „Zweryfikowane” znika z listy; pozostają braki i wyjątki.
 - Telefon: początek listy 538 → 330 px. Po wybraniu książki statystyki i narzędzia ustępują szczegółom i powrotowi. Narzędzia są pod jednym przyciskiem z licznikiem podejrzanych przypisań (20); filtry pozostają osobno.
 - Zachowano układy Okładki i Serie. 639 testów przeszło. Pomiary i zrzuty: artifacts/ux-review/stage5.
-
 
 ## 2026-11-11 (46) — UX 4: tabela ofert na komputerze
 
@@ -193,20 +198,17 @@ Pomiar na kopii bazy (550 prawdziwych wydań, bez 93 „Wydań nieustalonych”,
 - 1440×900: 14 pełnych ofert zamiast około 7, wiersz 37 zamiast 89 px, 50 zamiast 25 ofert na stronie (50 zamiast 100 stron). Źródło i status są przy wyszukiwaniu. Domyślne stany identyfikacji nie mają ostrzeżeń; szuflada ma mniejszą okładkę i cenę przy tytule.
 - browser-smoke klika teraz przycisk oferty w tabeli desktopowej. 639 testów przeszło; pomiary i oba motywy: artifacts/ux-review/stage4.
 
-
 ## 2026-11-11 (45) — UX 3: zestawy w dwóch przewijanych panelach
 
 - 1440×900: wysokość strony 13990 → 900 px; wiersz składu 151 → 58 px; przy 9 książkach widać 7 zamiast 3. Lista i szczegóły przewijają się osobno, wybrana pozycja pozostaje w widoku.
 - Zdjęcie przeniesiono do nagłówka, zachowując naturalne proporcje. Skład zajmuje pełną szerokość panelu, ISBN nie łamie się w środku. Mobilny przepływ lista → szczegóły pozostaje.
 - 639 testów przeszło, w tym testy zestawów i niezapisanych zmian; zrzuty w obu motywach: artifacts/ux-review/stage3.
 
-
 ## 2026-11-11 (44) — UX 2: wspólna liczba decyzji
 
 - Przed zmianą: 281 ofert w nawigacji, 237 decyzji w nagłówku, 506 zadań w pasku identyfikacji i katalogu. 506 zawierało 225 referencji Empiku; 281 ofert łączy się w 237 decyzji ISBN. To różne zbiory, błędnie opisane tą samą etykietą.
 - Wspólne obliczenie kolejki ręcznej daje 237 decyzji / 281 ofert. Nawigacja, katalog, pasek identyfikacji i przycisk skanera pokazują decyzje. Statystyki zadań pozostają w szczegółach, z osobnymi nazwami. Pominięte pozycje nadal są nierozstrzygnięte i należą do globalnego licznika.
 - Rozszerzono review-queue-paging.test.mjs o licznik decyzji; review-error-handling.test.mjs sprawdza teraz wspólną kolejkę zamiast starego licznika zadań. Zrzuty: artifacts/ux-review/stage2.
-
 
 ## 2026-11-11 (43) — UX 1: decyzje zawsze pod ręką
 
@@ -333,6 +335,7 @@ Pomiar na kopii bazy (550 prawdziwych wydań, bez 93 „Wydań nieustalonych”,
   - poniżej 40 zł — po 48 h, potem co 96 h (wcześniej wszystkie: po 2 dniach, co 3 dni).
 
   W kolejce najpierw najdroższe. Tempo bez zmian: 8 stron na 10 minut, przez wspólną bramkę źródła. Na danych z 2026-11-10 do sprawdzenia czeka 1902 ofert (wg starej reguły 1505), w tym 463 od 100 zł — te zostaną sprawdzone w pierwszych ok. 10 godzinach.
+
 - **Ponowne wystawienia.** Nowa oferta tego samego sprzedawcy o tym samym tytule albo ISBN, która pojawia się po zniknięciu poprzedniej (brak w pełnym skanie albo strona usunięta), jest z nią powiązana. W szczegółach obu ofert widać „Wcześniej wystawiona jako… / Wystawiona ponownie jako…” z przyciskiem „To różne ogłoszenia”. Powiązanie jest w „Ostatnich decyzjach” jako „Ponowne wystawienie (automatycznie)” i można je tam rozłączyć; rozłączona para nie jest łączona ponownie. Nic nie jest przez nie odrzucane — oferta przechodzi identyfikację jak każda inna. Działa od teraz: sprzedawca jest zapisywany od zmiany 26, więc starszych ofert (360 ofert Vinted w 95 grupach o identycznym tytule) nie da się powiązać wstecz.
 
 ## 2026-11-10 (26) — Pełny zapis obserwacji oferty

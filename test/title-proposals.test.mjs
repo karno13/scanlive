@@ -197,3 +197,24 @@ test('stored proposals are re-ranked with the current scoring without any lookup
   assert.ok(stored.candidates[0].score < 0.6);
   assert.equal(rescoreStoredProposals(repository), 0, 'a second pass changes nothing');
 });
+
+test('a catalogue entry titled only with its author name is never a proposal', () => {
+  const nameOnly = { title: 'Terry Pratchett', authors: ['Terry Pratchett'] };
+  assert.equal(
+    scoreCandidate('Terry Pratchett Warstwy wszechświata | Stan Bardzo Dobry', nameOnly),
+    0,
+  );
+  // Without own authors: the name is known from the other works of the catalogue.
+  const knownAuthors = new Set(['terry', 'pratchett']);
+  assert.equal(
+    scoreCandidate(
+      'Terry Pratchett, Mgnienie Ekranu',
+      { title: 'Terry Pratchett' },
+      { knownAuthors },
+    ),
+    0,
+  );
+  // A real title that contains the name still scores.
+  const biography = { title: 'Terry Pratchett: życie z przypisami', authors: ['Rob Wilkins'] };
+  assert.ok(scoreCandidate('Terry Pratchett życie z przypisami Rob Wilkins', biography) >= 0.85);
+});

@@ -173,6 +173,16 @@ export function scoreCandidate(offerTitle, candidate, { knownAuthors = null } = 
   const offer = new Set(titleTokens(offerTitle));
   const { main } = candidateTokenSets(candidate);
   if (!main.length || !offer.size) return 0;
+  // A catalogue entry titled with nothing but an author's name ("Terry Pratchett", made from a
+  // listing without a title) names no book: every listing of that author would match it fully.
+  const ownNames = new Set(
+    titleTokens(candidate.authorText ?? (candidate.authors ?? []).join(' ')),
+  );
+  if (
+    main.every((token) => ownNames.has(token)) ||
+    (main.length >= 2 && knownAuthors && main.every((token) => knownAuthors.has(token)))
+  )
+    return 0;
   const hit = main.filter((token) => offer.has(token)).length;
   const candidateCoverage = hit / main.length;
   const offerCoverage = hit / offer.size;

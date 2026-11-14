@@ -166,7 +166,10 @@ export function titleFromListing(title, authors = []) {
     .split(/\s[-–—|]\s/)
     .map(clean)
     .filter((segment) => fold(segment).length >= 3);
-  return sentenceCase(clean((segments[0] ?? clean(text)).replace(/\s*[,;]\s*$/, '')));
+  const result = sentenceCase(clean((segments[0] ?? clean(text)).replace(/\s*[,;]\s*$/, '')));
+  // A quotation mark left without its pair ('Tytuł” Autor' once the author is removed).
+  const quotes = result.match(/[“”„"]/g) ?? [];
+  return quotes.length % 2 ? clean(result.replace(/[“”„"]/g, ' ')) : result;
 }
 
 function sameIsbnOffers(repository, isbn) {
