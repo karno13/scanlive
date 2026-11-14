@@ -22,6 +22,26 @@ test('Vinted language evidence survives repository reopen and expires', () => {
   repo.close();
 });
 
+test('a recognised Vinted page without a language is kept for a week, not 90 days', () => {
+  const repo = new SqliteCatalogRepository(':memory:');
+  let time = 0;
+  const day = 24 * 60 * 60 * 1000;
+  const cache = createSqliteVintedDetailCache(repo, { now: () => time });
+  cache.set('https://www.vinted.pl/items/3', {
+    language: null,
+    languageStatus: 'missing_in_response',
+  });
+  cache.set('https://www.vinted.pl/items/4', {
+    language: null,
+    languageStatus: 'schema_unrecognized',
+  });
+  assert.deepEqual(cache.get('https://www.vinted.pl/items/3'), { language: null });
+  assert.equal(cache.get('https://www.vinted.pl/items/4'), undefined);
+  time = 8 * day;
+  assert.equal(cache.get('https://www.vinted.pl/items/3'), undefined);
+  repo.close();
+});
+
 test('Vinted SQLite cache never retains unknown or overly long language data', () => {
   const repo = new SqliteCatalogRepository(':memory:');
   const cache = createSqliteVintedDetailCache(repo);

@@ -5,9 +5,17 @@ import { identifyOffer } from './offer-identity.mjs';
 // Store only stable language/ISBN evidence, never HTML or failed responses.
 // A listing's language does not change, so decisions are kept for 90 days. Offers already in the
 // catalogue passed the Polish check when they were first saved: they need no detail read at all.
+// A page that was read and recognised but names no language (about 110 listings in every full
+// scan, 11.2026) is kept for a week as language '' — a seller may still fill it in. A page whose
+// structure was not recognised is never kept.
 export function createSqliteVintedDetailCache(
   repository,
-  { now = Date.now, ttlMs = 90 * 24 * 60 * 60 * 1000, maxEntries = 20000 } = {},
+  {
+    now = Date.now,
+    ttlMs = 90 * 24 * 60 * 60 * 1000,
+    missingTtlMs = 7 * 24 * 60 * 60 * 1000,
+    maxEntries = 20000,
+  } = {},
 ) {
   const db = repository.database;
   const get = db.prepare(
@@ -30,7 +38,7 @@ export function createSqliteVintedDetailCache(
     get(url) {
       const row = get.get(url);
       if (row && row.expires_at > now())
-        return { language: row.language, ...(row.isbn ? { isbn: row.isbn } : {}) };
+        return { language: row.language || null, ...(row.isbn ? { isbn: row.isbn } : {}) };
       let stored = null;
       try {
         stored = known.get(identifyOffer({ source: 'Vinted', url }).id);
@@ -45,11 +53,23 @@ export function createSqliteVintedDetailCache(
     },
     set(url, detail) {
       const language = typeof detail?.language === 'string' ? detail.language.trim() : '';
-      if (!language || language.length > 100 || typeof url !== 'string' || url.length > 2048)
+      const missing = !language && detail?.languageStatus === 'missing_in_response';
+      if (
+        (!language && !missing) ||
+        language.length > 100 ||
+        typeof url !== 'string' ||
+        url.length > 2048
+      )
         return this;
       const isbn =
         typeof detail?.isbn === 'string' && detail.isbn.length <= 20 ? detail.isbn : null;
-      set.run(url, language, isbn, now() + ttlMs, new Date(now()).toISOString());
+      set.run(
+        url,
+        language,
+        isbn,
+        now() + (missing ? missingTtlMs : ttlMs),
+        new Date(now()).toISOString(),
+      );
       if (++insertions % 50 === 0) {
         deleteExpired.run(now());
         trim.run(maxEntries);

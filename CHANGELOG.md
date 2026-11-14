@@ -2,6 +2,11 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (69) — Szybsze sprawdzanie języka na Vinted
+
+- **Błąd:** oferty Vinted, na których stronie sprzedawca nie podał języka, były czytane od nowa w każdym skanie — około 110 stron na pełny skan (ok. 4 minuty przy tempie jednej strony na 2 s). Teraz wynik „brak języka” jest pamiętany przez 7 dni; po tym czasie strona jest czytana ponownie, bo sprzedawca mógł język uzupełnić.
+- Pomiar na kopii bazy: skan z 14.11 wieczorem sprawdzał 1237 nowych ofert przez 63 minuty — to pierwszy skan nowych fraz (seria). Kolejne skany tych samych fraz czytają tylko nowe oferty (skany z 12–13.11: 22–41 stron, 5–7 minut).
+
 ## 2026-11-14 (68) — Usuwanie pozycji z katalogu
 
 - Na dole strony książki („Książki” → wybrana książka) jest **„Usuń z katalogu”** — dla pozycji, które nie należą do kolekcji. Po potwierdzeniu (okno podaje liczbę wydań i ofert) książka znika z list razem z wydaniami, a wszystkie jej oferty są odrzucane i znikają z weryfikacji i z „Ofert”.
