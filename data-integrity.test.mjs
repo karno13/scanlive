@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createProductionCatalog } from './catalog-production.mjs';
 import { availableCatalogMigrations, applyCatalogMigrations } from './catalog-migrations.mjs';
-import { withHistoryWriteLock } from './local-app.mjs';
+import { withHistoryWriteLock } from './app-runtime.mjs';
 
 test('history write lock executes one mutation at a time even when calls overlap', async () => {
   const events = [];

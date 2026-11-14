@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createProductionCatalog } from './catalog-production.mjs';
-import { searchOffers } from './local-app.mjs';
+import { searchOffers } from './scan-engine.mjs';
 import { parseMarketplace } from './marketplaces.mjs';
 import { conditionClass, listedAtFromAge, rawSnapshot } from './offer-observations.mjs';
 import {

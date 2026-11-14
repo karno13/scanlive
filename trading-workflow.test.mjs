@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createProductionCatalog } from './catalog-production.mjs';
-import { createLocalAppServer, searchOffers } from './local-app.mjs';
+import { createLocalAppServer } from './local-app.mjs';
+import { searchOffers } from './scan-engine.mjs';
 import { persistSqliteScan } from './sqlite-single-store.mjs';
 import {
   listCatalogOffers,

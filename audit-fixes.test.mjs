@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import { availableCatalogMigrations, applyCatalogMigrations } from './catalog-migrations.mjs';
 import { listCatalogWorks, listCatalogOffers, listIdentificationJobs } from './catalog-api.mjs';
-import { readJson, catalogHistorySnapshot } from './local-app.mjs';
+import { readJson, catalogHistorySnapshot } from './app-runtime.mjs';
 import { allBookStatistics, bookStatistics } from './price-analysis.mjs';
 import { sqliteHistoryModel } from './sqlite-history-read.mjs';
 

@@ -4,14 +4,16 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { defaultHistoryPath } from './offer-history.mjs';
+import { defaultCatalogPath } from './catalog-data-location.mjs';
+import { runtimeDataDirectory } from './app-runtime.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const read = (name) => readFileSync(join(root, name), 'utf8');
 test('legacy history remains stable while catalog is stored in user data directory', () => {
   assert.equal(defaultHistoryPath, join(root, 'scan-results', 'local-offer-history.json'));
   assert.match(read('catalog-production.mjs'), /databasePath = defaultCatalogPath\(\)/);
-  assert.match(read('local-app.mjs'), /join\(runtimeDataDirectory, 'local-app\.log'\)/);
-  assert.match(read('local-app.mjs'), /mkdir\(runtimeDataDirectory, \{ recursive: true \}\)/);
+  // The log and the scan status live next to the database, in the user's data directory.
+  assert.equal(runtimeDataDirectory, dirname(defaultCatalogPath()));
 });
 test('manual connectivity workflows never auto-run or submit shop cart POST', () => {
   const source = read('.github/workflows/source-connectivity.yml');

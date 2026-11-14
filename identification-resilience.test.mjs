@@ -49,8 +49,10 @@ test('identification batch continues after transient resolver failure', async ()
 });
 
 test('the scanner no longer awaits remote ISBN resolution before responding', () => {
-  const app = readFileSync(new URL('./local-app.mjs', import.meta.url), 'utf8');
-  assert.match(app, /scheduleCatalogResolution\(catalogStore\)/);
+  const app =
+    readFileSync(new URL('./scan-engine.mjs', import.meta.url), 'utf8') +
+    readFileSync(new URL('./background-jobs.mjs', import.meta.url), 'utf8');
+  assert.match(app, /scheduleCatalogResolution\(catalog\)/);
   assert.doesNotMatch(app, /await catalogStore\.processQueued\(\)/);
   assert.match(app, /runningCatalogResolution/);
 });

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createProductionCatalog } from './catalog-production.mjs';
-import { searchOffers, validateSearchInput } from './local-app.mjs';
+import { searchOffers, validateSearchInput } from './scan-engine.mjs';
 import { searchUrl } from './marketplaces.mjs';
 import { putScanProfile } from './scan-profiles-api.mjs';
 import { createScanScheduler, getScanSchedule, saveScanSchedule } from './scan-schedule.mjs';

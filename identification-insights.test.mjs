@@ -37,7 +37,7 @@ test('identification outcome aggregation distinguishes completion without matchi
 
 test('review includes read-only external lookup and preserves approval flow', async () => {
   const review = await readFile(new URL('./app/views/review.js', import.meta.url), 'utf8');
-  const server = await readFile(new URL('./local-app.mjs', import.meta.url), 'utf8');
+  const server = await readFile(new URL('./background-jobs.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(review, /reviewExternalIsbnButton/);
   assert.match(review, /preview:true/);
   assert.match(review, /response\.canConfirm/);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { searchOffers } from './local-app.mjs';
+import { searchOffers } from './scan-engine.mjs';
 
 test('Vinted detail reads are bounded to two in-flight requests and preserve offer ordering', async () => {
   let active = 0,

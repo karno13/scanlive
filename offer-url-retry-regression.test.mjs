@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { identifyOffer, normalizeOfferUrl, trustedOfferUrl } from './offer-identity.mjs';
-import { retryDelay } from './local-app.mjs';
+import { retryDelay } from './scan-engine.mjs';
 import { safeOfferHref } from './app/core/formatters.js';
 
 test('reject unsafe marketplace offer URLs and source-domain mismatches', () => {

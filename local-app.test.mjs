@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { searchOffers, validateSearchInput } from './local-app.mjs';
+import { searchOffers, validateSearchInput } from './scan-engine.mjs';
 
 test('local app validates saved sources and query limits', () => {
   assert.deepEqual(

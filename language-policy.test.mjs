@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 import { getPolishOnly, setPolishOnly, rejectForeignEditions } from './language-policy.mjs';
 import { apiRoute } from './api-routes.mjs';
-import { searchOffers } from './local-app.mjs';
+import { searchOffers } from './scan-engine.mjs';
 
 function queue(repository) {
   const db = repository.database;

@@ -8,7 +8,7 @@ import {
   pendingConfirmations,
 } from './offer-lifecycle.mjs';
 import { NO_LEGAL_ACCESS, hasNoLegalAccess, scannableSources } from './source-blocks.mjs';
-import { searchOffers, validateSearchInput } from './local-app.mjs';
+import { searchOffers, validateSearchInput } from './scan-engine.mjs';
 import { sourcesToScan } from './scan-schedule.mjs';
 import { SqliteCatalogRepository } from './sqlite-catalog-repository.mjs';
 

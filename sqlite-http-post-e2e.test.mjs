@@ -4,7 +4,8 @@ import { mkdtempSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createProductionCatalog } from './catalog-production.mjs';
-import { createLocalAppServer, searchOffers } from './local-app.mjs';
+import { createLocalAppServer } from './local-app.mjs';
+import { searchOffers } from './scan-engine.mjs';
 
 test('HTTP POST scan, ISBN resolution, manual assignment and restart use SQLite without JSON', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'bookflip-http-flow-'));
