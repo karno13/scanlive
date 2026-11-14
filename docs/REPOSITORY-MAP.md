@@ -59,6 +59,8 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | Plik | Rola |
 | --- | --- |
 | `marketplaces.mjs` | Adaptery źródeł, `readSourceHtml`, filtr książek |
+| `antiquarian-sources.mjs` | Antykwariaty czytane po kategorii: adresy kategorii, stronicowanie i parsery list |
+| `html-text.mjs` | Tekst i atrybuty z HTML bez DOM (wspólne dla parserów) |
 | `marketplace-gate.mjs` | Wspólne, adaptacyjne tempo zapytań na źródło; każde zapytanie przechodzi tędy |
 | `local-scan.mjs` | Hosty źródeł i uruchomienie skanu z wiersza poleceń |
 | `search-policy.mjs` | Dopasowanie oferty do frazy i odsiewanie nie-książek |

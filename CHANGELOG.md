@@ -2,6 +2,16 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (66) — Pięć antykwariatów internetowych jako nowe źródła
+
+Nowe źródła do wyboru w skanerze: **BlackBooks.pl** (Gdańsk), **Antykwariat Conroy** (Kraków), **Szarlatan.pl** (Wrocław), **Stara Dobra Książka** (Gdynia) i **Antykwariat NWS** (Kraków). Ich oferty mają rodzaj „Antykwariat” i wspólny kolor.
+
+- Antykwariaty nie są przeszukiwane frazą: skan czyta całą kategorię fantastyki / SF strona po stronie (tak pozwala ich `robots.txt`) i dopiero potem dopasowuje książki do fraz profilu. Książki, których żadna fraza nie nazywa, nie są zapisywane (liczone jako „temat”).
+- Ta sama fraza w danym antykwariacie jest czytana najwyżej raz na 20 godzin; w kolejnych skanach tego dnia jest od razu oznaczona jako zrobiona. Pełny odczyt to ok. 250 stron (najwięcej BlackBooks i Stara Dobra Książka), więc pierwszy skan z antykwariatami trwa kilka minut dłużej. Szybki skan (najnowsze) ich nie obejmuje.
+- Antykwariat Conroy podaje na liście ISBN, wydawcę, stan i wady — te oferty mają ISBN od razu. Pozostałe cztery podają tylko tytuł z autorem i cenę.
+- Oferta, która zniknęła z przeczytanej do końca kategorii, jest oznaczana jako niewidziana; sprzedane egzemplarze Starej Dobrej Książki („Egzemplarz sprzedany”) nie są ofertami.
+- Regulaminy pięciu sklepów nie zakazują automatycznego odczytu. **Skupszop.pl nie jest dodany:** fraza idzie w parametrze `filters[keyword]` razem z `routeName` ze strony wyszukiwania, której `robots.txt` zakazuje — do ustalenia przez właściciela.
+
 ## 2026-11-14 (65) — Rozpoznanie nowych źródeł i robots.txt obecnych
 
 Bez zmian w aplikacji; wynik jest w `docs/SOURCES-ACCESS-2026-11.md` (sekcja z 14.11).

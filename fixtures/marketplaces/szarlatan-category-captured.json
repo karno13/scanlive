@@ -1,0 +1,27 @@
+{
+  "kind": "captured",
+  "source": "Szarlatan.pl",
+  "host": "szarlatan.pl",
+  "searchQuery": "fantasy",
+  "category": "fantasy",
+  "categoryUrl": "/kategoria-produktu/ksiazki-wspolczesne/fantastyka/",
+  "capturedAt": "2026-11-14T21:30:00.000Z",
+  "sanitized": true,
+  "reviewedForPersonalData": true,
+  "note": "The first 3 listings and the pager of https://szarlatan.pl/kategoria-produktu/ksiazki-wspolczesne/fantastyka/page/1/ (one request, 2026-11-14). Shop products only, no personal data.",
+  "html": "<li class=\"has-post-title no-post-date has-post-category has-post-tag has-post-comment has-post-author product type-product post-220609 status-publish first instock product_cat-ksiazki-wspolczesne product_cat-fantastyka product_cat-literatura-piekna product_tag-adamiak-stanislaw-ks has-post-thumbnail purchasable product-type-simple\">\n\t<a href=\"https://szarlatan.pl/katalog/adamiak-stanislaw-ks-teologia-tolkiena-153614/\" class=\"woocommerce-LoopProduct-link woocommerce-loop-product__link\"><img data-tf-not-load=\"1\" width=\"404\" height=\"600\" src=\"https://szarlatan.pl/wp-content/uploads/2025/10/153614.jpg\" class=\"attachment-woocommerce_thumbnail size-woocommerce_thumbnail\" alt=\"Adamiak Stanisław ks. Teologia Tolkiena 153614.\" decoding=\"async\" srcset=\"https://szarlatan.pl/wp-content/uploads/2025/10/153614.jpg 404w, https://szarlatan.pl/wp-content/uploads/2025/10/153614-202x300.jpg 202w\" sizes=\"(max-width: 404px) 100vw, 404px\" /><h2 class=\"woocommerce-loop-product__title\">Adamiak Stanisław ks. Teologia Tolkiena                153614.</h2>\n\t<span class=\"price\"><span class=\"woocommerce-Price-amount amount\"><bdi>80,00&nbsp;<span class=\"woocommerce-Price-currencySymbol\" translate=\"no\" dir=\"auto\">&#122;&#322;</span></bdi></span></span>\n</a></li>\n<li class=\"has-post-title no-post-date has-post-category has-post-tag has-post-comment has-post-author product type-product post-124563 status-publish instock product_cat-ksiazki-wspolczesne product_cat-fantastyka product_cat-literatura-piekna product_tag-aldiss-brian has-post-thumbnail purchasable product-type-simple\">\n\t<a href=\"https://szarlatan.pl/katalog/aldiss-brian-tlumacz/\" class=\"woocommerce-LoopProduct-link woocommerce-loop-product__link\"><img loading=\"lazy\" width=\"280\" height=\"400\" src=\"https://szarlatan.pl/wp-content/uploads/2018/07/137306.jpg\" class=\"attachment-woocommerce_thumbnail size-woocommerce_thumbnail\" alt=\"Aldiss Brian Tłumacz\" decoding=\"async\" srcset=\"https://szarlatan.pl/wp-content/uploads/2018/07/137306.jpg 280w, https://szarlatan.pl/wp-content/uploads/2018/07/137306-210x300.jpg 210w\" sizes=\"(max-width: 280px) 100vw, 280px\" /><h2 class=\"woocommerce-loop-product__title\">Aldiss Brian Tłumacz</h2>\n\t<span class=\"price\"><span class=\"woocommerce-Price-amount amount\"><bdi>10,00&nbsp;<span class=\"woocommerce-Price-currencySymbol\" translate=\"no\" dir=\"auto\">&#122;&#322;</span></bdi></span></span>\n</a></li>\n<li class=\"has-post-title no-post-date has-post-category has-post-tag has-post-comment has-post-author product type-product post-213041 status-publish last instock product_cat-ksiazki-wspolczesne product_cat-fantastyka product_cat-literatura-piekna product_tag-aliston-aaron product_tag-star-wars has-post-thumbnail purchasable product-type-simple\">\n\t<a href=\"https://szarlatan.pl/katalog/aliston-aaron-eskadra-widm-star-wars-x-wingi-tom-v-cyklu-x-wingi-152709/\" class=\"woocommerce-LoopProduct-link woocommerce-loop-product__link\"><img loading=\"lazy\" width=\"386\" height=\"600\" src=\"https://szarlatan.pl/wp-content/uploads/2024/10/152709.jpg\" class=\"attachment-woocommerce_thumbnail size-woocommerce_thumbnail\" alt=\"Aliston Aaron Eskadra widm STAR WARS X-Wingi Tom V Cyklu X-Wingi 152709.\" decoding=\"async\" srcset=\"https://szarlatan.pl/wp-content/uploads/2024/10/152709.jpg 386w, https://szarlatan.pl/wp-content/uploads/2024/10/152709-193x300.jpg 193w\" sizes=\"(max-width: 386px) 100vw, 386px\" /><h2 class=\"woocommerce-loop-product__title\">Aliston Aaron Eskadra widm STAR WARS X-Wingi Tom V Cyklu X-Wingi                152709.</h2>\n\t<span class=\"price\"><span class=\"woocommerce-Price-amount amount\"><bdi>120,00&nbsp;<span class=\"woocommerce-Price-currencySymbol\" translate=\"no\" dir=\"auto\">&#122;&#322;</span></bdi></span></span>\n</a></li>\n\n<a class=\"next page-numbers\" href=\"https://szarlatan.pl/kategoria-produktu/ksiazki-wspolczesne/fantastyka/page/2/\">&rarr;</a>",
+  "expected": [
+    {
+      "url": "https://szarlatan.pl/katalog/adamiak-stanislaw-ks-teologia-tolkiena-153614/",
+      "price": 8000
+    },
+    {
+      "url": "https://szarlatan.pl/katalog/aldiss-brian-tlumacz/",
+      "price": 1000
+    },
+    {
+      "url": "https://szarlatan.pl/katalog/aliston-aaron-eskadra-widm-star-wars-x-wingi-tom-v-cyklu-x-wingi-152709/",
+      "price": 12000
+    }
+  ]
+}

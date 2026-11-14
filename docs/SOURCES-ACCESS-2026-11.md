@@ -98,6 +98,10 @@ Dla każdego serwisu odczytany `robots.txt` i jedna strona (kategoria fantastyki
 
 Wspólna cecha: wyszukiwarka bywa zakazana albo niepotrzebna, za to **strony kategorii są dozwolone i małe**. Dlatego te źródła czyta się po kategorii (fantastyka / SF), strona po stronie, a dopiero potem filtruje frazami profilu — nie przez zapytanie na każdą frazę.
 
+**Wdrożone 14.11.2026 (wpis 66 w `CHANGELOG.md`):** BlackBooks.pl, Antykwariat Conroy, Szarlatan.pl, Stara Dobra Książka i Antykwariat NWS — `antiquarian-sources.mjs`, tryb „kategoria” w `scan-engine.mjs` (`readCategorySource`, ta sama fraza najwyżej raz na 20 h). Regulaminy pięciu sklepów przeczytane: żaden nie zakazuje automatycznego odczytu. Kategorie: BlackBooks `/524-fantasy-science-fiction-horror` (nadrzędna zamiast dwóch podkategorii), NWS fantasy (27) i SF (28; dalsze strony pod adresem z pagera sklepu). Strony produktów nie są czytane.
+
+**Skupszop — stan po 14.11:** z kodu sklepu (`build/assets/Index-*.js`) wynika, że lista idzie przez `GET /api/search/listing` z parametrami `nodeId`, `routeName`, `page` (od 1), `perPage` i `filters[keyword]`; `routeName` pochodzi z ukrytego pola strony `/wyszukaj`, której `robots.txt` zakazuje. Bez niego zapytanie nie zostało sprawdzone — dalsze próby przerwane. Następny krok jak wyżej: odczytać jedno zapytanie w narzędziach deweloperskich przeglądarki.
+
 ### Do wdrożenia (w tej kolejności)
 
 | #   | Serwis              | Miasto, platforma    | Adres listy                                                                                                               | Na liście                                                                             | robots.txt                                                                                     | Uwagi                                                                                                       |

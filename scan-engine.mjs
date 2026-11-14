@@ -8,6 +8,9 @@ import { createVintedDetailCache } from './vinted-detail-cache.mjs';
 import { setTimeout as wait } from 'node:timers/promises';
 import { NEWEST_ORDER_SOURCES, scanMarketplace } from './marketplaces.mjs';
 import { localSourceHosts } from './local-scan.mjs';
+import { ANTIQUARIAN_SOURCES, isCategorySource } from './antiquarian-sources.mjs';
+import { matchesTopic } from './search-policy.mjs';
+import { completeResults } from './offer-availability.mjs';
 import { readVintedLanguage } from './vinted-detail.mjs';
 import { listedAtFromAge } from './offer-observations.mjs';
 import {
@@ -136,6 +139,8 @@ export async function searchOffers(
     signal = null,
     // Called after each source+query with its accepted offers, so they can be saved during the scan.
     onOffers = null,
+    // Antiquarian source+phrase pairs read completely in the last hours (freshCategoryTasks).
+    freshTasks = new Set(),
   } = {},
 ) {
   const { queries, sources, tasks, mode } = validateSearchInput(input),
@@ -144,6 +149,25 @@ export async function searchOffers(
     languageCache = detailCache;
   await Promise.all(
     sources.map(async (source) => {
+      if (isCategorySource(source)) {
+        // Category pages hold no newest-first order: a quick scan leaves these shops out.
+        if (newest) return;
+        const wanted = queries.filter(
+          (query) => !tasks || tasks.some((task) => task.source === source && task.query === query),
+        );
+        results.push(
+          ...(await readCategorySource(source, wanted, {
+            language: input?.polishOnly === false ? null : 'pl',
+            fresh: (query) => freshTasks.has(categoryTaskKey(source, query)),
+            scanner,
+            onProgress,
+            retryWait,
+            signal,
+            onOffers,
+          })),
+        );
+        return;
+      }
       // A source that blocked automated requests (CAPTCHA, 403) blocks the rest of this scan too:
       // its remaining phrases are reported at once instead of being asked and retried one by one.
       let blockedBy = null;
@@ -355,7 +379,12 @@ async function scanAllPages(
     });
     const next = scan.pagination?.nextPage;
     if (scan.pagination?.state !== 'more' || !Number.isInteger(next) || next <= current.page) break;
-    current = { ...current, page: next };
+    // A category page names the address of the next one (antiquarian-sources.mjs).
+    current = {
+      ...current,
+      page: next,
+      ...(scan.pagination.nextUrl ? { pageUrl: scan.pagination.nextUrl } : {}),
+    };
   }
   return {
     offers,
@@ -369,6 +398,126 @@ async function scanAllPages(
     diagnostic,
   };
 }
+// Antiquarian bookshops: a whole category is read once per scan (a few hundred listings, page by
+// page through the gate) and matched against each phrase afterwards. A phrase whose category read
+// finished within CATEGORY_READ_HOURS is not read again: small shops, ~250 pages for all five.
+export const CATEGORY_READ_HOURS = 20;
+const CATEGORY_LABEL = 'cała kategoria';
+const categoryTaskKey = (source, query) => JSON.stringify([source, query]);
+
+/** Source+phrase pairs of antiquarian bookshops read to the end in the last `hours`. */
+export function freshCategoryTasks(repository, now = new Date(), hours = CATEGORY_READ_HOURS) {
+  const since = new Date(now.getTime() - hours * 3_600_000).toISOString();
+  const keys = new Set();
+  for (const row of repository.database
+    .prepare('SELECT summary_json FROM scan_runs WHERE scanned_at>=?')
+    .all(since)) {
+    let results;
+    try {
+      results = JSON.parse(row.summary_json)?.context?.results;
+    } catch {
+      continue;
+    }
+    for (const result of completeResults(Array.isArray(results) ? results : []))
+      if (isCategorySource(result.source)) keys.add(categoryTaskKey(result.source, result.query));
+  }
+  return keys;
+}
+
+async function readCategorySource(
+  source,
+  queries,
+  { language, fresh, scanner, onProgress, retryWait, signal, onOffers },
+) {
+  const due = queries.filter((query) => !fresh(query));
+  for (const query of queries)
+    if (fresh(query))
+      onProgress({ type: 'source-done', source, query, offers: 0, pages: 0, status: 'fresh' });
+  if (!due.length) return [];
+  onProgress({ type: 'source-start', source, query: CATEGORY_LABEL });
+  const offers = new Map(),
+    pages = [],
+    rejected = {};
+  let diagnostic = null,
+    complete = true;
+  for (const categoryUrl of ANTIQUARIAN_SOURCES[source].categories) {
+    scanCancelled(signal);
+    const scan = await scanAllPages(
+      {
+        source,
+        host: localSourceHosts[source],
+        mode: 'category',
+        categoryUrl,
+        language,
+        page: 1,
+        paginationVersion: 1,
+      },
+      scanner,
+      (event) => onProgress({ ...event, source, query: CATEGORY_LABEL }),
+      retryWait,
+      signal,
+      300,
+    );
+    for (const offer of scan.offers) if (!offers.has(offer.url)) offers.set(offer.url, offer);
+    pages.push(...scan.pages);
+    for (const [reason, count] of Object.entries(scan.rejected || {}))
+      rejected[reason] = (rejected[reason] || 0) + count;
+    if (scan.pagination?.state !== 'end') complete = false;
+    if (scan.diagnostic) {
+      diagnostic ||= scan.diagnostic;
+      if (scan.diagnostic.blocked) break;
+    }
+  }
+  const listed = [...offers.values()],
+    matched = new Set(),
+    results = [];
+  for (const query of due) {
+    const topic = { mode: 'discovery', title: query, category: query, searchQuery: query };
+    const found = listed.filter((offer) => matchesTopic(topic, offer.title));
+    for (const offer of found) matched.add(offer.url);
+    const status = diagnostic ? (found.length ? 'partial' : 'unavailable') : 'ok';
+    results.push({
+      source,
+      query,
+      status,
+      offers: found,
+      // Only a category read to its last page may conclude that an offer is gone.
+      pagination: { state: complete && !diagnostic ? 'end' : 'partial' },
+      pages,
+      ...(diagnostic ? { diagnostic } : {}),
+    });
+    if (diagnostic)
+      onProgress({
+        type: 'source-error',
+        source,
+        query,
+        code: diagnostic.code,
+        partial: found.length,
+      });
+    if (onOffers && found.length) {
+      scanCancelled(signal);
+      await onOffers({
+        source,
+        query,
+        offers: found.map((offer) => ({ ...offer, source, matchedQueries: [query] })),
+      });
+    }
+    onProgress({
+      type: 'source-done',
+      source,
+      query,
+      offers: found.length,
+      pages: pages.length,
+      status,
+    });
+  }
+  // Books of the category that no phrase names: counted once, on the first phrase.
+  const unmatched = listed.length - matched.size;
+  if (unmatched) rejected.topic = (rejected.topic || 0) + unmatched;
+  if (results.length && Object.keys(rejected).length) results[0].rejected = rejected;
+  return results;
+}
+
 async function filterVintedPolishOffers(
   offers,
   languageReader,
@@ -534,7 +683,16 @@ export async function searchAndStore(
   let result;
   try {
     result = await awaitScan(
-      search(input, { onProgress, detailCache, signal, onOffers, now: () => scanAt }),
+      search(input, {
+        onProgress,
+        detailCache,
+        signal,
+        onOffers,
+        now: () => scanAt,
+        freshTasks: catalog.repository?.database
+          ? freshCategoryTasks(catalog.repository, scanAt)
+          : new Set(),
+      }),
       signal,
     );
     scanCancelled(signal);

@@ -1,0 +1,203 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createMarketplaceGate } from '../marketplace-gate.mjs';
+import { parseMarketplace, readSourceHtml, scanMarketplace } from '../marketplaces.mjs';
+import { ANTIQUARIAN_SOURCES, categoryPageInfo, categoryPageUrl } from '../antiquarian-sources.mjs';
+import { searchOffers, freshCategoryTasks } from '../scan-engine.mjs';
+import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
+import { offerKind } from '../offer-kinds.mjs';
+import { sourceOfferId } from '../offer-identity.mjs';
+
+const fixture = (name) =>
+  JSON.parse(readFileSync(new URL(`../fixtures/marketplaces/${name}`, import.meta.url), 'utf8'));
+const task = (source, extra = {}) => ({
+  source,
+  host: ANTIQUARIAN_SOURCES[source].host,
+  mode: 'category',
+  categoryUrl: ANTIQUARIAN_SOURCES[source].categories[0],
+  page: 1,
+  language: 'pl',
+  paginationVersion: 1,
+  ...extra,
+});
+
+test('Conroy: ISBN, publisher, condition and description come from the list itself', () => {
+  const { html } = fixture('conroy-category-captured.json');
+  const [first] = parseMarketplace(html, task('Antykwariat Conroy'));
+  assert.equal(first.title, 'Daniel Abraham "Smocza Droga"');
+  assert.equal(first.isbn, '978-83-932319-9-7');
+  assert.equal(first.publisher, 'Ars Machina');
+  assert.equal(first.conditionClass, 'good');
+  assert.match(first.conditionText, /^dobry; wady: lekko podniszczona/);
+  assert.match(first.listingDescription, /Rok wydania: 2012/);
+  assert.equal(first.price, 1000);
+});
+
+test('a category page keeps every book: phrases are matched later, not by the parser', () => {
+  const { html } = fixture('szarlatan-category-captured.json');
+  const rows = parseMarketplace(html, task('Szarlatan.pl', { searchQuery: 'Warhammer' }));
+  assert.equal(rows.length, 3);
+  // The shop's catalogue number at the end of the title is dropped.
+  assert.equal(rows[0].title, 'Adamiak Stanisław ks. Teologia Tolkiena');
+});
+
+test('Stara Dobra Książka: a sold copy stays on the list but is not an offer', () => {
+  const { html } = fixture('stara-dobra-ksiazka-category-captured.json');
+  assert.match(html, /Egzemplarz sprzedany/);
+  const urls = parseMarketplace(html, task('Stara Dobra Książka')).map((row) => row.url);
+  assert.ok(urls.every((url) => !/mechanizm-serca/.test(url)));
+});
+
+test('pager: next page found per shop; NWS follows the link it prints', () => {
+  const expected = {
+    'BlackBooks.pl': ['blackbooks-category-captured.json', null],
+    'Antykwariat Conroy': [
+      'conroy-category-captured.json',
+      'https://www.antykwariat-conroy.pl/fantastyka-c-7.html?page=2',
+    ],
+    'Szarlatan.pl': [
+      'szarlatan-category-captured.json',
+      'https://szarlatan.pl/kategoria-produktu/ksiazki-wspolczesne/fantastyka/page/2/',
+    ],
+    'Stara Dobra Książka': [
+      'stara-dobra-ksiazka-category-captured.json',
+      'https://staradobraksiazka.pl/1100-fantasy-science-fiction-horror,1.html',
+    ],
+    'Antykwariat NWS': [
+      'antykwariat-nws-category-captured.json',
+      'https://www.antykwariatnws.pl/antykwariat-27---1-Fantasy.html',
+    ],
+  };
+  for (const [source, [file, next]] of Object.entries(expected)) {
+    const { html, categoryUrl } = fixture(file);
+    const info = categoryPageInfo(html, task(source, { categoryUrl }), []);
+    // The BlackBooks capture is from its fantasy subcategory, outside the configured parent.
+    if (!next) continue;
+    assert.equal(info.state, 'more', source);
+    assert.equal(info.nextPage, 2, source);
+    assert.equal(info.nextUrl, next, source);
+  }
+  // Page 2 of NWS is read only at the address the first page linked.
+  const second = task('Antykwariat NWS', {
+    page: 2,
+    pageUrl: 'https://www.antykwariatnws.pl/antykwariat-27---1-Fantasy.html',
+  });
+  assert.equal(categoryPageUrl(second), second.pageUrl);
+  assert.throws(
+    () => categoryPageUrl({ ...second, pageUrl: 'https://www.antykwariatnws.pl/koszyk.html' }),
+    /INVALID_MARKETPLACE_PAGE/,
+  );
+  assert.throws(
+    () => categoryPageUrl(task('Szarlatan.pl', { categoryUrl: '/sklep/' })),
+    /UNTRUSTED_MARKETPLACE_TASK/,
+  );
+});
+
+test('the end of a category is concluded only from a pager or a short page', () => {
+  const source = 'Antykwariat Conroy';
+  const card = '<div class="item col-12"></div>';
+  const lastPage = `${card}<a href="https://www.antykwariat-conroy.pl/fantastyka-c-7.html?page=50">50</a>`;
+  assert.equal(categoryPageInfo(lastPage, task(source, { page: 51 }), []).state, 'end');
+  assert.equal(categoryPageInfo(card.repeat(3), task(source), []).state, 'end');
+  // A full first page without any pager: the pager changed, nothing may be marked gone.
+  assert.equal(categoryPageInfo(card.repeat(10), task(source), []).state, 'unknown');
+});
+
+test('ISO-8859-2 pages (Antykwariat NWS) are decoded by their charset', async () => {
+  const html = '<p>Wojny Świata Wynurzonego — Łódź</p>';
+  const bytes = new Uint8Array(
+    [...html].map((c) => ({ Ś: 0xa6, Ł: 0xa3, ź: 0xbc, '—': 0x2d })[c] ?? c.charCodeAt(0)),
+  );
+  const text = await readSourceHtml(
+    'https://www.antykwariatnws.pl/antykwariat-27---0-Fantasy.html',
+    {
+      source: 'Antykwariat NWS',
+      gate: createMarketplaceGate({ intervalMs: 0 }),
+      pause: async () => {},
+      fetcher: async () =>
+        new Response(bytes, { headers: { 'content-type': 'text/html; charset=latin2' } }),
+    },
+  );
+  assert.match(text, /Wojny Świata Wynurzonego - Łódź/);
+});
+
+const page = (titles, next = '') =>
+  titles
+    .map(
+      (title, i) =>
+        `<div class="item col-12"><a href="https://www.antykwariat-conroy.pl/x-p-${title.length}${i}.html"></a><p class="aboutProduct">${title}.<br>Stan: dobry.</p><span class="value"> 12,00 zł</span></div>`,
+    )
+    .join('') + next;
+
+test('a category is read once per scan and its books are matched to each phrase', async () => {
+  const requests = [];
+  const scanner = (current, options) =>
+    scanMarketplace(current, {
+      ...options,
+      gate: createMarketplaceGate({ intervalMs: 0 }),
+      pause: async () => {},
+      fetcher: async (url) => {
+        requests.push(String(url));
+        const html = String(url).includes('page=2')
+          ? page(['Terry Pratchett "Kolor magii"'], '<a href="/fantastyka-c-7.html?page=1">1</a>')
+          : page(
+              ['Dan Abnett "Duchy Gaunta"', 'Andrzej Sapkowski "Krew elfów"'],
+              '<a href="/fantastyka-c-7.html?page=2">2</a>',
+            );
+        return new Response(html, { headers: { 'content-type': 'text/html' } });
+      },
+    });
+  const events = [];
+  const result = await searchOffers(
+    {
+      queries: ['Terry Pratchett', 'Dan Abnett', 'Herezja Horusa'],
+      sources: ['Antykwariat Conroy'],
+    },
+    {
+      scanner,
+      onProgress: (event) => events.push(event),
+      freshTasks: new Set([JSON.stringify(['Antykwariat Conroy', 'Herezja Horusa'])]),
+    },
+  );
+  assert.equal(requests.length, 2, 'two pages, not two pages per phrase');
+  const byQuery = Object.fromEntries(result.results.map((row) => [row.query, row]));
+  assert.equal(byQuery['Terry Pratchett'].count, 1);
+  assert.equal(byQuery['Dan Abnett'].count, 1);
+  assert.equal(byQuery['Terry Pratchett'].status, 'ok');
+  assert.equal(byQuery['Terry Pratchett'].pagination.state, 'end');
+  // Read in the last hours: not asked again, reported done.
+  assert.equal(byQuery['Herezja Horusa'], undefined);
+  assert.ok(
+    events.some(
+      (e) => e.type === 'source-done' && e.query === 'Herezja Horusa' && e.status === 'fresh',
+    ),
+  );
+  // Sapkowski is named by no phrase.
+  assert.equal(result.summary.rejected.topic, 1);
+  assert.equal(offerKind({ source: 'Antykwariat Conroy' }), 'antiquarian');
+  assert.equal(
+    sourceOfferId(
+      'Antykwariat Conroy',
+      'https://www.antykwariat-conroy.pl/kolor-magii-p-17880.html',
+    ),
+    'Antykwariat Conroy:17880',
+  );
+});
+
+test('only complete category reads of recent scans count as fresh', () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  const save = (at, results) =>
+    repository.database
+      .prepare('INSERT INTO scan_runs(scanned_at,summary_json,created_at) VALUES(?,?,?)')
+      .run(at, JSON.stringify({ at, context: { results } }), at);
+  const ok = (source, query) => ({ source, query, status: 'ok', pagination: { state: 'end' } });
+  save('2026-11-14T08:00:00.000Z', [
+    ok('Antykwariat Conroy', 'Warhammer'),
+    { ...ok('Szarlatan.pl', 'Warhammer'), pagination: { state: 'partial' } },
+    ok('Vinted', 'Warhammer'),
+  ]);
+  save('2026-11-12T08:00:00.000Z', [ok('Antykwariat NWS', 'Warhammer')]);
+  const fresh = freshCategoryTasks(repository, new Date('2026-11-14T20:00:00.000Z'));
+  assert.deepEqual([...fresh], [JSON.stringify(['Antykwariat Conroy', 'Warhammer'])]);
+});

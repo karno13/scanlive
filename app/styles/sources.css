@@ -625,6 +625,19 @@ input:focus {
 [data-source='Dedalus.pl'].source-chip::before {
   background: var(--src-dedalus);
 }
+/* Antiquarian bookshops read by category share one colour. */
+[data-source='BlackBooks.pl'].source-dot,
+[data-source='BlackBooks.pl'].source-chip::before,
+[data-source='Antykwariat Conroy'].source-dot,
+[data-source='Antykwariat Conroy'].source-chip::before,
+[data-source='Szarlatan.pl'].source-dot,
+[data-source='Szarlatan.pl'].source-chip::before,
+[data-source='Stara Dobra Książka'].source-dot,
+[data-source='Stara Dobra Książka'].source-chip::before,
+[data-source='Antykwariat NWS'].source-dot,
+[data-source='Antykwariat NWS'].source-chip::before {
+  background: var(--src-antiquarian);
+}
 .mini-bar {
   display: block;
   height: 4px;

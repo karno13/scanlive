@@ -20,6 +20,11 @@ const hosts = {
   Empik: 'www.empik.com',
   'Tezeusz.pl': 'tezeusz.pl',
   'Dedalus.pl': 'dedalus.pl',
+  'BlackBooks.pl': 'blackbooks.pl',
+  'Antykwariat Conroy': 'www.antykwariat-conroy.pl',
+  'Szarlatan.pl': 'szarlatan.pl',
+  'Stara Dobra Książka': 'staradobraksiazka.pl',
+  'Antykwariat NWS': 'www.antykwariatnws.pl',
 };
 for (const filename of files) {
   test('marketplace fixture: ' + filename, () => {
@@ -45,6 +50,10 @@ for (const filename of files) {
       title: fixture.searchQuery,
       searchQuery: fixture.searchQuery,
       category: fixture.category || fixture.searchQuery,
+      // Antiquarian bookshops: one category page, every book kept (phrases are matched later).
+      ...(fixture.categoryUrl
+        ? { mode: 'category', categoryUrl: fixture.categoryUrl, page: 1 }
+        : {}),
     };
     const rows = parseMarketplace(fixture.html, task, '2026-10-31T18:00:00.000Z');
     assert.deepEqual(

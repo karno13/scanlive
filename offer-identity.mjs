@@ -24,6 +24,11 @@ const allowedMarketplaces = new Map([
   ['Empik', ['empik.com']],
   ['Tezeusz.pl', ['tezeusz.pl']],
   ['Dedalus.pl', ['dedalus.pl']],
+  ['BlackBooks.pl', ['blackbooks.pl']],
+  ['Antykwariat Conroy', ['antykwariat-conroy.pl']],
+  ['Szarlatan.pl', ['szarlatan.pl']],
+  ['Stara Dobra Książka', ['staradobraksiazka.pl']],
+  ['Antykwariat NWS', ['antykwariatnws.pl']],
 ]);
 export function trustedOfferUrl(source, raw) {
   const normalized = normalizeOfferUrl(raw);
@@ -69,6 +74,7 @@ export function sourceOfferId(source, rawUrl, explicitExternalId = null) {
     else if (source === 'Empik') external = path.match(/,p(\d+),ksiazka-p$/i)?.[1] || null;
     else if (source === 'Allegro') external = path.match(/-(\d+)$/)?.[1] || null;
     else if (source === 'OLX') external = path.match(/-ID([\w]+)\.html$/i)?.[1] || null;
+    else if (source === 'Antykwariat Conroy') external = path.match(/-p-(\d+)\.html$/)?.[1] || null;
   }
   return `${source}:${external || url}`;
 }

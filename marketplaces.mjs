@@ -12,6 +12,14 @@ import {
   rscText,
   objectAt,
 } from './reference-parsers.mjs';
+import { attribute, decodeHtml, textOnly } from './html-text.mjs';
+import {
+  ANTIQUARIAN_SOURCES,
+  categoryPageInfo,
+  categoryPageUrl,
+  isCategorySource,
+  parseCategoryPage,
+} from './antiquarian-sources.mjs';
 const sources = {
   Allegro: { host: 'allegro.pl', path: '/oferta/' },
   Empik: { host: 'www.empik.com', path: null },
@@ -20,6 +28,13 @@ const sources = {
   OLX: { host: 'www.olx.pl', path: '/d/oferta/' },
   'Tezeusz.pl': { host: 'tezeusz.pl', path: null },
   'Dedalus.pl': { host: 'dedalus.pl', path: null },
+  // Antiquarian bookshops read by category (antiquarian-sources.mjs).
+  ...Object.fromEntries(
+    Object.entries(ANTIQUARIAN_SOURCES).map(([name, spec]) => [
+      name,
+      { host: spec.host, path: null },
+    ]),
+  ),
   // Not a marketplace: book pages read to confirm ISBNs no bibliographic source knows.
   'lubimyczytac.pl': { host: 'lubimyczytac.pl', path: '/ksiazka/' },
 };
@@ -51,6 +66,8 @@ export function isPolishBook(title, metadata) {
 export function rejectionReason(task, title, metadata) {
   if (task.language === 'pl' && !isPolishBook(title, metadata)) return 'language';
   if (excludesProduct(title)) return 'product';
+  // A category read keeps every book: the scan matches the phrases afterwards (readCategorySource).
+  if (task.mode === 'category') return null;
   // Empik searches series and descriptions inside its book category: a Black Library novel
   // ("Kosmiczny Wilk. Tom 1") found for "warhammer" rarely names the universe in its title.
   // Its own fantasy / SF genre is trusted; other genres must still name the topic.
@@ -86,6 +103,10 @@ export const NEWEST_ORDER_SOURCES = new Set(['Vinted']);
 export function searchUrl(task) {
   if (!sources[task.source] || task.host !== sources[task.source].host)
     throw Error('UNTRUSTED_MARKETPLACE_TASK');
+  if (isCategorySource(task.source)) {
+    if (task.mode !== 'category') throw Error('CATEGORY_SOURCE_NEEDS_CATEGORY');
+    return categoryPageUrl(task);
+  }
   const query = queryText(task);
   if (task.source === 'Vinted') {
     const u = new URL('https://www.vinted.pl/catalog/2312-books');
@@ -160,6 +181,14 @@ export function sourceChallenge(html) {
   );
 }
 async function readBody(response, limit = 4000000) {
+  // Antykwariat NWS answers in ISO-8859-2 ("charset=latin2"); the rest in UTF-8.
+  const charset = /charset=["']?([\w-]+)/i.exec(response.headers?.get?.('content-type') || '')?.[1];
+  let decoder;
+  try {
+    decoder = new TextDecoder(charset || 'utf-8');
+  } catch {
+    decoder = new TextDecoder();
+  }
   if (!response.body) return '';
   const reader = response.body.getReader(),
     chunks = [];
@@ -181,7 +210,7 @@ async function readBody(response, limit = 4000000) {
     buffer.set(chunk, offset);
     offset += chunk.length;
   }
-  return new TextDecoder().decode(buffer);
+  return decoder.decode(buffer);
 }
 export async function readSourceHtml(
   raw,
@@ -318,6 +347,7 @@ export function parseMarketplace(
     else if (task.source === 'Allegro Lokalnie') rows = parseAllegroListing(html, book, observedAt);
     else if (['Tezeusz.pl', 'Dedalus.pl', 'Allegro', 'Empik'].includes(task.source))
       rows = parseBookstore(html, book, task.source);
+    else if (isCategorySource(task.source)) rows = parseCategoryPage(html, task.source, book);
     else {
       let recognized = false;
       for (const m of html.matchAll(
@@ -370,6 +400,12 @@ export function parseMarketplace(
       ...bibliographicMetadata(row),
       ...observationFields({ ...row, buyerFee }),
       ...(row.raw && typeof row.raw === 'object' ? { rawListing: row.raw } : {}),
+      ...(typeof row.listingDescription === 'string' && row.listingDescription
+        ? { listingDescription: row.listingDescription.slice(0, 8000) }
+        : {}),
+      ...(typeof row.externalOfferId === 'string' && /^\d{1,20}$/.test(row.externalOfferId)
+        ? { externalOfferId: row.externalOfferId }
+        : {}),
       title: row.title.slice(0, 500),
       url: u.href,
       price,
@@ -383,35 +419,6 @@ export function parseMarketplace(
     if (out.length === limit) break;
   }
   return out;
-}
-function decodeHtml(s) {
-  return String(s || '')
-    .replace(/&nbsp;|&#160;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Math.min(Number(n), 0x10ffff)))
-    .replace(/&#x([\da-f]+);/gi, (_, n) =>
-      String.fromCodePoint(Math.min(parseInt(n, 16), 0x10ffff)),
-    );
-}
-function textOnly(s) {
-  return decodeHtml(
-    String(s || '')
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<[^>]+>/g, ' '),
-  )
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-function attribute(attrs, name) {
-  const match = String(attrs).match(
-    new RegExp('\\b' + name + '\\s*=\\s*(?:"([^"]*)"|\\\'([^\\\']*)\\\')', 'i'),
-  );
-  return decodeHtml(match?.[1] ?? match?.[2] ?? '');
 }
 function parseEmpikCards(html, add) {
   const starts = [...html.matchAll(/<div\b([^>]*)>/gi)].filter((match) => {
@@ -754,6 +761,7 @@ export function vintedPageInfo(html, task) {
 }
 export function marketplacePageInfo(html, task, offers) {
   if (task.source === 'Vinted') return vintedPageInfo(html, task);
+  if (isCategorySource(task.source)) return categoryPageInfo(html, task, offers);
   const current = new URL(searchUrl(task)),
     page = task.page || 1;
   const digest = createHash('sha256')

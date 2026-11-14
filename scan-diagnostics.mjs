@@ -72,7 +72,7 @@ export function addScanEvent(diagnostics, event) {
       const observed = Math.max(0, Number(offers) || 0);
       row.offers += observed;
       diagnostics.offersSeen += observed;
-      row.status = status === 'ok' ? 'completed' : 'partial';
+      row.status = status === 'ok' || status === 'fresh' ? 'completed' : 'partial';
     }
   }
   const selected = [

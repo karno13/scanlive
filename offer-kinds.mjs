@@ -13,7 +13,17 @@ export const OFFER_KIND_LABELS = {
 // Order matters: the first matching rule wins. `seller` is matched against the shop's name (Empik
 // Marketplace sellers such as "Antykwariat i Księgarnia Tezeusz").
 const RULES = [
-  { sources: ['Tezeusz.pl'], kind: 'antiquarian' },
+  {
+    sources: [
+      'Tezeusz.pl',
+      'BlackBooks.pl',
+      'Antykwariat Conroy',
+      'Szarlatan.pl',
+      'Stara Dobra Książka',
+      'Antykwariat NWS',
+    ],
+    kind: 'antiquarian',
+  },
   { sources: ['Empik'], seller: 'antykw', kind: 'antiquarian' },
   { sources: ['Empik', 'Dedalus.pl'], kind: 'new_shop' },
   { sources: ['Vinted', 'OLX', 'Allegro Lokalnie', 'Allegro'], kind: 'private' },

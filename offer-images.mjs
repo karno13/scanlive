@@ -13,6 +13,12 @@ const IMAGE_HOSTS = [
   /^static\d*\.tezeusz\.pl$/,
   /^tezeusz\.pl$/,
   /^dedalus\.pl$/,
+  // Antiquarian bookshops (antiquarian-sources.mjs); Stara Dobra Książka serves photos from RedCart.
+  /^blackbooks\.pl$/,
+  /^www\.antykwariat-conroy\.pl$/,
+  /^szarlatan\.pl$/,
+  /^static\d*\.redcart\.pl$/,
+  /^www\.antykwariatnws\.pl$/,
   /^covers\.openlibrary\.org$/,
 ];
 const MAX_BYTES = 4 * 1024 * 1024;

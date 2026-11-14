@@ -15,6 +15,8 @@
   },
   "files": [
     "offer-ingest.mjs",
+    "antiquarian-sources.mjs",
+    "html-text.mjs",
     "offer-observations.mjs",
     "sqlite-catalog-repository.mjs",
     "offer-identity.mjs",

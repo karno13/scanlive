@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import { scanMarketplace } from './marketplaces.mjs';
+import { ANTIQUARIAN_SOURCES } from './antiquarian-sources.mjs';
 
 export const localSourceHosts = {
   Allegro: 'allegro.pl',
@@ -9,6 +10,9 @@ export const localSourceHosts = {
   OLX: 'www.olx.pl',
   'Tezeusz.pl': 'tezeusz.pl',
   'Dedalus.pl': 'dedalus.pl',
+  ...Object.fromEntries(
+    Object.entries(ANTIQUARIAN_SOURCES).map(([name, spec]) => [name, spec.host]),
+  ),
 };
 const sourceHosts = localSourceHosts;
 const sourceNames = new Map(Object.keys(sourceHosts).map((name) => [name.toLowerCase(), name]));
@@ -55,6 +59,10 @@ export async function runLocalScan(
       searchQuery: config.query,
       page: config.page,
       paginationVersion: 1,
+      // Antiquarian bookshops are read by category: the first category page, not a search.
+      ...(ANTIQUARIAN_SOURCES[source]
+        ? { mode: 'category', categoryUrl: ANTIQUARIAN_SOURCES[source].categories[0] }
+        : {}),
     };
     try {
       const result = await scanner(task);
