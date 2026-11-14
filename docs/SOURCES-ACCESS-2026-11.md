@@ -56,3 +56,38 @@ Na kopii danych Dedalus działał 11.11 o 08:24, a o 10:12 zaczął przekierowyw
 - **Czego nie robimy:** nie omijamy CAPTCHA (żadnych zmian nagłówków podszywających się pod przeglądarkę, rotacji adresów ani rozwiązywania zadań). Zmiana nagłówków pod kątem „wyglądania jak człowiek” byłaby właśnie obejściem.
 - **Co zrobiliśmy legalnie:** bazowy odstęp między zapytaniami do Dedalusa wynosi 6 s zamiast 2 s (`SOURCE_INTERVAL_MS`); po blokadzie bramka dalej podwaja odstęp (do 30 s), a skan odpuszcza resztę fraz tego źródła. Dedalus nie bierze udziału w sprawdzaniu dostępności stron ofert (`LIFECYCLE_SOURCES`); jego dostępność wynika z kodu `InStock` na liście wyników.
 - **Co zostaje:** źródło pozostaje w stanie „nie działa (CAPTCHA)” z datą, a skan próbuje je raz na skan i sam wraca, jeśli serwis przestanie blokować. Ma tylko 4 oferty w bazie; nie warto ryzykować więcej. Jeśli Dedalus udostępnia kanał dla partnerów (np. feed produktów), to kontakt z nim jest decyzją właściciela.
+
+## Nowe źródła i robots.txt obecnych — rozpoznanie (14.11.2026)
+
+Tylko rozpoznanie: żadne źródło nie zostało dodane ani wyłączone. Odczytane zostały pliki `robots.txt` (po jednym zapytaniu) i strona główna albo jedna odpowiedź API kandydata. **Regulaminów serwisów nie czytałem** — przed dodaniem źródła trzeba to zrobić, tak jak dla Allegro i OLX.
+
+### Obecne źródła a ich robots.txt (grupa `User-agent: *`)
+
+| Źródło           | Adres używany przez skan                      | robots.txt                                                                                                                                                      |
+| ---------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vinted           | `/catalog?search_text=…`, `/items/…`          | dozwolone (`Allow: /`; zakazane m.in. `/member/`, `/inbox`, `/checkout`)                                                                                        |
+| Empik            | `/ksiazki,31,s?q=…&start=…`, strony produktów | dozwolone (zakazane są adresy wyszukiwania z co najmniej trzema `&` i parametry typu `sort=`, `brand=`, `id=`)                                                  |
+| Allegro Lokalnie | `/oferty/q/…`, `/oferta/…`                    | dozwolone (zakazane tylko `/oferty/wystaw/*`); mimo to serwis odpowiada CAPTCHA                                                                                 |
+| **Tezeusz.pl**   | `/szukaj?szukaj=…`                            | **zakazane: `Disallow: /szukaj?`**; strony produktów, autorów (`/autor/…`) i wydawnictw są dozwolone; mapa strony: `feed.tezeusz.pl/sitemaps/sitemap_index.xml` |
+| **Dedalus.pl**   | `/s?q=…`                                      | **zakazane: `Disallow: /s?q=`** (i wzorzec `*?q=*`); serwis i tak odpowiada CAPTCHA                                                                             |
+
+Wniosek do decyzji właściciela: wyszukiwarki Tezeusza i Dedalusa są wyłączone z automatycznego odczytu przez same serwisy. `robots.txt` nie jest blokadą techniczną, ale jest wyraźnie wyrażoną wolą serwisu — spójnie z zasadą „nie obchodzimy blokad” należałoby:
+
+- Dedalus (4 oferty w bazie, CAPTCHA od 11.11): przenieść do „brak legalnego dostępu”, jak Allegro i OLX;
+- Tezeusz (122 oferty): zastąpić wyszukiwarkę dozwolonym adresem — stroną autora (`/autor/terry-pratchett`) albo stroną produktu dla ISBN znanego z katalogu — albo również wyłączyć.
+
+Do czasu decyzji nic się nie zmienia; nowych funkcji na wyszukiwarce Tezeusza (np. skan po ISBN) nie budujemy.
+
+### Kandydaci
+
+| Serwis          | Co to jest                                                                                       | robots.txt                                                                                                                                                            | Ocena                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Skupszop.pl** | sklep z używanymi i nowymi książkami tej samej firmy co skupksiazek.pl (z którego są ceny skupu) | wyszukiwarka stron (`/wyszukiwarka`, `/wyszukaj`), sortowanie i stronicowanie zakazane; **`Allow: /api/search/listing*`** — API listy produktów jest wprost dozwolone | **najlepszy kandydat**                                  |
+| TakCzytam       | sieć księgarni; sklep internetowy jest pod `takczytam.com` (platforma Redcart)                   | `takczytam.pl`: zakazane tylko `/wp-admin/`; `takczytam.com` niesprawdzony                                                                                            | do sprawdzenia: czy sklep sprzedaje używane egzemplarze |
+| Sprzedajemy.pl  | ogłoszenia                                                                                       | zakazane m.in. `/Zapytanie`, `/Raport`, dane i wydruk oferty; lista nazwanych botów i narzędzi ma `Disallow: /`                                                       | wątpliwy: zapytania po frazie są zakazane               |
+| Bonito.pl       | księgarnia (nowe, tanie)                                                                         | zakazane tylko `/zamowienie/`, `/proforma/`, `/d/`; lista narzędzi (`wget`, `libwww`, `Go-http-client`…) ma `Disallow: /`                                             | możliwa druga cena nowej książki obok Empiku            |
+| TaniaKsiazka.pl | księgarnia (nowe)                                                                                | wyszukiwarka zakazana                                                                                                                                                 | tylko strony produktów; mała wartość                    |
+
+**Skupszop — co zwraca `GET https://skupszop.pl/api/search/listing`** (jedna odpowiedź, 30 pozycji na stronę, lista stron w `data.pages`): dla każdej książki `isbn`, `name`, `author_raw`, `publisher.name`, `release_date`, `binding`, `price`, `price_regular`, `condition` (`nowa`, `jak nowa`, `dobry`, `widoczne ślady używania`), `is_available`, `on_stock`, `quantity_total`, `url`, `cover` oraz `variants` — osobna cena i liczba sztuk dla każdego stanu. Liczniki z odpowiedzi: 125 443 nowych i 200 678 używanych pozycji. To są dokładnie dane, których brakuje pozostałym źródłom: ISBN przy każdej ofercie (identyfikacja bez kolejki decyzji) i cena zależna od stanu.
+
+Czego nie ustaliłem: **jak przekazać frazę albo ISBN** (zwykłe `?query=`, `?q=`, `?search=`, `?phrase=`, `?keyword=` nie filtrują wyników; filtr nazywa się `keyword`, ale jego zapis w adresie jest inny). Dalsze zgadywanie parametrów cudzego API przerwałem. Następny krok, jeśli właściciel chce to źródło: otworzyć sklep w przeglądarce, wyszukać frazę i odczytać adres zapytania do `/api/search/listing` z narzędzi deweloperskich (jedno kliknięcie), przeczytać regulamin sklepu, a potem dodać adapter według przepisu „Source” z `CLAUDE.md` (zapytania przez bramkę, zapisana odpowiedź w `fixtures/marketplaces/`).

@@ -2,6 +2,14 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (65) — Rozpoznanie nowych źródeł i robots.txt obecnych
+
+Bez zmian w aplikacji; wynik jest w `docs/SOURCES-ACCESS-2026-11.md` (sekcja z 14.11).
+
+- **Skupszop.pl** to najlepszy kandydat na nowe źródło używanych książek: jego `robots.txt` wprost dopuszcza API listy produktów, a odpowiedź ma ISBN, stan egzemplarza, cenę dla każdego stanu i dostępność (200 678 używanych pozycji). Nie ustaliłem jeszcze zapisu frazy w adresie zapytania i nie czytałem regulaminu — dlatego źródło nie jest dodane.
+- **Do decyzji:** `robots.txt` Tezeusza zakazuje adresu wyszukiwarki, z którego korzysta skan (`/szukaj?`), a Dedalusa — `/s?q=`. Vinted, Empik i Allegro Lokalnie dopuszczają używane adresy. Propozycja w dokumencie: Dedalus do „brak legalnego dostępu”, Tezeusz przez strony autorów albo produktów.
+- Sprzedajemy.pl (zapytania zakazane), TaniaKsiazka (wyszukiwarka zakazana), Bonito i TakCzytam — ocena w tabeli.
+
 ## 2026-11-14 (64) — Allegro Lokalnie: mniej stron ofert naraz
 
 Allegro Lokalnie odpowiedziało CAPTCHA po 13 stronach ofert czytanych z rzędu (12.11), a 14.11 odmówiło także skanu; to źródło daje 62 z 82 decyzji w kolejce, więc blokada kosztuje najwięcej.
