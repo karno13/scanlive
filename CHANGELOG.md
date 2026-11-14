@@ -2,6 +2,17 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (59) — Style: plik na obszar, każdy selektor w jednym miejscu
+
+Bez zmian w wyglądzie i działaniu. Style obliczone każdego elementu (także `::before`, `::after`, `::marker`, `::placeholder`, `::backdrop`) w 976 stanach — 61 widoków i stanów (okna, paleta poleceń, tryb skupienia, siatka wsadowa, „Odrzuć z regułą…”, puste listy, najechanie i fokus) × 390/1100/1440/1920 px × motyw jasny i ciemny × tryb handlu — są takie same przed i po każdym kroku (`node scripts/css-snapshot.mjs <port> <katalog> --verify`).
+
+- **Pliki:** zamiast `app/app.css` (216 800 B, jedna linia do 3568 znaków) 12 plików w `app/styles/` dołączanych z `index.html` w stałej kolejności: tokeny i motywy, baza, powłoka, komponenty, Dziś, Kolejka, Książki, Oferty, Zestawy, Źródła, Ustawienia, tryb handlu. Razem 230 057 B po sformatowaniu Prettierem (najdłuższa linia 249 znaków); przesyłane z gzip: 42,4 KB → 49,0 KB.
+- **Reguły:** 2164 → 1826. **Selektory zdefiniowane w więcej niż jednej regule tego samego kontekstu** (`@media`): 283 → 14; licząc z wariantami `@media`: 445 → 239. **`!important`:** 39 → 40 — 6 zbędnych usuniętych, ale kilka list selektorów rozdzielonych między pliki powiela swoje deklaracje.
+- **Usunięte 199 selektorów**, które nie mogą niczego dopasować: wymagają klasy lub id, których nie ma w żadnym pliku aplikacji ani serwera (i żaden z 976 stanów ich nie pokazał).
+- **Kolejność kaskady** jest kolejnością plików. 300 fragmentów reguł (16%) stoi w pliku późniejszego obszaru pod notatką „Z obszaru …”, bo muszą przyjść po tamtejszych regułach; 201 z 479 wariantów `@media` stoi zaraz za swoim komponentem (pozostałe przesunięte zmieniłyby wygląd).
+- **Start aplikacji:** 68 zapytań zamiast 57 (11 arkuszy więcej, 58 statycznych zamiast 47; 228 KB zamiast 221 KB). Zwykłe przeładowanie: 71 zamiast 60, wszystkie arkusze odpowiadają 304 (10,7 KB).
+- **Testy** nie czytają już tekstu CSS: zasady (kolory tylko jako zmienne, motyw ciemny zmienia tylko wartości, ukryte widoki, `[hidden]`, bezpieczny obszar paska na telefonie) sprawdzają sparsowane reguły wszystkich arkuszy (`app-styles.mjs`); zachowanie — `scripts/browser-smoke.mjs` (pola 16 px / 44 px na telefonie, cele 44 px i widoczny fokus w szczegółach oferty, ukryte przyciski weryfikacji, brak animacji przy ograniczeniu ruchu). Usunięte asercje, które sprawdzały tylko obecność napisu w `app.css`.
+
 ## 2026-11-12 (58) — Porządki w dokumentacji i jedno polecenie kontroli
 
 Bez zmian w działaniu aplikacji.

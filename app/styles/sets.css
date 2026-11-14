@@ -1,0 +1,540 @@
+/* Zestawy. */
+.sets-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 36fr) minmax(0, 64fr);
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .sets-workspace {
+    display: block;
+  }
+}
+@media (min-width: 901px) {
+  .sets-workspace {
+    gap: 20px;
+  }
+}
+.sets-list {
+  display: grid;
+  margin-top: 8px;
+}
+.sets-main {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+@media (min-width: 901px) {
+  .sets-main {
+    position: sticky;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 12px;
+    top: 90px;
+    max-height: calc(100vh - 106px);
+  }
+}
+@media (max-width: 900px) {
+  .sets-main {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .sets-main {
+    display: none;
+  }
+}
+.sets-empty,
+.sets-results > p {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 12px 0;
+}
+.sets-search-bar {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 600px) {
+  .sets-search-bar {
+    flex-wrap: wrap;
+  }
+}
+.sets-search-bar .field {
+  flex: 1;
+}
+@media (max-width: 600px) {
+  .sets-search-bar .field {
+    flex-basis: 100%;
+  }
+}
+.sets-new .field {
+  margin-bottom: 10px;
+}
+.sets-new .button {
+  margin-bottom: 8px;
+}
+.sets-results {
+  margin-top: 12px;
+}
+.set-costs > h4 {
+  display: none;
+}
+.set-costs h4,
+.set-costs p,
+.set-costs output,
+.set-costs > button {
+  grid-column: 1/-1;
+}
+.set-unknown-form {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 70px;
+}
+@media (max-width: 600px) {
+  .set-unknown-form {
+    grid-template-columns: minmax(0, 1fr) 64px;
+  }
+}
+.set-cost-disclosure {
+  border-top: 1px solid var(--line);
+}
+.set-cost-disclosure > summary {
+  color: var(--green);
+}
+.set-unknown-form button {
+  grid-column: 1/-1;
+}
+@media (min-width: 901px) {
+  .sets-main > .panel {
+    padding: 20px;
+  }
+}
+@media (max-width: 900px) {
+  .detail-is-open .sets-sidebar {
+    display: none;
+  }
+  .detail-is-open .sets-main {
+    display: block;
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+@media (min-width: 901px) {
+  .catalog-row .status-pill {
+    font-size: 9px;
+    padding: 3px 5px;
+    border-radius: 4px;
+    white-space: normal;
+    text-align: right;
+  }
+  .catalog-detail .edition-price-summary {
+    padding: 18px 20px;
+    background: var(--tile);
+    border: 1px solid var(--tile-line);
+    border-radius: 8px;
+    gap: 16px;
+  }
+  .sets-sidebar {
+    border-radius: 10px;
+  }
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.detail-panel {
+  padding: 20px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+@media (max-width: 600px) {
+  .detail-panel {
+    padding: 16px;
+  }
+}
+.sets-sidebar {
+  padding: 14px;
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.rv-head.lean-review-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: nowrap;
+}
+@media (max-width: 900px) {
+  .rv-head.lean-review-header {
+    padding: 14px 16px;
+    flex-wrap: wrap;
+  }
+}
+@container review (max-width: 560px) {
+  .rv-head.lean-review-header {
+    flex-wrap: wrap;
+  }
+}
+.rv-actions.lean-review-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding: 12px 22px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-up-soft);
+}
+@media (max-width: 900px) {
+  .rv-actions.lean-review-footer {
+    bottom: 64px;
+    padding: 10px 16px;
+  }
+}
+@container review (max-width: 820px) {
+  .rv-body.lean-review-body {
+    grid-template-columns: minmax(120px, 170px) minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px 18px;
+  }
+}
+@container review (max-width: 560px) {
+  .rv-body.lean-review-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.insight-board .buyback-batch {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+/* Zestawy: układ jak w weryfikacji (lista ze zdjęciami, ogłoszenie, karty książek) */
+#view-sets .sets-sidebar {
+  padding: 0;
+}
+@media (min-width: 901px) {
+  #view-sets .sets-sidebar {
+    position: static;
+    height: 100%;
+    max-height: none;
+    overflow-y: auto;
+    min-height: 0;
+  }
+}
+#view-sets .sets-list {
+  display: block;
+  margin: 0;
+}
+#view-sets .sets-new {
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}
+#view-sets > .filterbar {
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#view-sets .rv-tabs {
+  margin: 0;
+}
+.sets-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+.sets-card.is-member {
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--line));
+}
+.sets-suggestions:empty,
+.sets-results:empty {
+  display: none;
+}
+.sets-search-panel {
+  margin: 4px 0 12px;
+}
+.sets-unknown {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+.sets-confirm {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 4px;
+}
+.sets-actions {
+  flex-wrap: wrap;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.catalog-duplicates[open] {
+  padding-bottom: 12px;
+}
+/* Sets: books from a pasted description or a range of volumes. */
+.sets-bulk-panel {
+  margin: 4px 0 12px;
+  border: 1px solid var(--card-line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--surface);
+}
+.sets-bulk-panel > summary {
+  cursor: pointer;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+}
+.sets-bulk-panel[open] {
+  padding-bottom: 12px;
+}
+.sets-bulk-actions {
+  margin: 8px 0;
+}
+.sets-range {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(70px, 1fr) minmax(70px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  margin-top: 12px;
+}
+@media (max-width: 600px) {
+  .sets-range {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+/* Katalog → Wydawcy i serie: universes as data (changelog 30) */
+.universes-list .universe-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 12px;
+  align-items: end;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+/* Weryfikacja: idle identification is one status line — title, state, a small restart button and
+   "Szczegóły"; opening the details puts the full panel under the line. */
+.identification-dashboard.is-idle {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 14px;
+  padding: 6px 14px;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.catalog-detail .series-editor,
+.catalog-detail .universe-editor {
+  padding: 6px 0;
+}
+/* UX review 3: full-width member rows and independent set panels. */
+#setDetail .rv-body {
+  display: block;
+  padding: 12px 16px;
+}
+#setDetail .rv-head {
+  gap: 12px;
+  padding: 12px 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  #setDetail .rv-head {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 4px 12px;
+  }
+}
+#setDetail #setPhoto {
+  width: 72px;
+  flex: 0 0 72px;
+  margin: 0;
+}
+#setPhoto > .cover,
+#setPhoto img {
+  height: auto;
+  min-height: 0;
+  max-height: 100px;
+  width: 100%;
+  object-fit: contain;
+}
+#setPhoto figcaption {
+  font-size: 12px;
+  margin-top: 4px;
+}
+#setPhoto figcaption a {
+  display: inline;
+}
+#setDetail .is-member .rv-cand-body {
+  min-width: 0;
+}
+#setDetail .is-member .rv-cand-body b {
+  font-size: 14px;
+  line-height: 1.3;
+}
+#setDetail .is-member .rv-cand-body > small {
+  display: inline;
+  margin-left: 6px;
+  font-size: 12.5px;
+}
+@media (max-width: 900px) {
+  #setDetail .is-member .rv-cand-body > small {
+    display: block;
+  }
+}
+#setDetail .sets-card-actions {
+  gap: 8px;
+}
+@media (max-width: 900px) {
+  #setDetail .sets-card-actions {
+    grid-column: 2;
+    flex-wrap: wrap;
+  }
+}
+@media (min-width: 901px) {
+  #view-sets .sets-workspace {
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+    overflow: hidden;
+    contain: layout paint;
+  }
+  #view-sets #setDetail {
+    display: block;
+    padding: 0;
+    position: static;
+    height: 100%;
+    max-height: none;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  #setDetail .rv-actions {
+    position: static;
+  }
+  #setDetail .sets-summary {
+    min-height: 0;
+  }
+  #setDetail #setPhoto figcaption {
+    display: none;
+  }
+}
+/* Z obszaru „Powłoka”, po regułach tego pliku (kaskada). */
+#mainContent > .view > .view-heading:not(:has(> button)) {
+  display: none;
+}
+#setOfferLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+/* UX review 7.3: phone set header — photo beside the title, one link to the listing, no pinned bar. */
+@media (max-width: 900px) {
+  #setDetail #setPhoto figcaption {
+    display: none;
+  }
+  #setDetail .rv-head-side {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  #setDetail .rv-actions {
+    position: static;
+    box-shadow: none;
+  }
+  #setDetail .rv-actions .lean-review-primary-actions {
+    position: static;
+    box-shadow: none;
+    display: flex;
+    flex-wrap: wrap;
+    padding: 0;
+    border: 0;
+  }
+  #setDetail .rv-actions a.button.primary {
+    display: none;
+  }
+}
+#setDetail .rv-head h3 {
+  font-family: var(--font-ui);
+  font-weight: 650;
+  letter-spacing: -0.2px;
+}
+@media (max-width: 900px) {
+  #mainContent :is(#setTabs, #reviewTabs) > button {
+    min-height: 44px;
+  }
+}
+/* Sets: "Nie interesuje mnie" next to each row, without opening it. */
+#setList .set-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+#setList .set-row > .review-item {
+  min-width: 0;
+}
+#setList .set-dismiss {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+#setList .set-row.is-dismissed .review-item {
+  opacity: 0.7;
+}
+/* Z obszaru „Powłoka”, po regułach tego pliku (kaskada). */
+/* Navigation: Dziś · Kolejka · Książki · Oferty · Źródła, Ustawienia at the bottom of the sidebar. */
+.sidebar .nav-secondary {
+  margin-top: auto;
+  padding-top: 12px;
+}
+@media (min-width: 901px) and (max-width: 1440px) {
+  .sidebar .brand {
+    justify-content: center;
+    padding: 0 0 12px;
+  }
+  .sidebar .sidebar-footer {
+    justify-content: center;
+    padding: 12px 0 0;
+  }
+}
+/* Kolejka on desktop: the three rows above the list stay under 170 px. */
+@media (min-width: 901px) {
+  :is(#view-review, #view-sets, #view-checks) {
+    padding-top: 12px;
+  }
+}

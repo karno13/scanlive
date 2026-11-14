@@ -4,7 +4,8 @@ coverage/
 fixtures/
 package-lock.json
 # Frontend scripts and HTML: tests read their exact text (source-shape checks), so they are not
-# reformatted. The stylesheets are formatted (tests parse them, see app-styles.mjs).
+# reformatted. The stylesheets (app/styles/*.css) are formatted: tests parse them (app-styles.mjs)
+# and scripts/css-snapshot.mjs --verify checks that a change keeps every computed style.
 app/**
 !app/**/
 !app/**/*.css

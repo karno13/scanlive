@@ -162,7 +162,7 @@ export function coverMarkup(src, label, { size = 'md', escapeHtml } = {}) {
     .map((word) => word[0].toLocaleUpperCase('pl'))
     .join('');
   const safe = escapeHtml || ((value) => String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`));
-  // CSP forbids inline style attributes; the hue is one of 12 classes defined in app.css.
+  // CSP forbids inline style attributes; the hue is one of 12 [data-hue] rules in styles/components.css.
   const hue = Math.floor(hueFor(text.split(/[.:]/)[0]) / 30);
   return `<span class="cover cover-${size}${src ? ' has-image' : ''}" data-hue="${hue}" aria-hidden="true"><span class="cover-fallback">${safe(initials || '•')}</span>${src ? `<img src="${safe(src)}" alt="" loading="lazy" decoding="async">` : ''}</span>`;
 }

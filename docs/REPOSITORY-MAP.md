@@ -144,7 +144,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | --- | --- |
 | `app/index.html` | Szkielet: sześć zakładek (Dziś, Kolejka, Książki, Oferty, Źródła, Ustawienia) |
 | `app/app.js` | Powłoka: zakładki, adres URL, łączenie widoków |
-| `app/app.css` | Style warstwowe; późniejsze reguły nadpisują wcześniejsze, tokeny motywów w „v5.1 Tokeny i motywy” |
+| `app/styles/*.css` | Style w 12 plikach dołączanych z `index.html` w stałej kolejności (= kolejność kaskady): `tokens` (kolory jako zmienne, motyw ciemny zmienia tylko wartości), `base`, `shell` (pasek boczny i górny, nawigacja mobilna), `components`, potem obszary `today`, `queue`, `catalog`, `offers`, `sets`, `sources`, `settings`, `trading`. Jedna reguła na selektor w danym kontekście; reguła, która musi przyjść po regule późniejszego pliku, stoi tam pod notatką „Z obszaru …” |
 | `app/frontend-utils.js` | Pomocnicze funkcje przeglądarki bez DOM |
 | `app/scan-stream.js` | Odczyt strumienia wyników skanu (NDJSON) |
 | `app/core/api.js` | Wspólne zapytanie HTTP JSON |

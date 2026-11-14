@@ -1,0 +1,935 @@
+/* Ustawienia. */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.settings-card p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.settings-list {
+  display: grid;
+  gap: 8px;
+}
+.settings-list > span {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.settings-list small {
+  color: var(--muted);
+}
+.diagnostic-panel {
+  margin-top: 16px;
+}
+.diagnostic-result {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.identification-more .settings-card {
+  margin: 8px 0;
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.toast {
+  background: var(--toast-bg);
+  color: var(--on-brand);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.loading-copy {
+  color: var(--muted);
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.verification-conflict {
+  padding: 10px;
+  border-left: 3px solid var(--conflict-line);
+  background: var(--note-warm);
+  color: var(--conflict-text);
+  font-size: 13px;
+}
+.verification-match {
+  padding: 10px;
+  border-left: 3px solid var(--green);
+  background: var(--green-soft);
+  font-size: 13px;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.edition-price-summary > span {
+  display: grid;
+  gap: 3px;
+  flex: 1 1 100px;
+}
+.cover-preview {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 44px;
+  flex: none;
+  overflow: hidden;
+}
+#dataSettings,
+#legacyImports {
+  padding: 18px;
+  margin-bottom: 16px;
+}
+/* Z obszaru „Zestawy”, po regułach tego pliku (kaskada). */
+.set-costs {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 14px 0;
+}
+@media (max-width: 600px) {
+  .set-costs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+#view-settings > .panel {
+  margin-bottom: 16px;
+}
+#view-settings > details.panel {
+  padding: 16px 18px;
+}
+#view-settings .panel h3 {
+  font-size: 16px;
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.comparison-candidate {
+  padding: 12px;
+  background: var(--tile);
+  border-radius: 8px;
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.verification-fact {
+  font-size: 12px;
+  padding: 8px 0;
+}
+/* Z obszaru „Powłoka”, po regułach tego pliku (kaskada). */
+@media (max-width: 900px) {
+  .view {
+    padding: 0 20px 28px;
+  }
+}
+@media (max-width: 600px) {
+  .view {
+    padding: 0 12px 24px;
+  }
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+@media (max-width: 600px) {
+  .panel {
+    padding: 14px;
+    border-radius: 10px;
+  }
+}
+/* Z obszaru „Oferty”, po regułach tego pliku (kaskada). */
+@media (max-width: 600px) {
+  .offers-panel {
+    padding: 0;
+  }
+}
+/* Z obszaru „Zestawy”, po regułach tego pliku (kaskada). */
+@media (max-width: 600px) {
+  .sets-main > .panel {
+    margin-bottom: 12px;
+  }
+}
+/* Z obszaru „Oferty”, po regułach tego pliku (kaskada). */
+.observation-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+}
+@media (min-width: 901px) {
+  .observation-row {
+    padding: 14px 4px;
+  }
+}
+.observation-row > span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.edition-history > .button {
+  margin: 10px 8px 0 0;
+  min-height: 44px;
+}
+.edition-history .inline-note {
+  padding: 0;
+  margin: 0;
+}
+@media (min-width: 901px) {
+  #view-catalog > .compact-filters {
+    flex: none;
+    margin: 0;
+    border: 0;
+  }
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.panel {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text);
+}
+.button {
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  transition:
+    background-color 0.15s,
+    transform 0.08s,
+    border-color 0.15s;
+}
+.success {
+  background: var(--good-soft);
+  color: var(--good);
+}
+.warning {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.error {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+/* powierzchnie pomocnicze (dawniej twarde kolory jasne) */
+.comparison-candidate {
+  background: var(--surface-2);
+  color: var(--text);
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.verification-conflict {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.verification-match {
+  background: var(--good-soft);
+  color: var(--text);
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.drawer {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+/* Z obszaru „Oferty”, po regułach tego pliku (kaskada). */
+#offerDrawer.drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(620px, 100%);
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: 20px 24px 32px;
+  z-index: 100;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+@media (max-width: 600px) {
+  #offerDrawer.drawer {
+    padding: 12px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+}
+/* Z obszaru „Źródła”, po regułach tego pliku (kaskada). */
+.scan-cta {
+  min-width: 180px;
+  min-height: 52px;
+  font-size: 16px;
+}
+/* Z obszaru „Powłoka”, po regułach tego pliku (kaskada). */
+@media (min-width: 901px) {
+  .view {
+    padding: 24px 28px 40px;
+  }
+}
+/* Z obszaru „Oferty”, po regułach tego pliku (kaskada). */
+.observation-row {
+  border-bottom-color: var(--line);
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.mobile-offer .book-spine,
+.book-spine {
+  background: var(--surface-2);
+  color: var(--brand);
+}
+/* Z obszaru „Źródła”, po regułach tego pliku (kaskada). */
+.scan-plan .is-warn {
+  color: var(--warn);
+}
+.scan-run-next .section-eyebrow {
+  margin: 0 0 4px;
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.duplicate-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+@media (max-width: 600px) {
+  .duplicate-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+/* v5.25 Podejrzane przypisania: ISBN wskazuje inną książkę niż tytuł ogłoszenia */
+.conflict-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+@media (max-width: 600px) {
+  .conflict-row {
+    grid-template-columns: 1fr;
+  }
+}
+.conflict-pair {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.conflict-pair .conflict-arrow {
+  color: var(--muted);
+  font-size: 12px;
+}
+.conflict-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+@media (max-width: 600px) {
+  .conflict-actions {
+    justify-content: stretch;
+  }
+}
+.proposal-chip.is-mismatch {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+/* 18. Oferty, których nie widać w ostatnim pełnym skanie */
+.proposal-chip.is-stale {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.button.ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+}
+.cover {
+  --cover-hue: 150;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+  border-radius: 4px 6px 6px 4px;
+  background: linear-gradient(
+    145deg,
+    hsl(var(--cover-hue) 34% 46%),
+    hsl(calc(var(--cover-hue) + 25) 38% 30%)
+  );
+  box-shadow: var(--cover-shadow);
+  color: var(--cover-text);
+  aspect-ratio: 2 / 3;
+}
+.cover-xs {
+  width: 28px;
+}
+.cover-sm {
+  width: 40px;
+}
+.cover-md {
+  width: 56px;
+}
+.cover-lg {
+  width: 112px;
+}
+.cover-xl {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.rv-item.review-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  transition: background-color 0.12s;
+}
+.proposal-chip.is-high {
+  background: var(--good-soft);
+  color: var(--good);
+}
+.shortcut-hint span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.rv-cands.proposal-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.fact.is-diff {
+  background: var(--diff);
+  color: var(--diff-text);
+  font-weight: 700;
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.rv-score[data-score='10'],
+.rv-score[data-score='9'] {
+  color: var(--good);
+}
+.rv .lean-review-selected {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.rv-actions .button {
+  min-height: 40px;
+  font-size: 14px;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.work-row.catalog-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+.edition-line > span {
+  flex: 1;
+  min-width: 0;
+}
+/* Z obszaru „Oferty”, po regułach tego pliku (kaskada). */
+.offer-card.mobile-offer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.drawer {
+  background: var(--surface);
+  color: var(--text);
+}
+.palette {
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 120px));
+  margin: 12vh auto auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+.palette-empty {
+  margin: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 12px;
+  border: 0;
+}
+#interfaceSettings {
+  padding: 18px;
+  margin-bottom: 16px;
+}
+.pref-list {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+}
+.pref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.pref input[type='checkbox'] {
+  order: 2;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brand);
+}
+.pref > span {
+  display: grid;
+  gap: 2px;
+}
+.pref small {
+  color: var(--muted);
+}
+/* Z obszaru „Źródła”, po regułach tego pliku (kaskada). */
+@media (max-width: 600px) {
+  .insight-board {
+    padding: 16px;
+  }
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+/* v5.23 — catalogue editions proposed in review (offline, above BN proposals) */
+.rv-local-cands:not(:empty) {
+  margin-bottom: 14px;
+}
+.proposal-chip.is-catalog {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+/* Z obszaru „Źródła”, po regułach tego pliku (kaskada). */
+/* v5.27 Awaria źródła metadanych */
+.insight-alert {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.buyback-price.is-priced {
+  color: var(--good);
+  font-size: 24px;
+  font-weight: 700;
+}
+.buyback-box .inline-note {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+.buyback-chip.is-priced {
+  background: var(--good-soft);
+  color: var(--good);
+  font-weight: 600;
+}
+.seed-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.seed-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.seed-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+/* Z obszaru „Oferty”, po regułach tego pliku (kaskada). */
+.offer-assignment-option {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+#reviewSelectToggle[aria-pressed='true'] {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+}
+/* Z obszaru „Zestawy”, po regułach tego pliku (kaskada). */
+.sets-cards {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.sets-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+@media (max-width: 600px) {
+  .sets-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+.sets-card-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex: none;
+}
+.sets-qty {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  flex: none;
+}
+.sets-unknown-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.rv-cand-note {
+  margin: 2px 0 8px;
+  font-size: 12px;
+}
+.rv-cand-note.is-tie {
+  color: var(--warn-text);
+  font-weight: 600;
+}
+.rv-same-isbn {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.series-volume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+/* Z obszaru „Źródła”, po regułach tego pliku (kaskada). */
+.scan-run-totals span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.scan-run-totals .is-warn {
+  background: var(--warn-bg);
+}
+.scan-run-issue {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+/* Source marks are small squares; round dots are reserved for state (green works, amber partly,
+   red does not). Empik's red dot read as "this source is broken". OLX no longer shares Vinted's teal. */
+[data-source='OLX'].source-dot {
+  background: var(--src-olx);
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.catalog-names .names-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 360px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+.wp-chart {
+  margin: 12px 0 4px;
+}
+.wp-chart .wp-axis {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.wp-s0 {
+  fill: var(--wp-s0);
+  background: var(--wp-s0);
+}
+.wp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 10px;
+}
+.wp-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.wp-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.wp-legend .wp-key {
+  margin-right: 0;
+}
+.wp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.wp-tools {
+  margin-top: 10px;
+}
+.wp-tools-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.wp-move {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 6px 4px;
+}
+/* Z obszaru „Oferty”, po regułach tego pliku (kaskada). */
+.relist-links .link-button {
+  font-size: 12px;
+  min-height: 32px;
+}
+/* Z obszaru „Źródła”, po regułach tego pliku (kaskada). */
+.scan-run-rejected {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.wp-comparable .wp-sold {
+  background: var(--green-soft);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-shadow: inset 3px 0 var(--green);
+}
+/* Z obszaru „Źródła”, po regułach tego pliku (kaskada). */
+/* Scan schedule: quick scan of the newest listings (changelog 29) */
+.scan-schedule .quick-scan {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px 4px;
+  margin: 10px 0;
+  display: grid;
+  gap: 6px;
+}
+.scan-problems .link-button {
+  min-height: 0;
+  padding: 0;
+  font-size: inherit;
+}
+#mainContent > #view-settings > .view-heading {
+  display: none;
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.review-toolbar > .identification-dashboard {
+  flex: 0 1 340px;
+  margin: 0;
+}
+@media (max-width: 900px) {
+  .review-toolbar > .identification-dashboard,
+  .review-toolbar > .filterbar {
+    flex-basis: 100%;
+  }
+}
+/* Z obszaru „Oferty”, po regułach tego pliku (kaskada). */
+@media (min-width: 901px) {
+  .offers-table .offer-title {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0;
+    min-height: 32px;
+    font-size: 13px;
+  }
+}
+.drawer-photo .cover,
+.drawer-photo img {
+  height: auto;
+  max-height: 120px;
+  min-height: 0;
+  object-fit: contain;
+}
+/* UX review 6.1: shared metadata scale, independent of the selected theme. */
+#mainContent
+  :is(
+    small,
+    .inline-note,
+    .fact,
+    .status-pill,
+    .proposal-chip,
+    .status-tag,
+    .form-note,
+    .rv-kicker,
+    .sets-meta,
+    .scanner-discover-count,
+    .offer-subtitle,
+    .scan-run-rejected,
+    .rv-isbn-line,
+    figcaption,
+    .source-chip,
+    .rv-same-isbn,
+    .lean-review-selected,
+    .missing-facts span,
+    .pagination,
+    .scan-run-summary,
+    .scan-language-toggle,
+    .diagnostic-panel .panel-heading p,
+    .wp-axis,
+    .wp-legend,
+    #identificationRunState,
+    #identificationProgressScope
+  ) {
+  font-size: var(--font-meta) !important;
+}
+/* UX review 6.5: settings controls keep a readable, bounded width. */
+#interfaceSettings :is(#prefTheme, #prefDensity) {
+  width: min(260px, 100%);
+  max-width: 260px;
+  flex: 0 1 260px;
+  justify-self: start;
+}
+.settings-grid > details:not([open]) {
+  align-self: start;
+  height: auto;
+  min-height: 0;
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.status-pill.pending,
+.state-badge.pending {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+#reviewDetail .rv-compare-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: zoom-in;
+}
+.photo-zoom img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(94vh - 80px);
+  margin: 0 auto;
+  object-fit: contain;
+  cursor: zoom-out;
+}
+.photo-zoom-close {
+  display: flex;
+  margin: 10px auto 0;
+}
+/* Z obszaru „Dziś”, po regułach tego pliku (kaskada). */
+.today-tile:hover {
+  background: var(--hover);
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.queue-types .queue-keys {
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  display: none;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.work-offer-row:hover {
+  background: var(--hover);
+}
+.work-offer-row > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}

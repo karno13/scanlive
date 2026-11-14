@@ -9,6 +9,7 @@ Current focus: scanner, catalogue, verification (trading features are parked) �
 - **`npm run verify` before finishing work**: lint, `check:syntax`, typecheck, `format:check`, tests — in that order, stops at the first failure (`scripts/verify.mjs`). There is no git remote, so `.github/workflows` never run — this is the check.
 - `npm test` — all tests (isolated temp data dir, never the user's DB). One file: `npm test -- rejected-offers.test.mjs`.
 - `npm run lint` (incl. `no-undef`; globals listed by hand in `eslint.config.mjs`) · `npm run check:syntax` · `npm run typecheck` (files with `// @ts-check`; each must be listed in `tsconfig.typecheck.json`, a test enforces it) · `npm run format:check` (needs `npm install` once; do not commit a `package-lock.json`).
+- CSS changes: `node scripts/css-snapshot.mjs <port> <dir> --verify` compares the computed styles of every view and state (4 widths, both themes, trading on/off) for HEAD against the working tree; server on a copy of the data, other port than 4317 (command in the script header; ~1.5 h, `--only <regex>` for a subset). Zero differences = the look did not change.
 - UI smoke: `node scripts/browser-smoke.mjs` (needs `npm install --no-save --no-package-lock playwright@1.55.1` and `npx playwright install chromium`).
 - Shell: Git Bash / PowerShell on Windows; **no Python** — write helper scripts in Node.
 
@@ -21,7 +22,7 @@ Full table: `docs/REPOSITORY-MAP.md`. The short version:
 - `catalog-production.mjs` — opens the DB and runs `startup-jobs.mjs`: data repairs are **one-time jobs** with a flag in `app_preferences` (`runOnce`, versioned key when rules can change); only in-memory loads and series aliases run every start. Scanned offers enter through `offer-ingest.mjs` (`ScannedOffer`, one shape).
 - `catalog-resolver.mjs` + `identification-worker.mjs` — ISBN → edition; `metadata-sources/*` adapters.
 - `marketplaces.mjs` — source adapters and `readSourceHtml`; every marketplace request goes through `marketplace-gate.mjs` (per-source adaptive pacing). Never add a request path that bypasses it.
-- Frontend: `app/index.html`, `app/app.js` (shell, tabs, wiring), `app/views/<area>.js`, `app/core/*` (api, formatters, prefs). `app/app.css` is large and layered: later rules override earlier ones — append, and check the end of the file before adding a selector.
+- Frontend: `app/index.html`, `app/app.js` (shell, tabs, wiring), `app/views/<area>.js`, `app/core/*` (api, formatters, prefs). Styles: `app/styles/*.css`, linked from `index.html` in a fixed order that is the cascade order (tokens, base, shell, components, then one file per area: today, queue, catalog, offers, sets, sources, settings, trading). Each selector has one rule per context; its `@media` variant follows it where the cascade allows. A rule lives in its area's file unless it must come after a rule of a later file — then it sits there under a `/* Z obszaru „…” … */` note. Edit the existing rule of a selector instead of adding another; colours only as tokens (`styles/tokens.css`).
 
 ## Rules
 

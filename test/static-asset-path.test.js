@@ -8,7 +8,10 @@ test('public assets include first-party browser modules without a manual route l
   assert.equal(publicAssetPath('/views/scanner.js'), 'views/scanner.js');
   assert.equal(publicAssetPath('/views/future-module.js'), 'views/future-module.js');
   assert.equal(publicAssetPath('/core/formatters.js'), 'core/formatters.js');
-  assert.equal(publicAssetPath('/app.css'), 'app.css');
+  assert.equal(publicAssetPath('/styles/tokens.css'), 'styles/tokens.css');
+  assert.equal(publicAssetPath('/styles/queue.css'), 'styles/queue.css');
+  // The single stylesheet was split into app/styles/ (CSS clean-up, 2026-11).
+  assert.equal(publicAssetPath('/app.css'), null);
 });
 
 test('public asset matching rejects arbitrary files, traversals and encoded paths', () => {
@@ -25,6 +28,12 @@ test('public asset matching rejects arbitrary files, traversals and encoded path
     '/views/fake.js.map',
     '/core/%2e%2e%2fapp.js',
     '/backup.zip',
+    '/styles/../.env',
+    '/styles/%2e%2e/.env',
+    '/styles/sub/base.css',
+    '/styles/base.css.map',
+    '/styles/base.js',
+    '/styles/Base.css',
   ])
     assert.equal(publicAssetPath(path), null, path);
 });

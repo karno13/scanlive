@@ -1,0 +1,476 @@
+/* Oferty: tabela, lista na telefonie, szuflada oferty. */
+.offers-mobile-list {
+  display: block;
+}
+.offers-table-wrap {
+  display: none;
+}
+.offers-panel {
+  padding: 0;
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+@media (min-width: 901px) {
+  .offers-panel {
+    max-width: 1400px;
+  }
+}
+.mobile-offer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+  width: 100%;
+  min-height: 74px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+  background: var(--surface);
+  color: var(--text);
+  border-bottom-color: var(--line);
+}
+@media (max-width: 600px) {
+  .mobile-offer {
+    grid-template-columns: minmax(0, 1fr) 90px;
+    gap: 10px;
+    padding: 14px 12px;
+  }
+}
+.mobile-offer:first-child {
+  border-radius: 12px 12px 0 0;
+}
+.mobile-offer:hover {
+  background: var(--surface-2);
+}
+.mobile-offer-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.mobile-offer-copy strong {
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.mobile-offer-copy small {
+  color: var(--muted);
+}
+@media (max-width: 600px) {
+  .mobile-offer-copy small {
+    font-size: 11px;
+  }
+}
+.mobile-offer-price {
+  display: grid;
+  text-align: right;
+  gap: 3px;
+}
+.mobile-offer-price b {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px) {
+  .mobile-offer-price b {
+    font-size: 15px;
+  }
+}
+.mobile-offer-price small {
+  font-size: 11px;
+  color: var(--muted);
+}
+@media (max-width: 600px) {
+  .mobile-offer-price small {
+    font-size: 10px;
+  }
+}
+.price-list {
+  display: grid;
+  gap: 8px;
+}
+.price-list a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  border-bottom-color: var(--line);
+}
+.price-list > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  border-bottom-color: var(--line);
+}
+.price-list button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  border-bottom-color: var(--line);
+}
+.price-list > span > small {
+  display: inline;
+}
+.price-history-disclosure .price-list {
+  max-height: 320px;
+  overflow: auto;
+}
+#offerDrawer[hidden] {
+  display: none;
+}
+#offerDrawer .drawer-close {
+  z-index: 2;
+  position: static;
+  min-height: 44px;
+  background: var(--surface);
+}
+#offerDrawer .detail-actions {
+  position: static;
+  padding: 12px 0;
+  background: var(--surface);
+}
+#view-offers {
+  position: relative;
+}
+@media (max-width: 600px) {
+  #offerDrawer h2 {
+    font-size: 20px;
+  }
+}
+.observation-list {
+  display: grid;
+}
+.observation-row time {
+  font-size: 13px;
+}
+@media (min-width: 901px) {
+  .observation-row time {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .observation-row small {
+    max-width: 560px;
+  }
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.book-options button {
+  background: var(--surface);
+  color: var(--text);
+}
+.observation-row:hover {
+  background: var(--surface-2);
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.series-progress button {
+  display: grid;
+  gap: 2px 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  grid-template-columns: minmax(0, 1fr);
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.segmented button {
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+/* UX review 7.8: phone — settings in the bar, one-line catalogue switch, 44 px touch targets. */
+@media (max-width: 900px) {
+  .segmented button {
+    min-height: 44px;
+  }
+}
+.offer-card.mobile-offer:hover {
+  background: var(--zebra);
+}
+.offer-match {
+  color: var(--brand) !important;
+  font-weight: 600;
+}
+.offer-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.offer-cell > span:last-child {
+  min-width: 0;
+}
+.drawer-photo {
+  max-width: 92px;
+  margin: 8px 0;
+}
+body.density-compact .offer-card.mobile-offer {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+body.density-compact .offer-card .cover-sm {
+  width: 30px;
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+body.density-compact .work-row .cover-md {
+  width: 40px;
+}
+:root .offer-card.mobile-offer:hover {
+  background: var(--zebra);
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.series-jump a {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.offer-assignment {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0;
+}
+.offer-assignment-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.offer-assignment-results {
+  display: grid;
+  gap: 4px;
+  max-height: 280px;
+  overflow: auto;
+}
+.offer-assignment-option:hover:not(:disabled) {
+  background: var(--green-soft);
+}
+.offer-assignment-option:disabled {
+  opacity: 0.55;
+}
+.drawer-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+.offer-gone {
+  color: var(--warn-text);
+  font-weight: 650;
+}
+/* Oferty → "Wg książki": one card per edition. */
+#view-offers .filterbar .segmented {
+  flex: none;
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.rv-record-note a {
+  color: var(--green);
+}
+/* Z obszaru „Książki”, po regułach tego pliku (kaskada). */
+.wp-table .wp-conditions th[scope='rowgroup'] {
+  text-align: left;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  padding-top: 14px;
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+.identification-dashboard.is-idle > .identification-more > summary {
+  min-height: 32px;
+  padding: 4px 0;
+  color: var(--muted);
+}
+@media (max-width: 900px) {
+  #reviewDetail .lean-review-secondary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+.review-toolbar > details[open] > div,
+.review-toolbar .shortcut-help[open] > p {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: min(650px, 100%);
+  max-height: 300px;
+  overflow: auto;
+  z-index: 12;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+/* UX review 4: table on desktop, cards on phones. */
+@media (min-width: 901px) {
+  #view-offers .offers-table-wrap {
+    display: block;
+  }
+  #view-offers #offersMobileList {
+    display: none;
+  }
+  #view-offers .offers-panel {
+    max-width: none;
+  }
+  .offers-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+  .offers-table th:first-child {
+    width: 32%;
+  }
+  .offers-table th:nth-child(2) {
+    width: 11%;
+  }
+  .offers-table th:nth-child(3) {
+    width: 9%;
+  }
+  .offers-table th:nth-child(4) {
+    width: 13%;
+  }
+  .offers-table th:nth-child(5) {
+    width: 14%;
+  }
+  .offers-table th:nth-child(6) {
+    width: 12%;
+  }
+  .offers-table th:last-child {
+    width: 9%;
+  }
+  .offers-table .offer-subtitle {
+    display: none;
+  }
+  .offer-sort-header {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    padding: 0;
+    min-height: 32px;
+    text-align: left;
+  }
+  .offers-table tr[data-open-offer] {
+    cursor: pointer;
+  }
+  .offers-table tr[data-open-offer]:hover {
+    background: var(--hover);
+  }
+  #view-offers > .filterbar {
+    flex-wrap: nowrap;
+  }
+  #view-offers > .filterbar > select {
+    flex: 0 1 170px;
+  }
+}
+/* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
+/* UX review 6.3: direct access to sets and touch-sized external links. */
+.rv-head-side > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.offers-table .status-pill.neutral {
+  padding: 0;
+  background: transparent;
+  font-weight: 400;
+}
+/* UX review 7.4: one state column; prices line up on the right. */
+@media (min-width: 901px) {
+  .offers-table .offer-price-cell {
+    text-align: right;
+    padding-right: 20px;
+    font-variant-numeric: tabular-nums;
+  }
+  .offers-table th.offer-price-cell .offer-sort-header {
+    width: 100%;
+    text-align: right;
+  }
+}
+.offers-table .status-pill.warning {
+  padding: 1px 8px;
+}
+/* UX review 7.7: drawer facts sit next to their labels; an empty sales tile does not shout. */
+#offerDrawerContent .detail-grid > span {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  justify-content: start;
+}
+@media (max-width: 900px) {
+  #offerDrawerContent .detail-grid > span {
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+}
+#offerDrawerContent .detail-grid > span > small {
+  text-align: left;
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+/* Review 11.2026, stage 0.7: green means "act" — offer titles use the text colour (row and title stay
+   clickable, underlined on hover); the everyday "Wymaga decyzji" state is quiet. */
+#offersTableBody .offer-title {
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+}
+#offersTableBody tr:hover .offer-title,
+#offersTableBody .offer-title:hover,
+#offersTableBody .offer-title:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
+.filter-chip button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+#offersTableBody .offer-book {
+  min-height: 0;
+  padding: 0;
+  color: var(--text);
+  font-weight: 400;
+  text-align: left;
+}
+#offersTableBody .offer-book:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
