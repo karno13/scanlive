@@ -10,6 +10,10 @@
 // Dedalus answered a CAPTCHA after a normal scan (11.2026): a slower base pace, not a way around it.
 export const SOURCE_INTERVAL_MS = { 'Allegro Lokalnie': 8000, 'Dedalus.pl': 6000 };
 export const MAX_INTERVAL_MS = 30_000;
+// Offer pages of one source read in one background round (availability checks, page details).
+// Allegro Lokalnie answered a CAPTCHA after 13 offer pages in a row (12.11.2026) and then refused
+// the scan as well: a few pages per round, never a series. The rest waits for a later round.
+export const SOURCE_ROUND_LIMIT = { 'Allegro Lokalnie': 4 };
 
 export function createMarketplaceGate({
   intervalMs = 2000,

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readSourceHtml } from './marketplaces.mjs';
+import { SOURCE_ROUND_LIMIT } from './marketplace-gate.mjs';
 import { DETAIL_SOURCES, parseProductDetail, empikCategories } from './source-details.mjs';
 import { conditionClass } from './offer-observations.mjs';
 
@@ -96,6 +97,7 @@ export async function enrichOffers(
     stopped: null,
     paused: [],
   };
+  const pagesRead = new Map();
   for (const offer of pendingEnrichment(repository, { sources, limit, now })) {
     if (signal?.aborted) {
       report.stopped = 'aborted';
@@ -103,6 +105,10 @@ export async function enrichOffers(
     }
     // A source that refused us in this run is not asked again; the other sources go on.
     if (report.paused.includes(offer.source)) continue;
+    // A few pages of such a source per run; the rest stays pending for the next one.
+    const read = pagesRead.get(offer.source) ?? 0;
+    if (read >= (SOURCE_ROUND_LIMIT[offer.source] ?? Infinity)) continue;
+    pagesRead.set(offer.source, read + 1);
     const at = now().toISOString();
     let html;
     try {

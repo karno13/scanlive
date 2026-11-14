@@ -2,6 +2,7 @@
 // "Zarezerwowane"; a page that is gone (404/410) means the listing was removed. The last observed
 // price is kept: together with the date it is the best evidence of what a book sold for.
 import { readSourceHtml } from './marketplaces.mjs';
+import { SOURCE_ROUND_LIMIT } from './marketplace-gate.mjs';
 import { CHECK_TIERS, detectRelists, recordOfferStatus } from './offer-status.mjs';
 
 // Only sources with a status parser consume the periodic check budget. Allegro and OLX are not
@@ -173,6 +174,8 @@ export async function checkOfferLifecycle(
   const report = {
     blockedSources: [],
     checked: 0,
+    // Left for a later round by SOURCE_ROUND_LIMIT.
+    deferred: 0,
     sold: 0,
     reserved: 0,
     removed: 0,
@@ -185,6 +188,7 @@ export async function checkOfferLifecycle(
   // The shop's own availability code on the listing (Empik, Dedalus) confirms without a request.
   report.listingConfirmed = confirmFromListingCodes(repository, { now }).confirmed;
   const blocked = new Set();
+  const pagesRead = new Map();
   const sources = [...LIFECYCLE_SOURCES].filter((source) => !skipSources.includes(source));
   const gone = sources.length ? pendingLifecycleChecks(repository, { limit, now, sources }) : [];
   // Left over budget goes to offers that are still listed but were never checked on their page.
@@ -201,6 +205,12 @@ export async function checkOfferLifecycle(
   for (const offer of due) {
     if (signal?.aborted) break;
     if (blocked.has(offer.source)) continue;
+    const read = pagesRead.get(offer.source) ?? 0;
+    if (read >= (SOURCE_ROUND_LIMIT[offer.source] ?? Infinity)) {
+      report.deferred += 1;
+      continue;
+    }
+    pagesRead.set(offer.source, read + 1);
     const at = now().toISOString();
     let html;
     try {

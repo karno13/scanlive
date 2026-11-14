@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (64) — Allegro Lokalnie: mniej stron ofert naraz
+
+Allegro Lokalnie odpowiedziało CAPTCHA po 13 stronach ofert czytanych z rzędu (12.11), a 14.11 odmówiło także skanu; to źródło daje 62 z 82 decyzji w kolejce, więc blokada kosztuje najwięcej.
+
+- Zadania w tle (sprawdzanie dostępności i czytanie szczegółów ze strony oferty) czytają najwyżej **4 strony Allegro Lokalnie na rundę**; reszta czeka na następną rundę (dotąd do 20 przy dostępności i do 40 przy szczegółach). Odstęp 8 s między zapytaniami i pauza po blokadzie bez zmian. CAPTCHA nadal nie jest omijana.
+- Skutek uboczny: szczegóły i dostępność ofert z tego źródła uzupełniają się wolniej. Czy to wystarczy, żeby blokady ustały, okaże się po kilku dniach pracy aplikacji — nie da się tego sprawdzić bez zapytań do serwisu.
+
 ## 2026-11-14 (63) — Czas skanu, cena sprzedaży z małej próby, test parsera Tezeusza
 
 - **Dziś → „Ostatni skan”** pokazuje, ile trwał skan („· trwał 12 min”). Czas jest zapisywany przy każdym nowym skanie; starsze skany go nie mają. Pozwala ocenić koszt dodania frazy albo źródła.

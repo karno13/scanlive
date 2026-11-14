@@ -210,3 +210,47 @@ test('an unfamiliar status title and a malformed item id cannot declare removal 
   assert.equal(parseVintedStatus(page, '123'), null);
   assert.equal(parseVintedStatus(soldPage('123'), '123D'), null);
 });
+
+test('Allegro Lokalnie gets a few page reads per round, the rest waits for a later round', async () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    for (let index = 0; index < 7; index++)
+      repository.upsertOffer({
+        id: 'a' + index,
+        source: 'Allegro Lokalnie',
+        normalizedUrl: `https://allegrolokalnie.pl/oferta/ksiazka-${index}`,
+        originalTitle: 'a' + index,
+        currentPrice: 5000,
+      });
+    repository.upsertOffer({
+      id: 'v',
+      source: 'Vinted',
+      normalizedUrl: 'https://www.vinted.pl/items/123-v',
+      originalTitle: 'v',
+      currentPrice: 5000,
+    });
+    repository.database.exec("UPDATE offers SET last_seen_at='2026-01-01',availability='not_seen'");
+    const calls = [];
+    const round = () =>
+      checkOfferLifecycle(repository, {
+        limit: 20,
+        now: () => new Date('2026-11-11'),
+        fetchHtml: async (url, source) => {
+          calls.push(source);
+          return source === 'Vinted'
+            ? livePage('123')
+            : '<link itemprop="availability" href="https://schema.org/InStock">';
+        },
+      });
+    const report = await round();
+    assert.equal(calls.filter((source) => source === 'Allegro Lokalnie').length, 4);
+    assert.equal(calls.filter((source) => source === 'Vinted').length, 1);
+    assert.equal(report.deferred, 3);
+    // The deferred offers are still due: the next round reads them.
+    calls.length = 0;
+    await round();
+    assert.equal(calls.filter((source) => source === 'Allegro Lokalnie').length, 3);
+  } finally {
+    repository.close();
+  }
+});
