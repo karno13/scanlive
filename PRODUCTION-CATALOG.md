@@ -17,9 +17,7 @@ Identyfikacja sprawdza najpierw lokalny katalog ISBN, następnie Bibliotekę Nar
 
 ## Lokalizacja danych
 
-Domyślnie Windows: `%LOCALAPPDATA%\BookFlip\data\bookflip-catalog.sqlite`. Można nadpisać przez `BOOKFLIP_CATALOG_DB`. W nowej instalacji stary katalog `scan-results` **nie jest automatycznie importowany**.
-
-Przed uruchomieniem niezaaplikowanych migracji istniejącej bazy wykonywany jest backup z kontrolą integralności. Kopie w `data/backups/` nie zastępują kopii poza urządzeniem. Nie zmieniaj ani nie usuwaj istniejących plików `migrations/*.sql` — ich sumy są zapisane w bazie.
+Ścieżki bazy, kopie zapasowe i przywracanie: [README](README.md#dane-i-kopie-zapasowe). Aktualizacja i migracje: [docs/DATA-MIGRATION.md](docs/DATA-MIGRATION.md). Aktualny schemat: [docs/SCHEMA.sql](docs/SCHEMA.sql).
 
 ## Konfiguracja
 
@@ -61,9 +59,9 @@ Jedyna pełna lista zmiennych środowiskowych (README tylko tu odsyła). Wartoś
 - Zestaw ma własny zapis powiązań do wielu wydań; cena nadal dotyczy całej oferty.
 - `GET /api/catalog/status` zwraca liczniki i diagnostykę kolejki; w Ustawieniach dostępne jest ręczne ponowienie identyfikacji.
 
-## Diagnostyka i testy
+## Diagnostyka
 
-Log serwera: `%LOCALAPPDATA%\BookFlip\data\local-app.log`. Przed zakończeniem pracy uruchom `npm run verify` (lint, typy, formatowanie, testy); start interfejsu w Chromium sprawdza `node scripts/browser-smoke.mjs`. Te testy nie gwarantują, że zewnętrzny portal aktualnie pozwala na skanowanie.
+Log serwera: `%LOCALAPPDATA%\BookFlip\data\local-app.log`. `GET /api/catalog/status` zwraca liczniki i diagnostykę kolejki. Testy i kontrole: [README](README.md#testowanie).
 
 ## Weryfikacja i katalog (od 2026-11-07)
 

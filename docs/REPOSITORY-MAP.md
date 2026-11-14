@@ -234,16 +234,16 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 
 | Plik | Rola |
 | --- | --- |
-| `README.md` | Uruchomienie, obszary aplikacji, dane i kopie, testowanie |
-| `CLAUDE.md` | Krótkie zasady dla agentów kodujących |
+| `README.md` | Uruchomienie, obszary aplikacji, dane i kopie, testowanie, spis dokumentacji |
+| `CLAUDE.md` | Brief dla agentów: ustalenia, sposób pracy, polecenia, przepisy „jak dodać…”, co aktualizować |
 | `CHANGELOG.md` | Numerowane zmiany od 2026-11-10; starsze w `docs/archive/` |
-| `PRODUCTION-CATALOG.md` | Przepływ katalogu, źródła metadanych, wszystkie zmienne środowiskowe |
-| `docs/PRODUCT-DIRECTION.md` | Bieżący priorytet i cel docelowy produktu |
-| `docs/DATA-MIGRATION.md` | Przechowywanie danych i migracje |
+| `PRODUCTION-CATALOG.md` | Przepływ identyfikacji, źródła metadanych, wszystkie zmienne środowiskowe |
+| `docs/PRODUCT-DIRECTION.md` | Cel produktu, założenia właściciela, bieżący priorytet, czego nie robimy |
+| `docs/SCHEMA.sql` | Aktualny schemat bazy (generowany) |
+| `docs/DATA-MIGRATION.md` | Aktualizacja programu, migracje, dawne narzędzia JSON |
 | `docs/TAILSCALE.md` | Dostęp z telefonu przez Tailscale |
-| `docs/SOURCES-ACCESS-2026-11.md` | Rozpoznanie legalnego dostępu do Allegro i OLX |
-| `docs/UX-REVIEW-2026-11.md` | Wyniki przeglądu interfejsu z 11.2026 |
-| `docs/archive/` | Stare raporty, archiwum changelogu, dokumenty jednorazowe |
+| `docs/SOURCES-ACCESS-2026-11.md` | Dlaczego Allegro i OLX nie są skanowane (rozpoznanie legalnego dostępu) |
+| `docs/archive/` | Historia: stare raporty, przegląd interfejsu z 11.2026, archiwum changelogu. Nie opisuje stanu bieżącego |
 | Gałąź `gh-pages` | Publiczne demo bez produkcyjnego API |
 
 ## Elementy historyczne

@@ -16,12 +16,9 @@ Zamknij poprzednią instancję przed aktualizacją. Kolejne wersje programu mog�
 
 Przed zastosowaniem nowych migracji SQL istniejącej bazy program tworzy spójną kopię z użyciem SQLite i sprawdza jej integralność. Niepowodzenie backupu zatrzymuje migrację. Migracje schematu są wersjonowane; **nie modyfikuj usuniętych ani istniejących migracji**, bo bazy zapisują ich sumy kontrolne.
 
-Kopia zapasowa nie jest równoznaczna z automatycznym rollbackiem do starszego schematu. Aby przywrócić starszą wersję, zatrzymaj aplikację i użyj kopii utworzonej przed migracją, na osobnej instalacji. Przechowuj też regularne kopie poza laptopem.
+Kopia zapasowa nie jest równoznaczna z automatycznym rollbackiem do starszego schematu. Aby przywrócić starszą wersję, zatrzymaj aplikację i użyj kopii utworzonej przed migracją, na osobnej instalacji. Polecenia kopii i przywracania: [README](../README.md#dane-i-kopie-zapasowe).
 
-```powershell
-npm run backup
-npm run backup -- "D:\\Backups\\bookflip.sqlite"
-```
+Nowa zmiana schematu to kolejny plik w `migrations/`; po jego dodaniu `node scripts/dump-schema.mjs` odświeża [SCHEMA.sql](SCHEMA.sql).
 
 ## Narzędzia historyczne
 

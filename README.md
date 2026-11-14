@@ -96,19 +96,22 @@ node scripts/browser-smoke.mjs
 
 `npm run verify` to kontrola przed zakończeniem pracy. `npm test` izoluje katalog SQLite, log i stan skanowania w katalogu tymczasowym osobno dla każdego procesu testowego i ogranicza czas testu do 30 sekund; uruchamiaj testy przez ten skrypt, aby nie korzystały z plików stanu użytkownika.
 
-Test przeglądarkowy (`scripts/browser-smoke.mjs`) uruchamia Chromium na izolowanej niepustej bazie: wszystkie widoki w motywie jasnym i ciemnym, na komputerze i telefonie, z kontrolą kontrastu tekstu do tła (co najmniej 3:1). Nie zastępuje pełnego testu skanowania rzeczywistych portali. Pliki w `.github/workflows/` są pozostałością — repozytorium nie ma zdalnej kopii, więc nic ich nie uruchamia.
+Test przeglądarkowy (`scripts/browser-smoke.mjs`) uruchamia Chromium na izolowanej niepustej bazie: wszystkie widoki w motywie jasnym i ciemnym, na komputerze i telefonie, z kontrolą kontrastu tekstu do tła (co najmniej 3:1). Nie zastępuje pełnego testu skanowania rzeczywistych portali. Repozytorium nie ma zdalnej kopii, więc pliki w `.github/workflows/` się nie uruchamiają — kontrolą jest `npm run verify`.
 
-## Architektura i dalsza dokumentacja
+## Dokumentacja — gdzie co jest
 
-- `local-app.mjs` — serwer; `routes/` i `api-routes.mjs` — trasy API; `scan-engine.mjs` — skan; `app/` — interfejs.
-- `marketplaces.mjs`, `local-scan.mjs` — źródła skanowania (każde zapytanie przez `marketplace-gate.mjs`).
-- `catalog-production.mjs`, `sqlite-catalog-repository.mjs`, `catalog-api.mjs`, `offer-sets.mjs` — zapis i odczyt katalogu oraz zestawów.
-- `catalog-resolver.mjs`, `identification-worker.mjs`, `metadata-sources/` — dopasowanie ISBN i metadane.
-- `migrations/` — **niezmienne** migracje SQLite; nie usuwaj ani nie zmieniaj starych plików.
-
-Szczegóły: [Katalog i konfiguracja](PRODUCTION-CATALOG.md), [Przechowywanie i migracje](docs/DATA-MIGRATION.md), [Mapa repozytorium](docs/REPOSITORY-MAP.md), [CHANGELOG](CHANGELOG.md) (starsze wpisy w `docs/archive/`).
-
-Elementy historyczne: nieaktywny runner GitHub Actions usunięto; zachowano odrębnie testowane parsery źródeł i narzędzia importu starej historii JSON (diagnostyka dawnych danych), opisane w mapie repozytorium. Stare raporty i dokumenty jednorazowe są w `docs/archive/`, a usunięte materiały w historii Git.
+| Pytanie | Dokument |
+| --- | --- |
+| Jak uruchomić, zrobić kopię, przywrócić dane | ten plik |
+| Co ustalone, jak pracować nad kodem, przepisy „jak dodać…” | [CLAUDE.md](CLAUDE.md) (po angielsku, czytany przez agenta na początku każdej sesji) |
+| Po co jest produkt i czego nie robimy | [Kierunek produktu](docs/PRODUCT-DIRECTION.md) |
+| Który plik do czego służy | [Mapa repozytorium](docs/REPOSITORY-MAP.md) |
+| Jak wygląda baza | [docs/SCHEMA.sql](docs/SCHEMA.sql) (generowany z migracji) |
+| Jak działa identyfikacja i jakie są zmienne środowiskowe | [Katalog i konfiguracja](PRODUCTION-CATALOG.md) |
+| Aktualizacja programu, migracje, dawne narzędzia JSON | [Dane i migracje](docs/DATA-MIGRATION.md) |
+| Telefon przez Tailscale | [docs/TAILSCALE.md](docs/TAILSCALE.md) |
+| Dlaczego nie ma Allegro i OLX | [Rozpoznanie dostępu](docs/SOURCES-ACCESS-2026-11.md) |
+| Co się zmieniło i kiedy | [CHANGELOG](CHANGELOG.md); starsze wpisy i dawne raporty w `docs/archive/` (tylko historia) |
 
 ## Pomiar wydajności (bez internetu)
 

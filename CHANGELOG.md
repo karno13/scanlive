@@ -2,6 +2,15 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-14 (61) — Dokumentacja: jedno miejsce z ustaleniami i przepisami
+
+Bez zmian w aplikacji.
+
+- **`CLAUDE.md`** jest pełnym briefem na start pracy: co jest ustalone i o co nie pytać (jedna osoba, lokalnie, odsprzedaż na Vinted, polskie wydania, bez Allegro i OLX, handel odłożony), jak pracować, polecenia, gdzie co leży, przepisy „jak dodać trasę / migrację / zadanie w tle / źródło / widok / test” i tabela „co zaktualizować po zmianie”.
+- **`docs/PRODUCT-DIRECTION.md`** ma sekcję „Założenia właściciela”.
+- **`README.md`** ma spis „Dokumentacja — gdzie co jest” zamiast drugiego opisu architektury. Ścieżki bazy i polecenia kopii są opisane tylko w README; `PRODUCTION-CATALOG.md` i `docs/DATA-MIGRATION.md` do niego odsyłają.
+- Przegląd interfejsu z 11.2026 przeniesiony do `docs/archive/`; archiwum ma `README.md` z informacją, że nie opisuje stanu bieżącego.
+
 ## 2026-11-14 (60) — Tańsza praca nad kodem: szybsze `verify`, schemat bazy w jednym pliku, więcej typów
 
 Bez zmian w wyglądzie i działaniu aplikacji.
