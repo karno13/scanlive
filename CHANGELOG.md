@@ -2,6 +2,10 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (77) — „Nowy skan” przewija do formularza
+
+- **Błąd:** na telefonie „Nowy skan” na ekranie „Dziś” otwierał „Źródła” na górze, a formularz skanu był ok. 1100 px niżej, pod „Stanem źródeł”. Teraz po kliknięciu ekran przewija się od razu do formularza.
+
 ## 2026-11-15 (76) — Telefon: panel wsadowy w Kolejce
 
 - **Błąd:** na telefonie w Kolejce → „Szybkie” (i „Do dodania”) panel wsadowy („N pewnych dopasowań → Zatwierdź zaznaczone”) był ukryty. Teraz jest nad listą ofert; lista kart w panelu przewija się w obrębie panelu (do 45% wysokości ekranu), przycisk zatwierdzenia jest pod nią.
