@@ -1,7 +1,6 @@
 // "Usuń z katalogu": a button in the book page's action bar and the "Usunięte z katalogu" panel among the
 // catalogue tools. Removal hides the book with its editions and rejects its offers, also future
 // ones (catalog-removal.mjs); the toast and the panel restore it exactly.
-import { confirmDialog } from '../core/dialogs.js';
 
 const offersWord = (n) =>
   n === 1 ? '1 oferta' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? `${n} oferty` : `${n} ofert`;
@@ -18,26 +17,32 @@ async function restore(workId, { json, toast, loadCatalogData }) {
   changed();
 }
 
-/** "Usuń z katalogu" in the book page's action bar; the confirmation explains what happens. */
+/**
+ * Removes a book at once, without a confirmation (owner request 2026-11-15): the removal is fully
+ * reversible, so the toast's „Cofnij” and the „Usunięte z katalogu” panel are the safety net.
+ */
+export async function removeWork(workId, { json, toast, loadCatalogData }) {
+  const result = await json('/api/catalog/works/' + encodeURIComponent(workId) + '/removal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  toast(`Usunięto z katalogu: „${String(result.title).split(' / ')[0]}”${result.offers ? ` (odrzucone oferty: ${result.offers})` : ''}.`, {
+    label: 'Cofnij',
+    onClick: () => restore(workId, { json, toast, loadCatalogData }),
+    onError: (error) => toast('Nie przywrócono: ' + error.message),
+  });
+  await loadCatalogData();
+  changed();
+  return result;
+}
+
+/** "Usuń z katalogu" in the book page's action bar. */
 export function mountWorkRemoval({ row, button, json, toast, loadCatalogData, onRemoved }) {
   button.addEventListener('click', async () => {
     button.disabled = true;
     try {
-      const url = '/api/catalog/works/' + encodeURIComponent(row.id) + '/removal';
-      const preview = await json(url);
-      const confirmed = await confirmDialog(
-        `„${preview.title}”: ${preview.editions} ${preview.editions === 1 ? 'wydanie' : 'wydań'} i ${offersWord(preview.offers)} znikną z katalogu i z weryfikacji. Nowe oferty tej książki będą odrzucane automatycznie. Przywrócisz ją w „Narzędzia katalogu → Usunięte z katalogu”.`,
-        { title: 'Usunąć z katalogu?', confirmLabel: 'Usuń z katalogu', danger: true },
-      );
-      if (!confirmed) return;
-      await json(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-      toast(`Usunięto z katalogu: „${preview.title}”.`, {
-        label: 'Cofnij',
-        onClick: () => restore(row.id, { json, toast, loadCatalogData }),
-        onError: (error) => toast('Nie przywrócono: ' + error.message),
-      });
-      await loadCatalogData();
-      changed();
+      await removeWork(row.id, { json, toast, loadCatalogData });
       onRemoved?.();
     } catch (error) {
       toast('Nie usunięto: ' + error.message);

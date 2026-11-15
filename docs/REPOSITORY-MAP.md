@@ -181,7 +181,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `app/views/reject-rule.js` | Okno „Odrzuć z regułą…” i lista reguł |
 | `app/views/duplicates.js` | „Możliwe duplikaty dzieł” |
 | `app/views/book-page.js` | Góra strony książki: kafelki cen (z ceną skupu), pasek akcji, lista ofert z linkami do ogłoszeń |
-| `app/views/removed-works.js` | Przycisk „Usuń z katalogu” w pasku akcji strony książki i panel „Usunięte z katalogu” |
+| `app/views/removed-works.js` | „Usuń z katalogu” (bez potwierdzenia, z „Cofnij”) na stronie książki i na liście, panel „Usunięte z katalogu” |
 | `app/views/title-conflicts.js` | „Podejrzane przypisania” (tytuł niezgodny z wydaniem) |
 | `app/views/sets.js` | Zestawy: lista i skład |
 | `app/views/set-trading.js` | Koszt i scenariusz zestawu (tryb handlu) |

@@ -9,7 +9,7 @@ import { safeOfferHref , availabilityLabel, isPurchasable } from '../core/format
 import { urlForView } from '../core/view-history.js';
 import { mountSeriesEditor, readSeries, seriesSummary } from './series.js';
 import { confirmDialog } from '../core/dialogs.js';
-import { mountWorkRemoval } from './removed-works.js';
+import { mountWorkRemoval, removeWork } from './removed-works.js';
 import { coverMarkup, isbnCover, tidyWorkTitle, parseBnPeople, splitBnTitle, cleanPublisher } from '../core/bibliography.js';
 
 const firstIsbn = (editions = []) =>
@@ -177,6 +177,20 @@ function renderCatalog() {
     : queryEmptyMarkup();
   $$('[data-catalog-id]').forEach((button) =>
     button.addEventListener('click', () => openCatalogDetail(button.dataset.catalogId)),
+  );
+  $$('#catalogList [data-remove-work]').forEach((button) =>
+    button.addEventListener('click', async () => {
+      const wrap = button.closest('.catalog-row-wrap');
+      button.disabled = true;
+      wrap?.classList.add('is-removing');
+      try {
+        await removeWork(button.dataset.removeWork, { json, toast, loadCatalogData });
+      } catch (error) {
+        toast('Nie usunięto: ' + error.message);
+        wrap?.classList.remove('is-removing');
+        button.disabled = false;
+      }
+    }),
   );
 }
 
@@ -459,7 +473,8 @@ function catalogRowMarkup(row) {
     ? [cleanPublisher(single.publisher), single.publicationYear].filter(Boolean).join(' · ') || 'Brak danych wydania'
     : editionsLabel(row.editionCount);
   const missing = missingFacts(row);
-  return `<button class="catalog-row work-row ${row.id === state.selectedCatalogId ? 'active' : ''}" type="button" data-catalog-id="${escapeHtml(row.id)}" title="${escapeHtml(row.title)}"><span class="catalog-book-title">${coverMarkup(workCover(row), title, { size: 'md', escapeHtml })}<span class="catalog-book-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(workAuthors(row) || 'Autor nieznany')}</small><small class="work-meta">${escapeHtml(meta)}${parts.series ? ` · ${escapeHtml(parts.series)}${parts.volume ? ' ' + parts.volume : ''}` : ''}</small>${missing.length ? `<small class="missing-facts">${missing.map((item) => `<span>brak: ${escapeHtml(item)}</span>`).join('')}</small>` : ''}</span></span><span>${row.editionCount}</span><span data-plural="${pluralForm(row.offerCount)}">${row.offerCount}</span><span>${['manual', 'verified'].includes(row.verificationStatus) ? '' : `<span class="status-pill warning">${escapeHtml(statusLabel(row.verificationStatus))}</span>`}</span></button>`;
+  // „×” removes the book straight from the list (no confirmation; „Cofnij” in the toast restores it).
+  return `<div class="catalog-row-wrap"><button type="button" class="catalog-row-remove" data-remove-work="${escapeHtml(row.id)}" title="Usuń z katalogu (cofniesz w powiadomieniu)" aria-label="Usuń z katalogu: ${escapeHtml(title)}">×</button><button class="catalog-row work-row ${row.id === state.selectedCatalogId ? 'active' : ''}" type="button" data-catalog-id="${escapeHtml(row.id)}" title="${escapeHtml(row.title)}"><span class="catalog-book-title">${coverMarkup(workCover(row), title, { size: 'md', escapeHtml })}<span class="catalog-book-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(workAuthors(row) || 'Autor nieznany')}</small><small class="work-meta">${escapeHtml(meta)}${parts.series ? ` · ${escapeHtml(parts.series)}${parts.volume ? ' ' + parts.volume : ''}` : ''}</small>${missing.length ? `<small class="missing-facts">${missing.map((item) => `<span>brak: ${escapeHtml(item)}</span>`).join('')}</small>` : ''}</span></span><span>${row.editionCount}</span><span data-plural="${pluralForm(row.offerCount)}">${row.offerCount}</span><span>${['manual', 'verified'].includes(row.verificationStatus) ? '' : `<span class="status-pill warning">${escapeHtml(statusLabel(row.verificationStatus))}</span>`}</span></button></div>`;
 }
 
 function renderSeriesSummary() {

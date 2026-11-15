@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (71) — Usuwanie książki jednym kliknięciem z listy
+
+- Na liście „Książki” (widok „Lista” i „Okładki”) po najechaniu na książkę na okładce pojawia się **„×”**. Kliknięcie od razu usuwa książkę z katalogu, bez okna potwierdzenia — działa jak „Usuń z katalogu” (oferty odrzucone, nowe oferty tej książki odrzucane same). Na telefonie „×” jest widoczny stale.
+- „Usuń z katalogu” na stronie książki też nie pyta już o potwierdzenie.
+- Zabezpieczeniem jest **„Cofnij”** w powiadomieniu albo „Narzędzia katalogu → Usunięte z katalogu → Przywróć”. Sprawdzone na kopii bazy: usunięcie i „Cofnij” przywracają książkę razem z jej ofertą.
+
 ## 2026-11-15 (70) — Krótsza strona książki: kafelki cen, akcje, oferty z linkami
 
 - Na górze strony książki są **kafelki**: najniższa cena i mediana dostępnych ofert, mediana sprzedanych na Vinted, **cena skupu** (najwyższa wycena skupksiazek.pl spośród wydań z ISBN-13) i liczba ofert. Przykład z kopii bazy, „Fourth Wing”: 20,00 zł / 40,00 zł (275 dostępnych) / 30,00 zł (15 sprzedaży) / skup 16,55 zł / 298 ofert.

@@ -995,6 +995,54 @@
   color: var(--warn);
   font-size: 11px;
 }
+/* „×” on the cover: removes the book from the list without a confirmation (2026-11-15). */
+.catalog-row-wrap {
+  position: relative;
+}
+.catalog-row-wrap > .catalog-row {
+  width: 100%;
+}
+.catalog-row-wrap.is-removing {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.catalog-row-remove {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--danger-text);
+  font: 700 18px/1 var(--font-ui);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.catalog-row-wrap:hover .catalog-row-remove,
+.catalog-row-remove:focus-visible {
+  opacity: 1;
+}
+.catalog-row-remove:hover {
+  background: var(--bad-soft);
+}
+@media (hover: none) {
+  .catalog-row-remove {
+    opacity: 0.9;
+  }
+}
+#catalogList.is-grid .catalog-row-remove {
+  top: 6px;
+  right: 6px;
+  left: auto;
+}
 #catalogList.is-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
