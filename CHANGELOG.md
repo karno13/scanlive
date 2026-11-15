@@ -2,6 +2,14 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (88) — Nowa zakładka „Okazje”
+
+- Menu boczne: „Okazje” — dostępne oferty co najmniej 20% i 5 zł poniżej wartości swojego wydania. Przy każdej: cena, ile egzemplarz jest wart (z przedziałem), różnica w zł i %, wiarygodność wyceny, link do ogłoszenia i do strony książki. Na kopii bazy: 150 okazji, z czego 56 z wyceną średnią lub wysoką.
+- Wartość liczona jest z pozostałych ofert i sprzedaży tego samego wydania (sama oferta nie zaniża swojego punktu odniesienia), dla stanu danego egzemplarza. Potrzebne są co najmniej dwie inne ceny; same ceny nowych książek w sklepach nie wystarczają. Zestawy i oferty przypisane do „wydania nieustalonego” są pomijane.
+- Domyślnie widać tylko wyceny o średniej i wysokiej wiarygodności; pole „Pokaż też wyceny o niskiej wiarygodności” odsłania resztę. Sortowanie: różnica w zł, rabat %, najnowsze, najniższa cena.
+- Oferta 70% i więcej poniżej wyceny dostaje ostrzeżenie „sprawdź przypisanie” — tak duża różnica częściej oznacza pomyłkę w przypisaniu niż okazję.
+- Na telefonie zakładki nie ma w dolnym pasku (jest już pełny); otwiera się z palety poleceń lub adresem `?view=deals`.
+
 ## 2026-11-15 (87) — Wycena: poprawki po sprawdzeniu na danych
 
 - Książka, której wydania różnią się ceną (1,5× i więcej), pokazuje zakres wycen wydań — np. „Wartość 26–43 zł zależnie od wydania” — zamiast jednej kwoty mieszającej twardą oprawę z miękką. Wycena każdego wydania jest na stronie książki.

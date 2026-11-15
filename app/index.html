@@ -24,6 +24,7 @@
     <symbol id="i-queue" viewBox="0 0 24 24"><path d="M9 11.5l2.2 2.2L15.5 9"/><circle cx="12" cy="12" r="9"/></symbol>
     <symbol id="i-books" viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/><path d="M9 7.5h6"/></symbol>
     <symbol id="i-offers" viewBox="0 0 24 24"><path d="M3.5 12.5V4.5a1 1 0 0 1 1-1h8l8 8a1 1 0 0 1 0 1.4l-6.6 6.6a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.3"/></symbol>
+    <symbol id="i-deals" viewBox="0 0 24 24"><path d="M4 7.5h9M4 7.5l3-3M4 7.5l3 3"/><path d="M12 20.5a6 6 0 1 0 0-12"/><path d="M12 12v5M10 14.5h4" transform="translate(2 0)"/></symbol>
     <symbol id="i-sources" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
     <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 14a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
   </svg>
@@ -36,6 +37,7 @@
         <button class="nav-item" type="button" data-view="queue" title="Kolejka"><span class="nav-glyph" aria-hidden="true"><svg class="ui-icon" width="22" height="22" focusable="false" aria-hidden="true"><use href="#i-queue"/></svg></span><span class="nav-label">Kolejka</span><small id="reviewNavCount">0 do decyzji</small></button>
         <button class="nav-item" type="button" data-view="catalog" title="Książki"><span class="nav-glyph" aria-hidden="true"><svg class="ui-icon" width="22" height="22" focusable="false" aria-hidden="true"><use href="#i-books"/></svg></span><span class="nav-label">Książki</span><small>Dzieła, wydania, serie</small></button>
         <button class="nav-item" type="button" data-view="offers" title="Oferty"><span class="nav-glyph" aria-hidden="true"><svg class="ui-icon" width="22" height="22" focusable="false" aria-hidden="true"><use href="#i-offers"/></svg></span><span class="nav-label">Oferty</span><small id="offersNavCount">0 zapisanych</small></button>
+        <button class="nav-item" type="button" data-view="deals" title="Okazje"><span class="nav-glyph" aria-hidden="true"><svg class="ui-icon" width="22" height="22" focusable="false" aria-hidden="true"><use href="#i-deals"/></svg></span><span class="nav-label">Okazje</span><small id="dealsNavCount">Poniżej wyceny</small></button>
         <button class="nav-item" type="button" data-view="scanner" title="Źródła"><span class="nav-glyph" aria-hidden="true"><svg class="ui-icon" width="22" height="22" focusable="false" aria-hidden="true"><use href="#i-sources"/></svg></span><span class="nav-label">Źródła</span><small>Stan źródeł i skan</small></button>
       </nav>
       <nav class="nav-list nav-secondary" aria-label="Ustawienia">
@@ -51,6 +53,12 @@
         <section class="view active" id="view-today" data-title="Dziś">
           <div class="view-heading today-heading"><div><p class="section-eyebrow">CO WYMAGA UWAGI</p><h2>Dziś</h2></div><span class="state-badge neutral" id="todaySince" role="status">Wczytywanie…</span><button class="button primary" type="button" id="todayReview">Weryfikacja</button><button class="button secondary" type="button" id="todayScan">Nowy skan</button></div>
           <div id="todayBody" class="today-body" aria-live="polite"><p class="inline-note">Wczytywanie podsumowania…</p></div>
+        </section>
+        <section class="view" id="view-deals" data-title="Okazje" hidden>
+          <div class="view-heading"><div><p class="section-eyebrow">OFERTY PONIŻEJ WYCENY</p><h2>Okazje</h2><p>Dostępne oferty co najmniej 20% i 5 zł poniżej wartości swojego wydania. Wartość liczona z pozostałych ofert i sprzedaży tego wydania, dla stanu danego egzemplarza.</p></div></div>
+          <div class="deals-toolbar"><label class="check-row"><input type="checkbox" id="dealsIncludeLow"> <span>Pokaż też wyceny o niskiej wiarygodności</span></label><label class="field deals-sort"><span>Sortuj</span><select id="dealsSort"><option value="saving">Największa różnica w zł</option><option value="discount">Największy rabat %</option><option value="newest">Najnowsze oferty</option><option value="price">Najniższa cena</option></select></label><span class="state-badge neutral" id="dealsCount" role="status">Wczytywanie…</span></div>
+          <p class="inline-note deals-note">Dostępne oferty co najmniej 20% i 5 zł poniżej wartości swojego wydania. Wartość liczona z pozostałych ofert i sprzedaży tego samego wydania, dla stanu danego egzemplarza — bez kosztów wysyłki i opłat.</p>
+          <div id="dealsList" class="deals-list" aria-live="polite"><p class="inline-note">Wczytywanie okazji…</p></div>
         </section>
         <section class="view" id="view-scanner" data-title="Źródła" hidden>
           <section class="today-sources sources-status" id="sourcesStatus" aria-label="Stan źródeł"><p class="inline-note">Wczytywanie stanu źródeł…</p></section>

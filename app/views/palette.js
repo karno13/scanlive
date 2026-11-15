@@ -38,6 +38,7 @@ export function installCommandPalette({ $, json, escapeHtml, money, showView, op
     ['queue', 'Kolejka', 'Weryfikacja, zestawy, podejrzane przypisania, duplikaty'],
     ['catalog', 'Książki', 'Dzieła, wydania i serie'],
     ['offers', 'Oferty', 'Wszystkie zebrane ogłoszenia'],
+    ['deals', 'Okazje', 'Oferty wyraźnie poniżej wyceny wydania'],
     ['scanner', 'Źródła', 'Stan źródeł i nowy skan'],
     ['sets', 'Zestawy', 'Kolejka: oferty z wieloma książkami'],
     ['settings', 'Ustawienia', 'Interfejs, reguły odrzucania, kopie'],

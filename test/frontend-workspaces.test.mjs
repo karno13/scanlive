@@ -17,7 +17,7 @@ test('desktop shell starts on Dziś and keeps every workspace in order', () => {
     (match) => match[1],
   );
   // Stage 2: "Kolejka" replaces "Do weryfikacji" and "Zestawy" (their screens are its tabs).
-  assert.deepEqual(views, ['today', 'queue', 'catalog', 'offers', 'scanner', 'settings']);
+  assert.deepEqual(views, ['today', 'queue', 'catalog', 'offers', 'deals', 'scanner', 'settings']);
   for (const id of ['view-review', 'view-sets', 'view-checks'])
     assert.match(html, new RegExp('id="' + id + '" data-title="Kolejka"'));
   assert.match(html, /class="view active" id="view-today" data-title="Dziś"/);

@@ -7,7 +7,7 @@ UI text, docs and changelog are **Polish**; code, comments and commit messages a
 
 - **What it is:** a local Windows app for one person (the owner). Node (no framework, no bundler, no runtime dependencies) + `node:sqlite` + vanilla ES-module frontend, opened at `http://127.0.0.1:4317`. Not a service: no multi-user, hosting, accounts or cloud.
 - **Purpose:** find used books for resale as a personal side income. Resale channel is Vinted, so Vinted prices are the reference; Polish editions only by default. Niche vs. broad market is still open — measure with data, do not assume.
-- **Current focus (since 2026-11-07):** scanner, catalogue, verification. Trading features (deal scoring, profit, ledger, alerts) are parked and hidden behind `body.trading-mode` (localStorage `bookflip.tradingMode=1`). No collector features, ever (`docs/PRODUCT-DIRECTION.md`).
+- **Current focus (since 2026-11-07):** scanner, catalogue, verification. Trading features (profit, costs, ledger, alerts) are parked and hidden behind `body.trading-mode` (localStorage `bookflip.tradingMode=1`). Exception since 2026-11-15, asked for by the owner: the „Okazje” tab (`deals.mjs`) lists buyable offers clearly below the market valuation of their edition — a price-against-valuation comparison only, no costs or profit. No collector features, ever (`docs/PRODUCT-DIRECTION.md`).
 - **Sources:** Allegro and OLX have no legal access (`docs/SOURCES-ACCESS-2026-11.md`) — they are not scanned and that is not a bug. Never work around CAPTCHA or blocks; every marketplace request goes through `marketplace-gate.mjs`.
 - **Maintenance goal:** future work must stay simple and cheap — small files per area, a fast `verify`, behaviour tests, no new dependencies or tooling without a clear saving.
 - **Git:** no remote, so `.github/workflows` never run; `npm run verify` is the check. The `remotes/gh/*` refs are the only copy of the history before 2026-11-07 — never prune or delete them. No configured git identity: commit with `-c user.name=… -c user.email=…` taken from `git log -1 --format='%an %ae'`.
@@ -67,14 +67,14 @@ One line per file: `docs/REPOSITORY-MAP.md`. Database: `docs/SCHEMA.sql` (genera
 
 ## Keep in sync
 
-| Change | Update |
-| --- | --- |
-| Anything the owner can see | Numbered entry at the top of `CHANGELOG.md` (Polish, a few lines, „**Błąd:**” for fixes, real numbers when measured) |
-| New, renamed or removed file | `docs/REPOSITORY-MAP.md` |
-| Migration | `node scripts/dump-schema.mjs`; the “last: NNN” number above |
-| Env var | Table „Konfiguracja” in `PRODUCTION-CATALOG.md` (the only list) |
-| How to run, back up, restore | `README.md` |
-| A settled decision changed | The first section of this file and `docs/PRODUCT-DIRECTION.md` |
+| Change                       | Update                                                                                                               |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Anything the owner can see   | Numbered entry at the top of `CHANGELOG.md` (Polish, a few lines, „**Błąd:**” for fixes, real numbers when measured) |
+| New, renamed or removed file | `docs/REPOSITORY-MAP.md`                                                                                             |
+| Migration                    | `node scripts/dump-schema.mjs`; the “last: NNN” number above                                                         |
+| Env var                      | Table „Konfiguracja” in `PRODUCTION-CATALOG.md` (the only list)                                                      |
+| How to run, back up, restore | `README.md`                                                                                                          |
+| A settled decision changed   | The first section of this file and `docs/PRODUCT-DIRECTION.md`                                                       |
 
 Other docs: `docs/DATA-MIGRATION.md` (updating, migrations, legacy tools), `docs/TAILSCALE.md` (phone access). `docs/archive/` is history — never a source of current rules. `test/documentation-current.test.mjs` pins a few phrases of README, `PRODUCTION-CATALOG.md` and `DATA-MIGRATION.md`.
 

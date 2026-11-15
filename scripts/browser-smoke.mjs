@@ -206,6 +206,7 @@ try {
     'checks',
     'catalog',
     'offers',
+    'deals',
     'settings',
   ]) {
     await goTo(page, view, '.sidebar');

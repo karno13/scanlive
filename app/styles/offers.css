@@ -474,3 +474,96 @@ body.density-compact .work-row .cover-md {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* „Okazje” (deals.mjs): offers clearly below the value of their edition */
+.deals-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 12px;
+}
+.deals-toolbar .deals-sort {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.deals-toolbar .state-badge {
+  margin-left: auto;
+}
+.deals-list {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.deal-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.deal-row:last-child {
+  border-bottom: 0;
+}
+.deal-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.deal-copy small {
+  color: var(--muted);
+}
+.deal-title {
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: 600;
+}
+.deal-copy .deal-warning {
+  color: var(--warn);
+}
+.deal-numbers {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  text-align: right;
+  white-space: nowrap;
+}
+.deal-numbers b {
+  font-size: 1.15em;
+}
+.deal-numbers span,
+.deal-numbers small {
+  color: var(--muted);
+}
+.deal-saving {
+  color: var(--good);
+}
+.deal-row.is-suspicious .deal-saving {
+  color: var(--warn);
+}
+.deals-note {
+  margin: 0 0 12px;
+}
+.deals-list > .inline-note {
+  margin: 14px;
+}
+@media (max-width: 900px) {
+  .deal-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .deal-numbers {
+    grid-column: 1 / -1;
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    align-items: baseline;
+    gap: 4px 12px;
+    white-space: normal;
+    text-align: left;
+  }
+}

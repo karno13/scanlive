@@ -266,6 +266,7 @@ const STATES = {
     await click(page, '[data-catalog-mode="manual"]');
   },
   offers: async (page) => view(page, 'offers'),
+  deals: async (page) => view(page, 'deals'),
   'offers-open': async (page) => {
     await view(page, 'offers');
     await click(page, '#offersTableBody [data-offer-id], #offersMobileList [data-mobile-offer-id]');

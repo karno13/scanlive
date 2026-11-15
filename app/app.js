@@ -9,6 +9,7 @@ import { connectLive } from './core/live.js';
 import { installQueue, QUEUE_TYPES, QUEUE_VIEWS } from './views/queue.js';
 import { mountRuleSettings } from './views/reject-rule.js';
 import { installSources } from './views/sources.js';
+import { installDeals } from './views/deals.js';
 import { createScanRun } from './views/scan-run.js';
 import { installScanProfiles } from './views/scan-profiles.js';
 import { installScanSeries } from './views/scan-series.js';
@@ -164,7 +165,7 @@ const viewScroll = new Map();
 function showView(name, options = {}) {
   // "Kolejka" opens the queue type used last (review, sets or one of the catalogue checks).
   if (name === 'queue') name = QUEUE_TYPES.find((type) => type.id === state.queueType)?.view || 'review';
-  if (!['today', 'scanner', 'review', 'checks', 'catalog', 'sets', 'offers', 'settings'].includes(name)) name = 'today';
+  if (!['today', 'scanner', 'review', 'checks', 'catalog', 'sets', 'offers', 'deals', 'settings'].includes(name)) name = 'today';
   if (hasUnsavedChanges()) {
     // Ask without blocking the page; the switch continues only after the user agrees.
     void confirmDiscard().then((ok) => { if (ok) showView(name, options); });
@@ -211,6 +212,7 @@ function showView(name, options = {}) {
   if (name === 'review') { renderReview(); void tradingControls?.refreshDecisions(); }
   if (name === 'catalog') renderCatalog();
   if (name === 'offers') renderOffers();
+  if (name === 'deals') void dealsView?.refresh();
   if (name === 'settings') { renderSettings(); void tradingControls?.refreshSettings(); void ruleSettings?.refresh(); }
   if (name === 'sets') void setsView.refreshSets().catch(error => toast(error.message));
   return true;
@@ -1081,6 +1083,7 @@ for (const id of ['catalogConflicts', 'catalogDuplicates']) {
 const queue = installQueue({ $, json, escapeHtml, showView, state });
 const ruleSettings = mountRuleSettings({ $, json, toast, escapeHtml });
 const sourcesView = installSources({ $, json, escapeHtml, openOffers });
+const dealsView = installDeals({ $, json, escapeHtml, money, openOfferDrawer, openWork: (id) => { if (showView('catalog')) void catalogView.openCatalogDetail(id); } });
 // The catalogue tools read their data when Katalog is first opened.
 let catalogToolsMounted = false;
 function mountCatalogTools() {

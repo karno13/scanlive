@@ -8,263 +8,265 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 
 ### Serwer i uruchamianie
 
-| Plik | Rola |
-| --- | --- |
-| `Uruchom BookFlip Scanner.cmd` | Start serwera na Windows (to samo co `npm start`) |
-| `Uruchom BookFlip przez Tailscale.cmd`, `scripts/start-tailscale.ps1` | Start z prywatnym dostępem z telefonu przez Tailscale Serve |
-| `scripts/windows-autostart.ps1` | Opcjonalny autostart przy logowaniu (Status/Enable/Disable); aplikacja nigdy go sama nie włącza |
-| `local-app.mjs` | Serwer HTTP: rozdział żądań, pliki interfejsu, start procesu i trasy zależne od stanu trwającego skanu (`/api/search`, `/api/today`, `/api/events`) |
-| `routes/image-routes.mjs` | Trasy zdjęć ofert i okładek |
-| `routes/review-routes.mjs` | Trasy kolejki weryfikacji: zadania identyfikacji, decyzje, decyzje wsadowe, sprawdzanie ISBN |
-| `routes/catalog-routes.mjs` | Trasy katalogu: dzieła, wydania, warianty, serie, osoby, zasilanie z BN, skup, eksport historii |
-| `routes/offer-routes.mjs` | Trasy ofert i zestawów |
-| `routes/source-routes.mjs` | Trasy widoku „Źródła”: stan źródeł i profile skanowania |
-| `app-runtime.mjs` | Wspólne dla procesu: otwarty katalog, usługa skupu, dziennik zdarzeń, stan skanu w pliku, blokada zapisu historii, `send` / `readJson` |
-| `scan-engine.mjs` | Przebieg skanu: walidacja żądania, odczyt źródeł z ponowieniami i stronicowaniem, kontrola języka Vinted, zapis ofert w trakcie skanu |
-| `background-jobs.mjs` | Zadania w tle po każdym przebiegu identyfikacji (`schedule*`): strony ofert, propozycje, ISBN, zestawy, cykl życia ofert, braki wydań |
-| `router.mjs` | Tabela tras: wzorce `/api/x/:id`, pierwsze dopasowanie wygrywa |
-| `api-routes.mjs` | Proste trasy JSON `/api/...` (tabela `apiRoutes`, handler zwraca wynik): katalog, kolejka, reguły, ustawienia, kopie, tryb handlu. Trasa z parametrem `catalog` w handlerze dostaje otwarty katalog albo żądanie kończy się 503 |
-| `static-asset-path.mjs` | Które ścieżki plików interfejsu wolno serwować |
-| `static-files.mjs` | Pliki interfejsu z gzip, `ETag` i odpowiedzią 304 |
-| `tailscale-access.mjs` | Dopuszcza tylko host Tailscale Serve i tożsamość właściciela |
-| `live-events.mjs` | Strumień zdarzeń `/api/events` (skan, kolejka, źródła) zamiast odpytywania |
+| Plik                                                                  | Rola                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Uruchom BookFlip Scanner.cmd`                                        | Start serwera na Windows (to samo co `npm start`)                                                                                                                                                                               |
+| `Uruchom BookFlip przez Tailscale.cmd`, `scripts/start-tailscale.ps1` | Start z prywatnym dostępem z telefonu przez Tailscale Serve                                                                                                                                                                     |
+| `scripts/windows-autostart.ps1`                                       | Opcjonalny autostart przy logowaniu (Status/Enable/Disable); aplikacja nigdy go sama nie włącza                                                                                                                                 |
+| `local-app.mjs`                                                       | Serwer HTTP: rozdział żądań, pliki interfejsu, start procesu i trasy zależne od stanu trwającego skanu (`/api/search`, `/api/today`, `/api/events`)                                                                             |
+| `routes/image-routes.mjs`                                             | Trasy zdjęć ofert i okładek                                                                                                                                                                                                     |
+| `routes/review-routes.mjs`                                            | Trasy kolejki weryfikacji: zadania identyfikacji, decyzje, decyzje wsadowe, sprawdzanie ISBN                                                                                                                                    |
+| `routes/catalog-routes.mjs`                                           | Trasy katalogu: dzieła, wydania, warianty, serie, osoby, zasilanie z BN, skup, eksport historii                                                                                                                                 |
+| `routes/offer-routes.mjs`                                             | Trasy ofert i zestawów                                                                                                                                                                                                          |
+| `routes/source-routes.mjs`                                            | Trasy widoku „Źródła”: stan źródeł i profile skanowania                                                                                                                                                                         |
+| `app-runtime.mjs`                                                     | Wspólne dla procesu: otwarty katalog, usługa skupu, dziennik zdarzeń, stan skanu w pliku, blokada zapisu historii, `send` / `readJson`                                                                                          |
+| `scan-engine.mjs`                                                     | Przebieg skanu: walidacja żądania, odczyt źródeł z ponowieniami i stronicowaniem, kontrola języka Vinted, zapis ofert w trakcie skanu                                                                                           |
+| `background-jobs.mjs`                                                 | Zadania w tle po każdym przebiegu identyfikacji (`schedule*`): strony ofert, propozycje, ISBN, zestawy, cykl życia ofert, braki wydań                                                                                           |
+| `router.mjs`                                                          | Tabela tras: wzorce `/api/x/:id`, pierwsze dopasowanie wygrywa                                                                                                                                                                  |
+| `api-routes.mjs`                                                      | Proste trasy JSON `/api/...` (tabela `apiRoutes`, handler zwraca wynik): katalog, kolejka, reguły, ustawienia, kopie, tryb handlu. Trasa z parametrem `catalog` w handlerze dostaje otwarty katalog albo żądanie kończy się 503 |
+| `static-asset-path.mjs`                                               | Które ścieżki plików interfejsu wolno serwować                                                                                                                                                                                  |
+| `static-files.mjs`                                                    | Pliki interfejsu z gzip, `ETag` i odpowiedzią 304                                                                                                                                                                               |
+| `tailscale-access.mjs`                                                | Dopuszcza tylko host Tailscale Serve i tożsamość właściciela                                                                                                                                                                    |
+| `live-events.mjs`                                                     | Strumień zdarzeń `/api/events` (skan, kolejka, źródła) zamiast odpytywania                                                                                                                                                      |
 
 ### SQLite i dane
 
-| Plik | Rola |
-| --- | --- |
-| `catalog-production.mjs` | Otwiera bazę, składa źródła metadanych, uruchamia `startup-jobs.mjs` |
-| `catalog-migrations.mjs` | Stosuje migracje z `migrations/` z kontrolą sum |
-| `migrations/NNN_*.sql` | **Niezmienne** migracje (`001`–`007`, `099`–`132`); nowa zmiana = kolejny numer |
+| Plik                                                                     | Rola                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `catalog-production.mjs`                                                 | Otwiera bazę, składa źródła metadanych, uruchamia `startup-jobs.mjs`                        |
+| `catalog-migrations.mjs`                                                 | Stosuje migracje z `migrations/` z kontrolą sum                                             |
+| `migrations/NNN_*.sql`                                                   | **Niezmienne** migracje (`001`–`007`, `099`–`132`); nowa zmiana = kolejny numer             |
 | `docs/SCHEMA.sql`, `scripts/dump-schema.mjs`, `test/schema-doc.test.mjs` | Aktualny schemat bazy w jednym pliku (generowany z migracji); test pilnuje, by był aktualny |
-| `startup-jobs.mjs` | Naprawy danych przy starcie jako zadania jednorazowe z flagą (`runOnce`) |
-| `catalog-data-location.mjs` | Ścieżka bazy w `%LOCALAPPDATA%` i kopia przed migracjami |
-| `auto-backup.mjs` | Codzienna kopia bazy w `backups` (7 najnowszych), opcjonalnie druga lokalizacja |
-| `catalog-repository.mjs` | Interfejs repozytorium katalogu (metody bazowe) |
-| `sqlite-catalog-repository.mjs` | Repozytorium SQLite: dzieła, wydania, oferty, zadania identyfikacji |
-| `sqlite-single-store.mjs` | Zapis skanu i ręcznych akcji w SQLite (jedyny tryb magazynu) |
-| `offer-ingest.mjs` | Jedyna droga zapisu ofert ze skanu (typ `ScannedOffer`) |
-| `offer-identity.mjs` | Normalizacja adresu oferty i identyfikator ogłoszenia w źródle |
-| `offer-history.mjs` | Funkcje pomocnicze dawnego formatu historii ofert (ISBN, struktura) |
-| `history-brief.mjs` | Lekkie etykiety książek dla listy ofert |
-| `sqlite-history-read.mjs` | Odczyt zgodny z dawnym `/api/history` (tylko eksport i narzędzia) |
-| `price-analysis.mjs` | Agregaty cen książek dla eksportu historii |
-| `catalog-api.mjs` | Odczyty list: dzieła, oferty, grupy ofert, kolejka weryfikacji |
-| `offer-workspace-api.mjs` | Notatki, cena docelowa i obserwowanie ofert |
-| `scan-profiles-api.mjs` | Zapisane profile skanowania w SQLite |
-| `work-series-api.mjs` | Ręczne adnotacje serii dzieła |
+| `startup-jobs.mjs`                                                       | Naprawy danych przy starcie jako zadania jednorazowe z flagą (`runOnce`)                    |
+| `catalog-data-location.mjs`                                              | Ścieżka bazy w `%LOCALAPPDATA%` i kopia przed migracjami                                    |
+| `auto-backup.mjs`                                                        | Codzienna kopia bazy w `backups` (7 najnowszych), opcjonalnie druga lokalizacja             |
+| `catalog-repository.mjs`                                                 | Interfejs repozytorium katalogu (metody bazowe)                                             |
+| `sqlite-catalog-repository.mjs`                                          | Repozytorium SQLite: dzieła, wydania, oferty, zadania identyfikacji                         |
+| `sqlite-single-store.mjs`                                                | Zapis skanu i ręcznych akcji w SQLite (jedyny tryb magazynu)                                |
+| `offer-ingest.mjs`                                                       | Jedyna droga zapisu ofert ze skanu (typ `ScannedOffer`)                                     |
+| `offer-identity.mjs`                                                     | Normalizacja adresu oferty i identyfikator ogłoszenia w źródle                              |
+| `offer-history.mjs`                                                      | Funkcje pomocnicze dawnego formatu historii ofert (ISBN, struktura)                         |
+| `history-brief.mjs`                                                      | Lekkie etykiety książek dla listy ofert                                                     |
+| `sqlite-history-read.mjs`                                                | Odczyt zgodny z dawnym `/api/history` (tylko eksport i narzędzia)                           |
+| `price-analysis.mjs`                                                     | Agregaty cen książek dla eksportu historii                                                  |
+| `catalog-api.mjs`                                                        | Odczyty list: dzieła, oferty, grupy ofert, kolejka weryfikacji                              |
+| `offer-workspace-api.mjs`                                                | Notatki, cena docelowa i obserwowanie ofert                                                 |
+| `scan-profiles-api.mjs`                                                  | Zapisane profile skanowania w SQLite                                                        |
+| `work-series-api.mjs`                                                    | Ręczne adnotacje serii dzieła                                                               |
 
 ### Skanowanie i źródła
 
-| Plik | Rola |
-| --- | --- |
-| `marketplaces.mjs` | Adaptery źródeł, `readSourceHtml`, filtr książek |
-| `antiquarian-sources.mjs` | Antykwariaty czytane po kategorii: adresy kategorii, stronicowanie i parsery list |
-| `html-text.mjs` | Tekst i atrybuty z HTML bez DOM (wspólne dla parserów) |
-| `marketplace-gate.mjs` | Wspólne, adaptacyjne tempo zapytań na źródło; każde zapytanie przechodzi tędy |
-| `local-scan.mjs` | Hosty źródeł i uruchomienie skanu z wiersza poleceń |
-| `search-policy.mjs` | Dopasowanie oferty do frazy i odsiewanie nie-książek |
-| `scan-schedule.mjs` | Harmonogram skanów profilu i szybki skan najnowszych |
-| `scan-cancellation.mjs` | Anulowanie trwającego skanu |
-| `scan-diagnostics.mjs` | Ograniczona diagnostyka przebiegu skanu |
-| `source-blocks.mjs` | Źródła blokujące odczyt i „brak legalnego dostępu” (Allegro, OLX) |
-| `source-status.mjs` | Czy źródło działa, od kiedy nie i dlaczego |
-| `source-details.mjs` | Fakty ze strony produktu (JSON-LD, atrybuty) |
-| `vinted-detail.mjs` | Odczyt strony ogłoszenia Vinted: język, ISBN, stan, zdjęcia |
-| `vinted-detail-cache.mjs`, `vinted-detail-sqlite-cache.mjs` | Pamięć podręczna stron Vinted: w procesie i w SQLite |
-| `language-policy.mjs` | „Tylko polskie wydania”: odrzucanie wydań obcojęzycznych |
-| `starter-profiles.mjs` | Profile skanowania tworzone przy pierwszym uruchomieniu |
-| `reference-parsers.mjs` | Parsery stron przeniesione z dawnego skanera |
+| Plik                                                        | Rola                                                                              |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `marketplaces.mjs`                                          | Adaptery źródeł, `readSourceHtml`, filtr książek                                  |
+| `antiquarian-sources.mjs`                                   | Antykwariaty czytane po kategorii: adresy kategorii, stronicowanie i parsery list |
+| `html-text.mjs`                                             | Tekst i atrybuty z HTML bez DOM (wspólne dla parserów)                            |
+| `marketplace-gate.mjs`                                      | Wspólne, adaptacyjne tempo zapytań na źródło; każde zapytanie przechodzi tędy     |
+| `local-scan.mjs`                                            | Hosty źródeł i uruchomienie skanu z wiersza poleceń                               |
+| `search-policy.mjs`                                         | Dopasowanie oferty do frazy i odsiewanie nie-książek                              |
+| `scan-schedule.mjs`                                         | Harmonogram skanów profilu i szybki skan najnowszych                              |
+| `scan-cancellation.mjs`                                     | Anulowanie trwającego skanu                                                       |
+| `scan-diagnostics.mjs`                                      | Ograniczona diagnostyka przebiegu skanu                                           |
+| `source-blocks.mjs`                                         | Źródła blokujące odczyt i „brak legalnego dostępu” (Allegro, OLX)                 |
+| `source-status.mjs`                                         | Czy źródło działa, od kiedy nie i dlaczego                                        |
+| `source-details.mjs`                                        | Fakty ze strony produktu (JSON-LD, atrybuty)                                      |
+| `vinted-detail.mjs`                                         | Odczyt strony ogłoszenia Vinted: język, ISBN, stan, zdjęcia                       |
+| `vinted-detail-cache.mjs`, `vinted-detail-sqlite-cache.mjs` | Pamięć podręczna stron Vinted: w procesie i w SQLite                              |
+| `language-policy.mjs`                                       | „Tylko polskie wydania”: odrzucanie wydań obcojęzycznych                          |
+| `starter-profiles.mjs`                                      | Profile skanowania tworzone przy pierwszym uruchomieniu                           |
+| `reference-parsers.mjs`                                     | Parsery stron przeniesione z dawnego skanera                                      |
 
 ### Identyfikacja: ISBN i metadane
 
-| Plik | Rola |
-| --- | --- |
-| `isbn.mjs` | Odczyt ISBN z oferty (tylko dowody, bez zgadywania) |
-| `isbn-normalization.mjs` | Czyszczenie i walidacja ISBN, formy 10/13 |
-| `catalog-resolver.mjs` | ISBN → wydanie: wybór rekordu BN / Open Library |
-| `identification-worker.mjs` | Przetwarzanie zadań identyfikacji i kierowanie do weryfikacji |
-| `identification-scheduler.mjs` | Kadencja partii identyfikacji, wznowienie po restarcie |
-| `identification-retry.mjs` | Ponowienie zadań, gdy ISBN trafił już do katalogu |
-| `metadata-lookup.mjs` | Zapytanie o ISBN w kolejnych źródłach z cache SQLite |
-| `metadata-http.mjs` | Limity zapytań do dostawców i krótki cache w procesie |
-| `metadata-record.mjs` | Wspólny kształt rekordu metadanych |
-| `metadata-sources/bn.mjs` | Biblioteka Narodowa (pierwsze źródło) |
-| `metadata-sources/open-library.mjs` | Open Library |
-| `metadata-sources/e-isbn.mjs` | e-ISBN, krajowy rejestr ISBN |
-| `metadata-sources/google-books.mjs` | Google Books, tylko z kluczem |
-| `metadata-sources/lubimyczytac.mjs` | lubimyczytac.pl, tylko przez `isbn-lookups.mjs` |
-| `isbn-lookups.mjs` | Szukanie nieznanych ISBN na lubimyczytac.pl w tle |
-| `bn-marc.mjs` | Odczyt rekordu MARC 21 z BN: osoby, serie, tomy |
-| `catalog-bibliography.mjs` | Osoby z rolami, serie i opis fizyczny wydań |
-| `catalog-title-isbn.mjs` | Kandydaci ISBN po tytule |
-| `title-proposals.mjs` | Propozycje wydań po tytule dla ofert bez ISBN |
-| `title-consistency.mjs` | Wykrywanie ISBN niepasującego do tytułu oferty |
-| `title-repair.mjs` | Poprawa tytułów wielkimi literami lub bez polskich znaków |
-| `publisher-names.mjs` | Jedna pisownia wydawców |
-| `name-aliases.mjs` | Ręczne łączenie wariantów nazw wydawców i serii |
+| Plik                                | Rola                                                          |
+| ----------------------------------- | ------------------------------------------------------------- |
+| `isbn.mjs`                          | Odczyt ISBN z oferty (tylko dowody, bez zgadywania)           |
+| `isbn-normalization.mjs`            | Czyszczenie i walidacja ISBN, formy 10/13                     |
+| `catalog-resolver.mjs`              | ISBN → wydanie: wybór rekordu BN / Open Library               |
+| `identification-worker.mjs`         | Przetwarzanie zadań identyfikacji i kierowanie do weryfikacji |
+| `identification-scheduler.mjs`      | Kadencja partii identyfikacji, wznowienie po restarcie        |
+| `identification-retry.mjs`          | Ponowienie zadań, gdy ISBN trafił już do katalogu             |
+| `metadata-lookup.mjs`               | Zapytanie o ISBN w kolejnych źródłach z cache SQLite          |
+| `metadata-http.mjs`                 | Limity zapytań do dostawców i krótki cache w procesie         |
+| `metadata-record.mjs`               | Wspólny kształt rekordu metadanych                            |
+| `metadata-sources/bn.mjs`           | Biblioteka Narodowa (pierwsze źródło)                         |
+| `metadata-sources/open-library.mjs` | Open Library                                                  |
+| `metadata-sources/e-isbn.mjs`       | e-ISBN, krajowy rejestr ISBN                                  |
+| `metadata-sources/google-books.mjs` | Google Books, tylko z kluczem                                 |
+| `metadata-sources/lubimyczytac.mjs` | lubimyczytac.pl, tylko przez `isbn-lookups.mjs`               |
+| `isbn-lookups.mjs`                  | Szukanie nieznanych ISBN na lubimyczytac.pl w tle             |
+| `bn-marc.mjs`                       | Odczyt rekordu MARC 21 z BN: osoby, serie, tomy               |
+| `catalog-bibliography.mjs`          | Osoby z rolami, serie i opis fizyczny wydań                   |
+| `catalog-title-isbn.mjs`            | Kandydaci ISBN po tytule                                      |
+| `title-proposals.mjs`               | Propozycje wydań po tytule dla ofert bez ISBN                 |
+| `title-consistency.mjs`             | Wykrywanie ISBN niepasującego do tytułu oferty                |
+| `title-repair.mjs`                  | Poprawa tytułów wielkimi literami lub bez polskich znaków     |
+| `publisher-names.mjs`               | Jedna pisownia wydawców                                       |
+| `name-aliases.mjs`                  | Ręczne łączenie wariantów nazw wydawców i serii               |
 
 ### Weryfikacja i decyzje
 
-| Plik | Rola |
-| --- | --- |
-| `offer-enrichment.mjs` | Dane ze strony oferty w tle, ponowienia po blokadzie |
-| `offer-editions.mjs` | Wydania tworzone z ogłoszenia, gdy nikt nie zna ISBN |
-| `offer-assignment.mjs` | Ręczna zmiana lub odłączenie przypisania oferty |
-| `game-material.mjs` | Podręczniki do gier i wydania obcojęzyczne poza katalogiem |
-| `bundle-detection.mjs` | Wykrywanie zestawów po słowach i tytułach z katalogu |
-| `rejected-offers.mjs` | Odrzucanie powtórek wcześniej odrzuconych ofert |
-| `catalog-removal.mjs` | „Usuń z katalogu”: ukrycie dzieła, odrzucenie jego ofert (także przyszłych), przywracanie |
-| `rejection-rules.mjs` | Reguły „odrzucaj takie zawsze” (sprzedawca, fraza, cena) |
-| `review-batches.mjs` | Decyzje wsadowe „Szybkie” i „Do dodania”, cofane w całości |
-| `empik-references.mjs` | Odwracalne przypisanie cen odniesienia Empiku do dzieła |
+| Plik                   | Rola                                                                                      |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| `offer-enrichment.mjs` | Dane ze strony oferty w tle, ponowienia po blokadzie                                      |
+| `offer-editions.mjs`   | Wydania tworzone z ogłoszenia, gdy nikt nie zna ISBN                                      |
+| `offer-assignment.mjs` | Ręczna zmiana lub odłączenie przypisania oferty                                           |
+| `game-material.mjs`    | Podręczniki do gier i wydania obcojęzyczne poza katalogiem                                |
+| `bundle-detection.mjs` | Wykrywanie zestawów po słowach i tytułach z katalogu                                      |
+| `rejected-offers.mjs`  | Odrzucanie powtórek wcześniej odrzuconych ofert                                           |
+| `catalog-removal.mjs`  | „Usuń z katalogu”: ukrycie dzieła, odrzucenie jego ofert (także przyszłych), przywracanie |
+| `rejection-rules.mjs`  | Reguły „odrzucaj takie zawsze” (sprzedawca, fraza, cena)                                  |
+| `review-batches.mjs`   | Decyzje wsadowe „Szybkie” i „Do dodania”, cofane w całości                                |
+| `empik-references.mjs` | Odwracalne przypisanie cen odniesienia Empiku do dzieła                                   |
 
 ### Katalog: dzieła, wydania, serie
 
-| Plik | Rola |
-| --- | --- |
-| `work-grouping.mjs` | Grupowanie wydań w dzieła i kandydaci na duplikaty |
-| `distinct-works.mjs` | „To różne książki”: odwracalne rozdzielenie duplikatów |
-| `edition-variants.mjs` | Warianty cenowe wydań i „Wydanie nieustalone” |
-| `edition-gaps.mjs` | Uzupełnianie wydawcy i roku wydań ze źródeł (odwracalne) |
-| `edition-series.mjs` | Cykl i tom z ogłoszeń i e-ISBN |
-| `catalog-series.mjs` | Widok serii: uniwersum → cykl → tom |
-| `universes.mjs` | Uniwersa jako dane (tabela `universes`) |
-| `catalog-seeding.mjs` | Zasilanie katalogu z BN po autorze, wydawcy lub tytule |
-| `catalog-insights.mjs` | Kompletność danych i braki w katalogu |
-| `catalog-measures.mjs` | Cztery miary ekranu „Dziś” z trendem |
-| `today.mjs` | Dane ekranu „Dziś” w jednym zapytaniu |
+| Plik                   | Rola                                                     |
+| ---------------------- | -------------------------------------------------------- |
+| `work-grouping.mjs`    | Grupowanie wydań w dzieła i kandydaci na duplikaty       |
+| `distinct-works.mjs`   | „To różne książki”: odwracalne rozdzielenie duplikatów   |
+| `edition-variants.mjs` | Warianty cenowe wydań i „Wydanie nieustalone”            |
+| `edition-gaps.mjs`     | Uzupełnianie wydawcy i roku wydań ze źródeł (odwracalne) |
+| `edition-series.mjs`   | Cykl i tom z ogłoszeń i e-ISBN                           |
+| `catalog-series.mjs`   | Widok serii: uniwersum → cykl → tom                      |
+| `universes.mjs`        | Uniwersa jako dane (tabela `universes`)                  |
+| `catalog-seeding.mjs`  | Zasilanie katalogu z BN po autorze, wydawcy lub tytule   |
+| `catalog-insights.mjs` | Kompletność danych i braki w katalogu                    |
+| `catalog-measures.mjs` | Cztery miary ekranu „Dziś” z trendem                     |
+| `today.mjs`            | Dane ekranu „Dziś” w jednym zapytaniu                    |
 
 ### Oferty, zestawy i sygnał sprzedaży
 
-| Plik | Rola |
-| --- | --- |
-| `offer-observations.mjs` | Stan egzemplarza, sprzedawca, opłaty, zdjęcia, surowe dane ogłoszenia |
-| `offer-kinds.mjs` | Rodzaj oferty: sklep / antykwariat / prywatna |
-| `offer-availability.mjs` | Oznaczanie ofert, których pełny skan już nie zwraca |
-| `offer-status.mjs` | Historia stanów oferty, przedział sprzedaży, ponowne wystawienia |
-| `offer-lifecycle.mjs` | Sprawdzanie stron ofert, które zniknęły ze skanów |
-| `offer-images.mjs` | Walidacja i lokalne proxy zdjęć oraz okładek |
-| `offer-sets.mjs` | Zestawy: jedna oferta z kilkoma wydaniami |
-| `set-descriptions.mjs` | Skład zestawu z opisu ogłoszenia |
-| `price-stats.mjs` | Statystyki cen w SQL, w groszach |
-| `market-valuation.mjs` | Wycena rynkowa książki/wydania: przedział, wiarygodność, uzasadnienie |
-| `buyback-quotes.mjs`, `buyback-skupksiazek.mjs` | Ceny skupu hurtowego (skupksiazek.pl) |
+| Plik                                            | Rola                                                                             |
+| ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| `offer-observations.mjs`                        | Stan egzemplarza, sprzedawca, opłaty, zdjęcia, surowe dane ogłoszenia            |
+| `offer-kinds.mjs`                               | Rodzaj oferty: sklep / antykwariat / prywatna                                    |
+| `offer-availability.mjs`                        | Oznaczanie ofert, których pełny skan już nie zwraca                              |
+| `offer-status.mjs`                              | Historia stanów oferty, przedział sprzedaży, ponowne wystawienia                 |
+| `offer-lifecycle.mjs`                           | Sprawdzanie stron ofert, które zniknęły ze skanów                                |
+| `offer-images.mjs`                              | Walidacja i lokalne proxy zdjęć oraz okładek                                     |
+| `offer-sets.mjs`                                | Zestawy: jedna oferta z kilkoma wydaniami                                        |
+| `set-descriptions.mjs`                          | Skład zestawu z opisu ogłoszenia                                                 |
+| `price-stats.mjs`                               | Statystyki cen w SQL, w groszach                                                 |
+| `deals.mjs`                                     | „Okazje”: dostępne oferty wyraźnie poniżej wyceny swojego wydania (`/api/deals`) |
+| `market-valuation.mjs`                          | Wycena rynkowa książki/wydania: przedział, wiarygodność, uzasadnienie            |
+| `buyback-quotes.mjs`, `buyback-skupksiazek.mjs` | Ceny skupu hurtowego (skupksiazek.pl)                                            |
 
 ### Frontend
 
-| Plik | Rola |
-| --- | --- |
-| `app/index.html` | Szkielet: sześć zakładek (Dziś, Kolejka, Książki, Oferty, Źródła, Ustawienia) |
-| `app/app.js` | Powłoka: zakładki, adres URL, łączenie widoków |
-| `app/styles/*.css` | Style w 12 plikach dołączanych z `index.html` w stałej kolejności (= kolejność kaskady): `tokens` (kolory jako zmienne, motyw ciemny zmienia tylko wartości), `base`, `shell` (pasek boczny i górny, nawigacja mobilna), `components`, potem obszary `today`, `queue`, `catalog`, `offers`, `sets`, `sources`, `settings`, `trading`. Jedna reguła na selektor w danym kontekście; reguła, która musi przyjść po regule późniejszego pliku, stoi tam pod notatką „Z obszaru …” |
-| `app/frontend-utils.js` | Pomocnicze funkcje przeglądarki bez DOM |
-| `app/scan-stream.js` | Odczyt strumienia wyników skanu (NDJSON) |
-| `app/core/api.js` | Wspólne zapytanie HTTP JSON |
-| `app/core/bibliography.js` | Czytelne etykiety BN, okładki i miniatury |
-| `app/core/detail-navigation.js` | Powrót ze szczegółów do listy bez utraty formularza |
-| `app/core/dialogs.js` | Dostępne okna potwierdzeń zamiast `confirm`/`alert` |
-| `app/core/formatters.js` | Formatowanie dat, kwot i HTML |
-| `app/core/valuation.js` | Wycena rynkowa w interfejsie: linia na liście, ramka na stronie książki |
-| `app/core/identification-progress.js` | Postęp kolejki identyfikacji |
-| `app/core/live.js` | Połączenie ze strumieniem `/api/events`, ponowne łączenie |
-| `app/core/preferences.js` | Preferencje interfejsu w `localStorage` |
-| `app/core/scan-limits.js` | Limit fraz skanu i profilu (wspólny dla interfejsu i serwera) |
-| `app/core/ux.js` | Etykiety stanów, niezapisane zmiany, odczyt kwot |
-| `app/core/view-history.js` | Widok ↔ adres URL (bez DOM) |
-| `app/views/today.js` | Ekran „Dziś”: kafle, źródła, skany, miary |
-| `app/views/since-last-visit.js` | Moment poprzedniej wizyty dla „Dziś” |
-| `app/views/dashboard.js` | Zwinięty „Stan katalogu” na dole „Dziś” |
-| `app/views/queue.js` | „Kolejka”: zakładki typów decyzji i wspólne skróty |
-| `app/views/review.js` | Weryfikacja ofert: lista, propozycje, decyzje |
-| `app/views/review-bulk.js` | Zaznaczanie wielu ofert i jedna akcja dla wszystkich |
-| `app/views/review-batch.js` | Siatka kart w „Szybkie” i „Do dodania” |
-| `app/views/review-photo.js` | Powiększenie zdjęcia, zdjęcie obok okładki |
-| `app/views/reject-rule.js` | Okno „Odrzuć z regułą…” i lista reguł |
-| `app/views/duplicates.js` | „Możliwe duplikaty dzieł” |
-| `app/views/book-page.js` | Góra strony książki: kafelki cen (z ceną skupu), pasek akcji, lista ofert z linkami do ogłoszeń |
-| `app/views/removed-works.js` | „Usuń z katalogu” (bez potwierdzenia, z „Cofnij”) na stronie książki i na liście, panel „Usunięte z katalogu” |
-| `app/views/title-conflicts.js` | „Podejrzane przypisania” (tytuł niezgodny z wydaniem) |
-| `app/views/sets.js` | Zestawy: lista i skład |
-| `app/views/set-trading.js` | Koszt i scenariusz zestawu (tryb handlu) |
-| `app/views/catalog.js` | „Książki”: dzieła, wydania, filtry braków |
-| `app/views/catalog-names.js` | „Wydawcy i serie”: łączenie nazw, uniwersa |
-| `app/views/catalog-seeds.js` | Panel zasilania katalogu z BN |
-| `app/views/series.js` | Adnotacje serii i tomów w przeglądarce |
-| `app/views/edition-history.js` | Historia cen wydania z zapisanych obserwacji |
-| `app/views/work-prices.js` | Ceny książki we wszystkich wydaniach i wariantach |
-| `app/views/buyback.js` | Cena skupu przy wydaniach |
-| `app/views/offers.js` | „Oferty”: lista, filtry, szczegóły, grupowanie „Wg książki” |
-| `app/views/offer-assignment.js` | Zmiana lub odłączenie wydania oferty |
-| `app/views/offer-workspace.js` | Notatki i obserwowanie ofert |
-| `app/views/sources.js` | „Źródła”: stan każdego źródła nad formularzem skanu |
-| `app/views/scanner.js` | Start skanu i śledzenie jego strumienia |
-| `app/views/scan-run.js` | Panel „Przebieg skanu” |
-| `app/views/scan-insights.js` | Diagnostyka lokalnego skanu |
-| `app/views/scan-profiles.js` | Zapisane wyszukiwania (profile) |
-| `app/views/scan-series.js` | „Szukaj po serii”: uzgodnione listy tytułów wstawiane jako frazy |
-| `app/views/scan-schedule.js` | Automatyczny skan profilu co N godzin |
-| `app/views/trading-controls.js` | Przyciski następnych kroków pod panelem przebiegu |
-| `app/views/settings.js` | Ustawienia, skuteczność fraz, diagnostyka identyfikacji |
-| `app/views/palette.js` | Paleta poleceń `Ctrl+K` |
+| Plik                                  | Rola                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `app/index.html`                      | Szkielet: sześć zakładek (Dziś, Kolejka, Książki, Oferty, Źródła, Ustawienia)                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `app/app.js`                          | Powłoka: zakładki, adres URL, łączenie widoków                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `app/styles/*.css`                    | Style w 12 plikach dołączanych z `index.html` w stałej kolejności (= kolejność kaskady): `tokens` (kolory jako zmienne, motyw ciemny zmienia tylko wartości), `base`, `shell` (pasek boczny i górny, nawigacja mobilna), `components`, potem obszary `today`, `queue`, `catalog`, `offers`, `sets`, `sources`, `settings`, `trading`. Jedna reguła na selektor w danym kontekście; reguła, która musi przyjść po regule późniejszego pliku, stoi tam pod notatką „Z obszaru …” |
+| `app/frontend-utils.js`               | Pomocnicze funkcje przeglądarki bez DOM                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `app/scan-stream.js`                  | Odczyt strumienia wyników skanu (NDJSON)                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `app/core/api.js`                     | Wspólne zapytanie HTTP JSON                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `app/core/bibliography.js`            | Czytelne etykiety BN, okładki i miniatury                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `app/core/detail-navigation.js`       | Powrót ze szczegółów do listy bez utraty formularza                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `app/core/dialogs.js`                 | Dostępne okna potwierdzeń zamiast `confirm`/`alert`                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `app/core/formatters.js`              | Formatowanie dat, kwot i HTML                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `app/core/valuation.js`               | Wycena rynkowa w interfejsie: linia na liście, ramka na stronie książki                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `app/core/identification-progress.js` | Postęp kolejki identyfikacji                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `app/core/live.js`                    | Połączenie ze strumieniem `/api/events`, ponowne łączenie                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `app/core/preferences.js`             | Preferencje interfejsu w `localStorage`                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `app/core/scan-limits.js`             | Limit fraz skanu i profilu (wspólny dla interfejsu i serwera)                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `app/core/ux.js`                      | Etykiety stanów, niezapisane zmiany, odczyt kwot                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `app/core/view-history.js`            | Widok ↔ adres URL (bez DOM)                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `app/views/today.js`                  | Ekran „Dziś”: kafle, źródła, skany, miary                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `app/views/since-last-visit.js`       | Moment poprzedniej wizyty dla „Dziś”                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `app/views/dashboard.js`              | Zwinięty „Stan katalogu” na dole „Dziś”                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `app/views/queue.js`                  | „Kolejka”: zakładki typów decyzji i wspólne skróty                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `app/views/review.js`                 | Weryfikacja ofert: lista, propozycje, decyzje                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `app/views/review-bulk.js`            | Zaznaczanie wielu ofert i jedna akcja dla wszystkich                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `app/views/review-batch.js`           | Siatka kart w „Szybkie” i „Do dodania”                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `app/views/review-photo.js`           | Powiększenie zdjęcia, zdjęcie obok okładki                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `app/views/reject-rule.js`            | Okno „Odrzuć z regułą…” i lista reguł                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `app/views/duplicates.js`             | „Możliwe duplikaty dzieł”                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `app/views/book-page.js`              | Góra strony książki: kafelki cen (z ceną skupu), pasek akcji, lista ofert z linkami do ogłoszeń                                                                                                                                                                                                                                                                                                                                                                                |
+| `app/views/removed-works.js`          | „Usuń z katalogu” (bez potwierdzenia, z „Cofnij”) na stronie książki i na liście, panel „Usunięte z katalogu”                                                                                                                                                                                                                                                                                                                                                                  |
+| `app/views/title-conflicts.js`        | „Podejrzane przypisania” (tytuł niezgodny z wydaniem)                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `app/views/sets.js`                   | Zestawy: lista i skład                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `app/views/set-trading.js`            | Koszt i scenariusz zestawu (tryb handlu)                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `app/views/catalog.js`                | „Książki”: dzieła, wydania, filtry braków                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `app/views/catalog-names.js`          | „Wydawcy i serie”: łączenie nazw, uniwersa                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `app/views/catalog-seeds.js`          | Panel zasilania katalogu z BN                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `app/views/series.js`                 | Adnotacje serii i tomów w przeglądarce                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `app/views/edition-history.js`        | Historia cen wydania z zapisanych obserwacji                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `app/views/work-prices.js`            | Ceny książki we wszystkich wydaniach i wariantach                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `app/views/buyback.js`                | Cena skupu przy wydaniach                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `app/views/offers.js`                 | „Oferty”: lista, filtry, szczegóły, grupowanie „Wg książki”                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `app/views/offer-assignment.js`       | Zmiana lub odłączenie wydania oferty                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `app/views/offer-workspace.js`        | Notatki i obserwowanie ofert                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `app/views/deals.js`                  | „Okazje”: lista ofert poniżej wyceny, filtr wiarygodności, sortowanie                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `app/views/sources.js`                | „Źródła”: stan każdego źródła nad formularzem skanu                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `app/views/scanner.js`                | Start skanu i śledzenie jego strumienia                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `app/views/scan-run.js`               | Panel „Przebieg skanu”                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `app/views/scan-insights.js`          | Diagnostyka lokalnego skanu                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `app/views/scan-profiles.js`          | Zapisane wyszukiwania (profile)                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `app/views/scan-series.js`            | „Szukaj po serii”: uzgodnione listy tytułów wstawiane jako frazy                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `app/views/scan-schedule.js`          | Automatyczny skan profilu co N godzin                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `app/views/trading-controls.js`       | Przyciski następnych kroków pod panelem przebiegu                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `app/views/settings.js`               | Ustawienia, skuteczność fraz, diagnostyka identyfikacji                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `app/views/palette.js`                | Paleta poleceń `Ctrl+K`                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ### Testy i kontrole
 
-| Plik | Rola |
-| --- | --- |
-| `test/*.test.mjs`, `test/*.test.js`, `app/**/*.test.mjs`, `scripts/*.test.mjs` | Testy Node (`node:test`); wszystkie testy serwera są w `test/` |
-| `scripts/run-tests.mjs`, `scripts/isolated-runtime.mjs` | `npm test`: każdy proces testowy na tymczasowym katalogu danych |
-| `sqlite-concurrency-worker.mjs` | Proces pomocniczy testu równoległego zapisu SQLite |
-| `scripts/verify.mjs` | `npm run verify`: lint, typy, formatowanie, testy; stop na pierwszym błędzie |
-| `eslint.config.mjs`, `tsconfig.typecheck.json` | Reguły lintu (z `no-undef`) i lista plików `// @ts-check` |
-| `test/typecheck-coverage.test.mjs` | Pilnuje, by każdy plik `// @ts-check` był w `tsconfig.typecheck.json` |
-| `test/theme-tokens.test.mjs`, `test/documentation-current.test.mjs` | Kolory tylko przez tokeny; wymagane frazy dokumentacji |
-| `app-styles.mjs` | Arkusze stylów z `index.html` (w kolejności `<link>`) jako sparsowane reguły — dla testów zasad struktury, niezależnie od formatowania |
-| `fixtures/` | Zapisane strony źródeł dla testów parserów |
-| `scripts/browser-smoke.mjs` | Test Chromium: widoki, oba motywy, kontrast, ukryte elementy, pola 16 px / 44 px na telefonie, widoczny fokus, ograniczenie ruchu (Playwright) |
-| `scripts/css-snapshot.mjs` | Style obliczone każdego elementu we wszystkich widokach i stanach; `--verify` porównuje rewizję z drzewem roboczym (zmiany CSS bez zmiany wyglądu) |
+| Plik                                                                           | Rola                                                                                                                                               |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test/*.test.mjs`, `test/*.test.js`, `app/**/*.test.mjs`, `scripts/*.test.mjs` | Testy Node (`node:test`); wszystkie testy serwera są w `test/`                                                                                     |
+| `scripts/run-tests.mjs`, `scripts/isolated-runtime.mjs`                        | `npm test`: każdy proces testowy na tymczasowym katalogu danych                                                                                    |
+| `sqlite-concurrency-worker.mjs`                                                | Proces pomocniczy testu równoległego zapisu SQLite                                                                                                 |
+| `scripts/verify.mjs`                                                           | `npm run verify`: lint, typy, formatowanie, testy; stop na pierwszym błędzie                                                                       |
+| `eslint.config.mjs`, `tsconfig.typecheck.json`                                 | Reguły lintu (z `no-undef`) i lista plików `// @ts-check`                                                                                          |
+| `test/typecheck-coverage.test.mjs`                                             | Pilnuje, by każdy plik `// @ts-check` był w `tsconfig.typecheck.json`                                                                              |
+| `test/theme-tokens.test.mjs`, `test/documentation-current.test.mjs`            | Kolory tylko przez tokeny; wymagane frazy dokumentacji                                                                                             |
+| `app-styles.mjs`                                                               | Arkusze stylów z `index.html` (w kolejności `<link>`) jako sparsowane reguły — dla testów zasad struktury, niezależnie od formatowania             |
+| `fixtures/`                                                                    | Zapisane strony źródeł dla testów parserów                                                                                                         |
+| `scripts/browser-smoke.mjs`                                                    | Test Chromium: widoki, oba motywy, kontrast, ukryte elementy, pola 16 px / 44 px na telefonie, widoczny fokus, ograniczenie ruchu (Playwright)     |
+| `scripts/css-snapshot.mjs`                                                     | Style obliczone każdego elementu we wszystkich widokach i stanach; `--verify` porównuje rewizję z drzewem roboczym (zmiany CSS bez zmiany wyglądu) |
 
 ### Narzędzia i pomiary
 
-| Plik | Rola |
-| --- | --- |
-| `scripts/backup-catalog.mjs`, `scripts/restore-catalog.mjs` | `npm run backup` / `npm run restore` z kontrolą integralności |
-| `scripts/lookup-isbn.mjs` | Ręczne sprawdzenie ISBN w źródłach metadanych |
-| `scripts/benchmark-scan.mjs`, `scripts/benchmark-identification.mjs` | Pomiary na syntetycznej bazie, bez internetu |
-| `scripts/ux-review-measure.mjs` | Zrzuty i pomiary na kopii bazy (port 4399) |
-| `scripts/ux-shots.mjs` | Zrzuty widoków w obu motywach, przewijanie i cele dotykowe |
-| `scripts/ux-review-acceptance.mjs` | Kontrola układu przy 390, 1100, 1440 i 1920 px |
-| `scripts/ux-review-contact.mjs` | Zestawienia zrzutów do kontroli wizualnej |
-| `scripts/measure-quick-tab.mjs` | Liczba akcji w zakładce „Szybkie” (na kopii bazy) |
-| `scripts/measure-network.mjs` | Zapytania i bajty interfejsu przy starcie i po przejściu widoków |
-| `scripts/page-settle.mjs` | Czekanie na ciszę w sieci z pominięciem `/api/events` |
+| Plik                                                                 | Rola                                                             |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `scripts/backup-catalog.mjs`, `scripts/restore-catalog.mjs`          | `npm run backup` / `npm run restore` z kontrolą integralności    |
+| `scripts/lookup-isbn.mjs`                                            | Ręczne sprawdzenie ISBN w źródłach metadanych                    |
+| `scripts/benchmark-scan.mjs`, `scripts/benchmark-identification.mjs` | Pomiary na syntetycznej bazie, bez internetu                     |
+| `scripts/ux-review-measure.mjs`                                      | Zrzuty i pomiary na kopii bazy (port 4399)                       |
+| `scripts/ux-shots.mjs`                                               | Zrzuty widoków w obu motywach, przewijanie i cele dotykowe       |
+| `scripts/ux-review-acceptance.mjs`                                   | Kontrola układu przy 390, 1100, 1440 i 1920 px                   |
+| `scripts/ux-review-contact.mjs`                                      | Zestawienia zrzutów do kontroli wizualnej                        |
+| `scripts/measure-quick-tab.mjs`                                      | Liczba akcji w zakładce „Szybkie” (na kopii bazy)                |
+| `scripts/measure-network.mjs`                                        | Zapytania i bajty interfejsu przy starcie i po przejściu widoków |
+| `scripts/page-settle.mjs`                                            | Czekanie na ciszę w sieci z pominięciem `/api/events`            |
 
 ### Dokumentacja
 
-| Plik | Rola |
-| --- | --- |
-| `README.md` | Uruchomienie, obszary aplikacji, dane i kopie, testowanie, spis dokumentacji |
-| `CLAUDE.md` | Brief dla agentów: ustalenia, sposób pracy, polecenia, przepisy „jak dodać…”, co aktualizować |
-| `CHANGELOG.md` | Numerowane zmiany od 2026-11-10; starsze w `docs/archive/` |
-| `PRODUCTION-CATALOG.md` | Przepływ identyfikacji, źródła metadanych, wszystkie zmienne środowiskowe |
-| `docs/PRODUCT-DIRECTION.md` | Cel produktu, założenia właściciela, bieżący priorytet, czego nie robimy |
-| `docs/SCHEMA.sql` | Aktualny schemat bazy (generowany) |
-| `docs/DATA-MIGRATION.md` | Aktualizacja programu, migracje, dawne narzędzia JSON |
-| `docs/TAILSCALE.md` | Dostęp z telefonu przez Tailscale |
-| `docs/SOURCES-ACCESS-2026-11.md` | Dlaczego Allegro i OLX nie są skanowane (rozpoznanie legalnego dostępu) |
-| `docs/archive/` | Historia: stare raporty, przegląd interfejsu z 11.2026, archiwum changelogu. Nie opisuje stanu bieżącego |
-| Gałąź `gh-pages` | Publiczne demo bez produkcyjnego API |
+| Plik                             | Rola                                                                                                     |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `README.md`                      | Uruchomienie, obszary aplikacji, dane i kopie, testowanie, spis dokumentacji                             |
+| `CLAUDE.md`                      | Brief dla agentów: ustalenia, sposób pracy, polecenia, przepisy „jak dodać…”, co aktualizować            |
+| `CHANGELOG.md`                   | Numerowane zmiany od 2026-11-10; starsze w `docs/archive/`                                               |
+| `PRODUCTION-CATALOG.md`          | Przepływ identyfikacji, źródła metadanych, wszystkie zmienne środowiskowe                                |
+| `docs/PRODUCT-DIRECTION.md`      | Cel produktu, założenia właściciela, bieżący priorytet, czego nie robimy                                 |
+| `docs/SCHEMA.sql`                | Aktualny schemat bazy (generowany)                                                                       |
+| `docs/DATA-MIGRATION.md`         | Aktualizacja programu, migracje, dawne narzędzia JSON                                                    |
+| `docs/TAILSCALE.md`              | Dostęp z telefonu przez Tailscale                                                                        |
+| `docs/SOURCES-ACCESS-2026-11.md` | Dlaczego Allegro i OLX nie są skanowane (rozpoznanie legalnego dostępu)                                  |
+| `docs/archive/`                  | Historia: stare raporty, przegląd interfejsu z 11.2026, archiwum changelogu. Nie opisuje stanu bieżącego |
+| Gałąź `gh-pages`                 | Publiczne demo bez produkcyjnego API                                                                     |
 
 ## Elementy historyczne
 
 Moduły nieosiągalne z `local-app.mjs`, zachowane do diagnostyki dawnych danych i parserów; każdy ma własny test:
 
-| Plik | Rola |
-| --- | --- |
-| `import-json-v2-to-sqlite.mjs` | Import dawnej historii JSON do SQLite |
-| `migration-rehearsal.mjs`, `scripts/rehearse-history-migration.mjs` | Próba migracji historii na kopii bazy |
-| `history-parity.mjs`, `scripts/check-history-parity.mjs` | Porównanie historii JSON i SQLite (tylko odczyt) |
-| `historical-reidentification.mjs`, `scripts/catalog-resolver.mjs` | Ponowna identyfikacja dawnych ofert z wiersza poleceń |
+| Plik                                                                | Rola                                                  |
+| ------------------------------------------------------------------- | ----------------------------------------------------- |
+| `import-json-v2-to-sqlite.mjs`                                      | Import dawnej historii JSON do SQLite                 |
+| `migration-rehearsal.mjs`, `scripts/rehearse-history-migration.mjs` | Próba migracji historii na kopii bazy                 |
+| `history-parity.mjs`, `scripts/check-history-parity.mjs`            | Porównanie historii JSON i SQLite (tylko odczyt)      |
+| `historical-reidentification.mjs`, `scripts/catalog-resolver.mjs`   | Ponowna identyfikacja dawnych ofert z wiersza poleceń |
 
 Nieaktywny runner GitHub (`run.mjs`, `process.mjs`, `continuation.mjs`, `enrich.mjs`, `page-cursor.mjs`) oraz dawne odczyty kanałów i skan wsadowy (`feed.mjs`, `rss.mjs`, `local-batch-scan.mjs`) zostały usunięte. Pliki w `.github/workflows/` są pozostałością: repozytorium nie ma zdalnej kopii, więc nic ich nie uruchamia. Stare raporty i dokumenty jednorazowe są w `docs/archive/`; usunięte materiały pozostają w historii Git.
 

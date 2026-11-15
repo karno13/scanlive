@@ -1,5 +1,5 @@
 // Pure helpers for view <-> URL mapping. Kept free of DOM so they are unit-testable.
-export const VIEWS = ['today', 'scanner', 'queue', 'review', 'checks', 'catalog', 'sets', 'offers', 'settings'];
+export const VIEWS = ['today', 'scanner', 'queue', 'review', 'checks', 'catalog', 'sets', 'offers', 'deals', 'settings'];
 
 // Addresses use the names shown in the navigation (review 11.2026, stage 3): "Książki" is
 // ?view=books, "Źródła" ?view=sources. The sections keep their ids (#view-catalog, #view-scanner).

@@ -57,6 +57,7 @@
     "price-analysis.mjs",
     "price-stats.mjs",
     "market-valuation.mjs",
+    "deals.mjs",
     "publisher-names.mjs",
     "rejected-offers.mjs",
     "review-batches.mjs",

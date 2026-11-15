@@ -8,7 +8,9 @@ Każda planowana funkcja powinna mieć jasne uzasadnienie w procesie handlowym: 
 
 ## Aktualny priorytet (od 2026-11-07)
 
-Właściciel projektu nie handluje w tej chwili. Rozwój koncentruje się na **skanerze, katalogu i weryfikacji**: pokrycie i niezawodność źródeł, struktura dzieł/wydań/serii oraz szybkość i trafność rozpoznawania książek. Funkcje stricte handlowe (ocena okazji, zysk, rejestr transakcji, alerty zakupowe) są odłożone do czasu zmiany tej decyzji.
+Właściciel projektu nie handluje w tej chwili. Rozwój koncentruje się na **skanerze, katalogu i weryfikacji**: pokrycie i niezawodność źródeł, struktura dzieł/wydań/serii oraz szybkość i trafność rozpoznawania książek. Funkcje stricte handlowe (zysk, koszty, rejestr transakcji, alerty zakupowe) są odłożone do czasu zmiany tej decyzji.
+
+**Zmiana 2026-11-15:** na prośbę właściciela wróciła ocena okazji w wąskiej postaci — zakładka „Okazje” pokazuje dostępne oferty wyraźnie poniżej wyceny rynkowej swojego wydania. To porównanie ceny z wyceną, bez kosztów, zysku i statusów zakupu; te pozostają odłożone.
 
 ## Założenia właściciela (ustalone, nie pytać ponownie)
 
@@ -23,7 +25,7 @@ Właściciel projektu nie handluje w tej chwili. Rozwój koncentruje się na **s
 ## Główne procesy
 
 1. **Sourcing:** przeszukiwanie marketplace'ów, wykrywanie nowych ofert, filtrowanie szumu, zapisywanie kryteriów poszukiwania i obserwacja cen.
-2. **Weryfikacja towaru:** rozpoznawanie ISBN, tytułu, tomu, wydania, języka, stanu i zawartości zestawu tylko w zakresie potrzebnym do ustalenia, *co jest sprzedawane i ile może być warte*.
+2. **Weryfikacja towaru:** rozpoznawanie ISBN, tytułu, tomu, wydania, języka, stanu i zawartości zestawu tylko w zakresie potrzebnym do ustalenia, _co jest sprzedawane i ile może być warte_.
 3. **Decyzja zakupowa:** cena ogłoszenia, dostawa, prowizje, inne koszty, przewidywana cena odsprzedaży, marża, ROI i margines na ryzyko.
 4. **Obsługa handlu:** lista okazji i kandydatów do zakupu, decyzje kupione/odrzucone, koszt nabycia, towary dostępne do odsprzedaży, historia transakcji i wynik finansowy (jako możliwe przyszłe moduły).
 5. **Kontrola jakości:** wiarygodność danych ofertowych, aktualność i dostępność ogłoszeń, duplikaty, pomyłki identyfikacji, bezpieczne backupy i diagnostyka.
@@ -40,7 +42,7 @@ Właściciel projektu nie handluje w tej chwili. Rozwój koncentruje się na **s
 ## Priorytety rozwoju
 
 1. **P0/P1:** trafność wyników skanowania, jakość dopasowania książek i wydań, wiarygodne ceny/dostępność, bezpieczne i wydajne pobieranie danych.
-2. **P1/P2:** opłacalność *całkowita* — zakup + wysyłka + prowizje + inne koszty vs. realistyczna cena sprzedaży; jasne obliczanie zysku, marży i ROI.
+2. **P1/P2:** opłacalność _całkowita_ — zakup + wysyłka + prowizje + inne koszty vs. realistyczna cena sprzedaży; jasne obliczanie zysku, marży i ROI.
 3. **P2:** operacyjna lista ofert do zakupu, statusy transakcyjne, koszt nabycia oraz marża na sprzedanym towarze.
 4. **P2/P3:** alerty o spadkach cen, nowych rentownych ofertach i powtarzalne skanowanie zgodne z ograniczeniami serwisów.
 5. **Później:** raporty handlowe, rotacja zapasów, koszty i rentowność źródeł; wyłącznie wtedy, gdy istnieją sprawdzone dane do tych obliczeń.

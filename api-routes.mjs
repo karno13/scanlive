@@ -4,6 +4,7 @@ import { deleteUniverse, listUniverses, saveUniverse } from './universes.mjs';
 import { recentRelistDecisions, undoRelist } from './offer-status.mjs';
 import { listScanProfiles } from './scan-profiles-api.mjs';
 import { groupedPriceStats } from './price-stats.mjs';
+import { listDeals } from './deals.mjs';
 import { readdir, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { backupCatalog } from './scripts/backup-catalog.mjs';
@@ -491,6 +492,7 @@ export const apiRoutes = createRouter()
   .add('GET', '/api/trading-defaults', ({ repo }) => getTradingDefaults(repo))
   .add('PUT', '/api/trading-defaults', ({ repo, input }) => saveTradingDefaults(repo, input))
   .add('GET', '/api/scan-runs', ({ repo }) => ({ items: listScanRuns(repo) }))
+  .add('GET', '/api/deals', ({ repo }) => listDeals(repo))
   // offers_seen: listings this source returned in its last checked scan, so a source whose
   // health row predates per-phrase success tracking is not shown as dead while it delivers offers.
   .add('GET', '/api/source-health', ({ repo }) => ({

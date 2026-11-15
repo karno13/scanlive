@@ -64,7 +64,7 @@ function roundPrice(grosze) {
 /**
  * @typedef {{ price: number, state: 'live'|'sold'|'gone', kind: string, condition: string,
  *   firstSeenAt?: string|null, soldAt?: string|null, firstPrice?: number|null,
- *   editionId?: string }} Observation
+ *   editionId?: string, offerId?: string }} Observation
  */
 
 /**
@@ -262,12 +262,32 @@ export function valuationSummary(valuation) {
 export function marketValuations(database, by, ids, at = Date.now()) {
   const out = new Map();
   if (!ids.length) return out;
+  const options = valuationOptions(database);
+  for (const [id, observations] of marketObservations(database, by, ids)) {
+    const valuation = estimateValue(observations, at, options);
+    if (by === 'work') Object.assign(valuation, editionSpread(observations, at, options));
+    out.set(id, valuation);
+  }
+  return out;
+}
+
+/** Options of estimateValue that come from the whole catalogue (since when offers are recorded). */
+export function valuationOptions(database) {
   const first = database.prepare('SELECT min(first_seen_at) AS first FROM offers').get()?.first;
-  const options = { trackedSince: first ? Date.parse(String(first)) : null };
+  return { trackedSince: first ? Date.parse(String(first)) : null };
+}
+
+/**
+ * The priced offers behind a valuation: Map id → Observation[] (with offerId and editionId).
+ * @param {import('node:sqlite').DatabaseSync} database
+ * @param {'work'|'edition'} by
+ * @param {string[]} ids
+ */
+export function marketObservations(database, by, ids) {
   const key = by === 'work' ? 'e.work_id' : 'm.edition_id';
   const rows = database
     .prepare(
-      `SELECT ${key} AS k, m.edition_id AS editionId, o.current_price AS price, o.availability AS availability,
+      `SELECT ${key} AS k, m.edition_id AS editionId, o.id AS offerId, o.current_price AS price, o.availability AS availability,
          coalesce(o.condition_class,'unknown') AS condition, ${offerKindSql('o')} AS kind,
          o.first_seen_at AS firstSeenAt, o.availability_changed_at AS changedAt,
          (SELECT h.price FROM offer_price_history h WHERE h.offer_id=o.id ORDER BY h.observed_at LIMIT 1) AS firstPrice
@@ -280,6 +300,7 @@ export function marketValuations(database, by, ids, at = Date.now()) {
   for (const row of rows) {
     const availability = String(row.availability);
     grouped.get(String(row.k))?.push({
+      offerId: String(row.offerId),
       editionId: String(row.editionId),
       price: Number(row.price),
       state:
@@ -295,12 +316,7 @@ export function marketValuations(database, by, ids, at = Date.now()) {
       firstPrice: row.firstPrice == null ? null : Number(row.firstPrice),
     });
   }
-  for (const [id, observations] of grouped) {
-    const valuation = estimateValue(observations, at, options);
-    if (by === 'work') Object.assign(valuation, editionSpread(observations, at, options));
-    out.set(id, valuation);
-  }
-  return out;
+  return grouped;
 }
 
 /**
