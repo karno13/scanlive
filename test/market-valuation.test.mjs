@@ -66,10 +66,14 @@ test('one offer gives a wide range and low confidence', () => {
 test('condition and shop prices are brought to a good used copy', () => {
   const worn = estimateValue([copy(4000, { condition: 'satisfactory' })], AT);
   const good = estimateValue([copy(4000)], AT);
-  assert.ok(worn.estimate < good.estimate);
+  // A worn copy at 40 zł means a good one is worth more, a new one at 40 zł means less.
+  assert.ok(worn.estimate > good.estimate);
+  assert.ok(worn.reasons.some((reason) => /zadowalający \+25%/.test(reason)));
+  assert.ok(!good.reasons.some((reason) => /sprowadzone/.test(reason)));
+  assert.ok(estimateValue([copy(4000, { condition: 'new' })], AT).estimate < good.estimate);
   const shop = estimateValue([copy(5000, { kind: 'new_shop', condition: 'unknown' })], AT);
   assert.equal(shop.confidence, 'low');
-  assert.ok(shop.estimate <= 3000, String(shop.estimate));
+  assert.equal(shop.estimate, 3000);
   assert.ok(shop.reasons.some((reason) => /sklep/.test(reason)));
 });
 
@@ -128,6 +132,82 @@ test('valuations come with the works list, the edition groups and the book page'
     // Many ids at once: one query, every id answered.
     const many = marketValuations(repository.database, 'work', ['w', 'w2', 'missing']);
     assert.equal(many.size, 3);
+  } finally {
+    repository.close();
+  }
+});
+
+test('shop offers are not supply, and old sales alone do not give high confidence', () => {
+  const shops = Array.from({ length: 9 }, () => copy(5000, { kind: 'new_shop' }));
+  const value = estimateValue([...shops, copy(3000), copy(3200)], AT);
+  assert.equal(value.supply, 'normal');
+  const old = estimateValue(
+    [400, 500, 600].map((days) => copy(8000, { state: 'sold', soldAt: daysAgo(days) })),
+    AT,
+  );
+  assert.equal(old.confidence, 'medium');
+});
+
+test('asking-price trend needs a real share of changed used offers', () => {
+  const steady = Array.from({ length: 20 }, () => copy(3000, { firstPrice: 3000 }));
+  const few = estimateValue(
+    [...steady, copy(1500, { firstPrice: 3000 }), copy(1500, { firstPrice: 3000 })],
+    AT,
+  );
+  assert.equal(few.trend, null);
+  const shop = copy(9000, { kind: 'new_shop', firstPrice: 3000 });
+  const many = estimateValue(
+    [shop, copy(3000), ...[2700, 2700, 2400].map((price) => copy(price, { firstPrice: 3000 }))],
+    AT,
+  );
+  assert.deepEqual(many.trend, { percent: -10, basis: 'asking', changed: 3, of: 4 });
+  assert.ok(many.reasons.some((reason) => /3 z 4 ofert zmieniło cenę, zwykle o −10%/.test(reason)));
+});
+
+test('new listings are reported only with a history to compare with', () => {
+  const fresh = [copy(3000), copy(3100), copy(3200)];
+  const text = (value) => value.reasons.join(' ');
+  assert.doesNotMatch(
+    text(estimateValue(fresh, AT, { trackedSince: AT - 14 * 86_400_000 })),
+    /nowe oferty/,
+  );
+  assert.match(
+    text(estimateValue(fresh, AT, { trackedSince: AT - 90 * 86_400_000 })),
+    /3 nowe oferty/,
+  );
+});
+
+test('a book whose editions are priced apart gets the range of its editions', () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    repository.createWork({ id: 'w', title: 'Mort', authors: [] });
+    repository.createEdition({ id: 'hard', workId: 'w', title: 'Mort', binding: 'oprawa twarda' });
+    repository.createEdition({ id: 'soft', workId: 'w', title: 'Mort', binding: 'oprawa miękka' });
+    const add = (id, edition, price) => {
+      repository.upsertOffer({
+        id,
+        source: 'Vinted',
+        normalizedUrl: `https://example.test/${id}`,
+        originalTitle: 'Mort',
+        currentPrice: price,
+        conditionClass: 'good',
+      });
+      repository.assignOfferToEdition(id, edition, {
+        id: 'm_' + id,
+        method: 'manual',
+        status: 'active',
+      });
+    };
+    add('a', 'hard', 6000);
+    add('b', 'hard', 6400);
+    add('c', 'soft', 2000);
+    add('d', 'soft', 2200);
+    const value = marketValuations(repository.database, 'work', ['w']).get('w');
+    assert.deepEqual(value.editionRange, { low: 1800, high: 5500, editions: 2 });
+    assert.equal(
+      marketValuations(repository.database, 'edition', ['hard']).get('hard').editionRange,
+      undefined,
+    );
   } finally {
     repository.close();
   }

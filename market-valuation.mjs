@@ -15,8 +15,13 @@ export const CONDITION_FACTOR = {
   new: 0.85,
   very_good: 0.95,
   good: 1,
-  satisfactory: 0.8,
-  unknown: 0.95,
+  satisfactory: 1.25,
+  unknown: 1,
+};
+const CONDITION_NOTE = {
+  new: 'nowy −15%',
+  very_good: 'bardzo dobry −5%',
+  satisfactory: 'zadowalający +25%',
 };
 /** What a seller asks is more than what a buyer pays. */
 export const ASKING_FACTOR = 0.9;
@@ -58,22 +63,27 @@ function roundPrice(grosze) {
 
 /**
  * @typedef {{ price: number, state: 'live'|'sold'|'gone', kind: string, condition: string,
- *   firstSeenAt?: string|null, soldAt?: string|null, firstPrice?: number|null }} Observation
+ *   firstSeenAt?: string|null, soldAt?: string|null, firstPrice?: number|null,
+ *   editionId?: string }} Observation
  */
 
 /**
  * The estimate from the observations of one book/edition. Prices in grosze.
  * @param {Observation[]} observations
  * @param {number} [at]
+ * @param {{ trackedSince?: number|null }} [options] when the catalogue started recording offers:
+ *   "new listings" are reported only once there is a longer history to compare with.
  */
-export function estimateValue(observations, at = Date.now()) {
+export function estimateValue(observations, at = Date.now(), { trackedSince = null } = {}) {
   const priced = observations.filter(
     (item) => item.price > 0 && item.price < MAX_PRICE && item.state !== 'gone',
   );
   const reasons = [];
   const live = priced.filter((item) => item.state === 'live');
   const sold = priced.filter((item) => item.state === 'sold');
-  const supply = live.length >= 8 ? 'plentiful' : live.length <= 1 ? 'scarce' : 'normal';
+  // Supply is the competing used copies; a shop's new book is not one of them.
+  const usedLive = live.filter((item) => item.kind !== 'new_shop');
+  const supply = usedLive.length >= 8 ? 'plentiful' : usedLive.length <= 1 ? 'scarce' : 'normal';
   if (!priced.length)
     return {
       estimate: null,
@@ -94,9 +104,10 @@ export function estimateValue(observations, at = Date.now()) {
     const age = (at - Date.parse(item.soldAt || item.firstSeenAt || '')) / DAY;
     const stale = Number.isFinite(age) && age > 180 ? 0.5 : 1;
     const isShop = item.kind === 'new_shop';
-    const factor =
-      (CONDITION_FACTOR[item.condition] ?? CONDITION_FACTOR.unknown) *
-      (item.state === 'sold' ? 1 : isShop ? SHOP_FACTOR : ASKING_FACTOR);
+    const factor = isShop
+      ? SHOP_FACTOR
+      : (CONDITION_FACTOR[item.condition] ?? CONDITION_FACTOR.unknown) *
+        (item.state === 'sold' ? 1 : ASKING_FACTOR);
     const weight =
       (item.state === 'sold' ? WEIGHT.sold : (WEIGHT[item.kind] ?? WEIGHT.private)) * stale;
     return { value: item.price * factor, weight, item };
@@ -115,6 +126,11 @@ export function estimateValue(observations, at = Date.now()) {
   points.sort((a, b) => a.value - b.value);
   const keptSold = points.filter((point) => point.item.state === 'sold').length;
   const keptLive = points.length - keptSold;
+  // Sales older than a year do not make a valuation certain.
+  const freshSold = points.filter(
+    (point) =>
+      point.item.state === 'sold' && !(at - Date.parse(point.item.soldAt || '') > 365 * DAY),
+  ).length;
   const onlyShop = points.every((point) => point.item.kind === 'new_shop');
   // Plenty of competing copies push the price down, a lone copy with sales behind it holds it.
   const centre = supply === 'plentiful' ? 0.4 : supply === 'scarce' && keptSold ? 0.6 : 0.5;
@@ -129,7 +145,7 @@ export function estimateValue(observations, at = Date.now()) {
   const spread = high / low;
   const confidence = onlyShop
     ? 'low'
-    : keptSold >= 3 && spread <= 1.6
+    : freshSold >= 3 && spread <= 1.6
       ? 'high'
       : (keptSold >= 1 && points.length >= 3 && spread <= 2.2) ||
           (points.length >= 5 && spread <= 1.8)
@@ -154,19 +170,28 @@ export function estimateValue(observations, at = Date.now()) {
         ? 'Są tylko ceny nowych książek w sklepach — używany egzemplarz wyceniono na ok. 60% ceny sklepowej; to szacunek, nie rynek wtórny.'
         : 'Ceny nowych książek ze sklepów liczą się słabo (ok. 60% ceny, mała waga).',
     );
-  if (points.some((point) => point.item.condition !== 'good' && point.item.kind !== 'new_shop'))
-    reasons.push('Ceny sprowadzone do egzemplarza w dobrym stanie (np. stan zadowalający +25%).');
+  const adjusted = Object.keys(CONDITION_NOTE).filter((condition) =>
+    points.some((point) => point.item.kind !== 'new_shop' && point.item.condition === condition),
+  );
+  if (adjusted.length)
+    reasons.push(
+      `Ceny sprowadzone do egzemplarza w dobrym stanie: ${adjusted.map((condition) => CONDITION_NOTE[condition]).join(', ')}.`,
+    );
   if (excluded)
     reasons.push(
       `Pominięto ${excluded} ${plural(excluded, 'nietypową cenę', 'nietypowe ceny', 'nietypowych cen')} (daleko od reszty).`,
     );
   if (supply === 'plentiful')
-    reasons.push(`Duża podaż: ${live.length} dostępnych ofert — wycena bliżej dolnej części cen.`);
+    reasons.push(
+      `Duża podaż: ${usedLive.length} ${plural(usedLive.length, 'używany egzemplarz', 'używane egzemplarze', 'używanych egzemplarzy')} w sprzedaży — wycena bliżej dolnej części cen.`,
+    );
   else if (supply === 'scarce')
     reasons.push(
-      live.length
-        ? 'Rzadko dostępna: tylko 1 oferta w sprzedaży.'
-        : 'Brak dostępnych ofert — wycena z cen archiwalnych.',
+      usedLive.length
+        ? 'Rzadko dostępna: tylko 1 używany egzemplarz w sprzedaży.'
+        : live.length
+          ? 'Brak używanych egzemplarzy w sprzedaży — są tylko nowe w sklepach.'
+          : 'Brak dostępnych ofert — wycena z cen archiwalnych.',
     );
   // Trend: sold prices of the last 90 days against older ones, else asking-price changes.
   let trend = null;
@@ -177,25 +202,29 @@ export function estimateValue(observations, at = Date.now()) {
       plainMedian(recent.map((i) => i.price)) / plainMedian(older.map((i) => i.price)) - 1;
     trend = { percent: Math.round(change * 100), basis: 'sold' };
   } else {
-    const changed = live.filter((item) => item.firstPrice && item.firstPrice !== item.price);
-    if (changed.length >= 2) {
-      const change =
-        changed.reduce((sum, item) => sum + item.price / Number(item.firstPrice), 0) /
-          changed.length -
-        1;
-      trend = { percent: Math.round(change * 100), basis: 'asking' };
+    // Asking prices: only used copies (a shop's price change is a promotion), and only when a
+    // real share of the sellers moved — a few changed offers say nothing about the rest.
+    const changed = usedLive.filter((item) => item.firstPrice && item.firstPrice !== item.price);
+    if (changed.length >= 3 && changed.length / usedLive.length >= 0.25) {
+      const change = plainMedian(changed.map((item) => item.price / Number(item.firstPrice))) - 1;
+      trend = {
+        percent: Math.round(change * 100),
+        basis: 'asking',
+        changed: changed.length,
+        of: usedLive.length,
+      };
     }
   }
   if (trend && Math.abs(trend.percent) >= 5)
     reasons.push(
       trend.basis === 'sold'
         ? `Ceny sprzedaży z ostatnich 90 dni ${trend.percent > 0 ? 'wyższe' : 'niższe'} o ${Math.abs(trend.percent)}% niż wcześniej.`
-        : `Sprzedający ${trend.percent > 0 ? 'podnieśli' : 'obniżyli'} ceny średnio o ${Math.abs(trend.percent)}%.`,
+        : `${trend.changed} z ${trend.of} ofert zmieniło cenę, zwykle o ${trend.percent > 0 ? '+' : '−'}${Math.abs(trend.percent)}%.`,
     );
   const newListings = live.filter(
     (item) => at - Date.parse(item.firstSeenAt || '') <= 30 * DAY,
   ).length;
-  if (newListings >= 3)
+  if (newListings >= 3 && trackedSince != null && at - trackedSince >= 60 * DAY)
     reasons.push(
       `${newListings} ${plural(newListings, 'nowa oferta', 'nowe oferty', 'nowych ofert')} w ostatnich 30 dniach.`,
     );
@@ -233,10 +262,12 @@ export function valuationSummary(valuation) {
 export function marketValuations(database, by, ids, at = Date.now()) {
   const out = new Map();
   if (!ids.length) return out;
+  const first = database.prepare('SELECT min(first_seen_at) AS first FROM offers').get()?.first;
+  const options = { trackedSince: first ? Date.parse(String(first)) : null };
   const key = by === 'work' ? 'e.work_id' : 'm.edition_id';
   const rows = database
     .prepare(
-      `SELECT ${key} AS k, o.current_price AS price, o.availability AS availability,
+      `SELECT ${key} AS k, m.edition_id AS editionId, o.current_price AS price, o.availability AS availability,
          coalesce(o.condition_class,'unknown') AS condition, ${offerKindSql('o')} AS kind,
          o.first_seen_at AS firstSeenAt, o.availability_changed_at AS changedAt,
          (SELECT h.price FROM offer_price_history h WHERE h.offer_id=o.id ORDER BY h.observed_at LIMIT 1) AS firstPrice
@@ -249,6 +280,7 @@ export function marketValuations(database, by, ids, at = Date.now()) {
   for (const row of rows) {
     const availability = String(row.availability);
     grouped.get(String(row.k))?.push({
+      editionId: String(row.editionId),
       price: Number(row.price),
       state:
         availability === 'sold'
@@ -263,6 +295,34 @@ export function marketValuations(database, by, ids, at = Date.now()) {
       firstPrice: row.firstPrice == null ? null : Number(row.firstPrice),
     });
   }
-  for (const [id, observations] of grouped) out.set(id, estimateValue(observations, at));
+  for (const [id, observations] of grouped) {
+    const valuation = estimateValue(observations, at, options);
+    if (by === 'work') Object.assign(valuation, editionSpread(observations, at, options));
+    out.set(id, valuation);
+  }
   return out;
+}
+
+/**
+ * Editions of one work priced apart (hardcover against paperback, a sought-after first edition):
+ * one amount for the book would blend them, so the book gets the range of its editions' values.
+ * Counts editions with at least two prices; apart means ×1.5 or more between their estimates.
+ */
+function editionSpread(observations, at, options) {
+  const byEdition = new Map();
+  for (const item of observations)
+    (byEdition.get(item.editionId) ?? byEdition.set(item.editionId, []).get(item.editionId)).push(
+      item,
+    );
+  if (byEdition.size < 2) return {};
+  const estimates = [];
+  for (const list of byEdition.values()) {
+    const value = estimateValue(list, at, options);
+    if (value.estimate != null && value.sold + value.live >= 2) estimates.push(value.estimate);
+  }
+  if (estimates.length < 2) return {};
+  const low = Math.min(...estimates),
+    high = Math.max(...estimates);
+  if (high / low < 1.5) return {};
+  return { editionRange: { low, high, editions: estimates.length } };
 }

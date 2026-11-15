@@ -2,6 +2,14 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (87) — Wycena: poprawki po sprawdzeniu na danych
+
+- Książka, której wydania różnią się ceną (1,5× i więcej), pokazuje zakres wycen wydań — np. „Wartość 26–43 zł zależnie od wydania” — zamiast jednej kwoty mieszającej twardą oprawę z miękką. Wycena każdego wydania jest na stronie książki.
+- **Błąd:** egzemplarz w stanie zadowalającym zaniżał wycenę zamiast ją podnosić (jego cena była mnożona przez 0,8, a opis mówił „+25%”). Teraz +25%; stan nieznany nie zmienia ceny; cena sklepowa liczona równo jako 60%.
+- **Błąd:** trend „sprzedający podnieśli ceny o 31%” wynikał z 3 ofert na 47, w tym promocji sklepu. Teraz liczą się tylko używane egzemplarze, co najmniej 3 zmienione ceny i co najmniej co czwarta oferta; opis mówi wprost: „5 z 14 ofert zmieniło cenę, zwykle o −10%”.
+- **Błąd:** powód „stan zadowalający +25%” pojawiał się przy 468 z 500 wycen, choć w 427 nie było takiego egzemplarza. Teraz wymienia tylko korekty faktycznie użyte.
+- „Duża podaż” liczy tylko używane egzemplarze, bez nowych książek w sklepach. „N nowych ofert w ostatnich 30 dniach” pojawi się dopiero, gdy katalog będzie zbierał oferty od co najmniej 60 dni. Wiarygodność „wysoka” wymaga 3 sprzedaży z ostatniego roku.
+
 ## 2026-11-15 (86) — Szacowana wartość rynkowa książki
 
 - Książki → Lista: pod każdą książką linia „Wartość ~80 zł 70–95 zł · wiarygodność średnia · 2 sprzedaże, 3 oferty”; po najechaniu — pełne uzasadnienie.

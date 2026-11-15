@@ -31,3 +31,11 @@ test('the book page box lists every reason', () => {
   assert.match(box, /Szacowana wartość rynkowa/);
   assert.equal(box.match(/<li>/g).length, 2);
 });
+
+test('editions priced apart: the range of editions replaces the blended amount', () => {
+  const mixed = { ...value, editionRange: { low: 2600, high: 4300, editions: 3 } };
+  const line = valuationLineMarkup(mixed, escapeHtml);
+  assert.match(line, /26–43 zł zależnie od wydania/);
+  assert.doesNotMatch(line, />Wartość ~80 zł/);
+  assert.match(valuationPanelMarkup(mixed, escapeHtml), /<strong>26–43 zł zależnie od wydania<\/strong>/);
+});
