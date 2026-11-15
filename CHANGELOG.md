@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (79) — Weryfikacja: większe zdjęcie, widoczny przycisk szczegółów
+
+- Kolejka → Weryfikacja: zdjęcie oferty jest większe — na komputerze 280 × 373 px zamiast 170 × 227 px, na telefonie 120 × 160 px zamiast 72 × 108 px (pomiar na kopii bazy).
+- „⋯” otwierający „Szczegóły i ponawianie” identyfikacji to teraz przycisk z ramką, w całości widoczny (był ucięty na krawędzi ramki), z podpowiedzią „Szczegóły i ponawianie”.
+- Tekst zastępczy pola szukania w Weryfikacji skrócony do „Szukaj ofert” (był ucięty: „…źródle lub IS”).
+
 ## 2026-11-15 (78) — Zakładka „Zestawy?”: przycisk „Zestaw” w pasku akcji
 
 - Kolejka → „Zestawy?”: akcja **„Zestaw” (Z)** jest przyciskiem w głównym pasku akcji, obok „Odrzuć” i „Pomiń”. W pozostałych zakładkach zostaje w menu „Więcej”.

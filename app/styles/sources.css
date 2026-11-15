@@ -1960,9 +1960,9 @@ input:focus {
     padding: 10px 12px;
   }
   #reviewDetail .rv-photo > .cover {
-    flex: 0 0 72px;
-    width: 72px;
-    max-height: 108px;
+    flex: 0 0 120px;
+    width: 120px;
+    max-height: 180px;
   }
 }
 .review-toolbar > .filterbar {
@@ -2138,8 +2138,8 @@ input:focus {
 }
 @media (max-width: 900px) {
   #reviewDetail .rv-photo > .rv-photo-zoom {
-    flex: 0 0 72px;
-    width: 72px;
+    flex: 0 0 120px;
+    width: 120px;
   }
 }
 /* Z obszaru „Dziś”, po regułach tego pliku (kaskada). */

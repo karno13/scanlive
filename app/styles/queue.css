@@ -1094,7 +1094,9 @@ body.density-compact .rv-item .cover-sm {
   .identification-dashboard.is-idle > .identification-more:not([open]) {
     position: absolute;
     right: 14px;
+    top: auto;
     bottom: 6px;
+    transform: none;
   }
 }
 /* Phone review: explicit placement prevents hidden shortcut keys from shifting
@@ -1154,7 +1156,7 @@ body.density-compact .rv-item .cover-sm {
     margin: 0;
   }
   #reviewDetail .rv-photo > .cover img {
-    max-height: 108px;
+    max-height: 180px;
     object-fit: contain;
   }
   #reviewDetail .rv-photo figcaption {
@@ -1203,15 +1205,26 @@ body.density-compact .rv-item .cover-sm {
 }
 .review-toolbar .identification-dashboard.is-idle > .identification-more {
   position: absolute;
-  right: 8px;
-  top: 8px;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 .review-toolbar .identification-dashboard.is-idle > .identification-more > summary {
   font-size: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
 }
 .review-toolbar .identification-dashboard.is-idle > .identification-more > summary::after {
   content: '⋯';
   font-size: 18px;
+  line-height: 1;
 }
 .review-toolbar .identification-dashboard .identification-more[open] {
   position: absolute;
@@ -1554,11 +1567,11 @@ body.density-compact .rv-item .cover-sm {
 }
 @media (max-width: 900px) {
   #reviewDetail .rv-photo > .rv-photo-zoom .cover {
-    width: 72px;
-    max-height: 108px;
+    width: 120px;
+    max-height: 180px;
   }
   #reviewDetail .rv-photo > .rv-photo-zoom .cover img {
-    max-height: 108px;
+    max-height: 180px;
     object-fit: contain;
   }
   #reviewDetail .rv-photo.is-comparing {
