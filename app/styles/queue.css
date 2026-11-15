@@ -473,6 +473,7 @@
   color: var(--muted);
 }
 .duplicate-group ul {
+  flex: 1 1 auto;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -490,6 +491,10 @@
 }
 .duplicate-group li.is-target span {
   font-weight: 600;
+}
+.duplicate-group li .link-button {
+  font: inherit;
+  text-align: left;
 }
 /* „Usunięte z katalogu”: one book per row, its restore button on the right. */
 .removed-works {

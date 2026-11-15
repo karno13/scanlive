@@ -14,7 +14,7 @@ export function mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData })
     const rows = group.works
       .map(
         (work) =>
-          `<li${work.id === group.targetId ? ' class="is-target"' : ''}><span>${escapeHtml(work.title.split(' / ')[0])}</span><small>${escapeHtml(
+          `<li${work.id === group.targetId ? ' class="is-target"' : ''}><span><button class="link-button" type="button" data-open-work="${escapeHtml(work.id)}" title="Strona książki">${escapeHtml(work.title.split(' / ')[0])}</button></span><small>${escapeHtml(
             work.authors[0] || 'autor nieznany',
           )} · ${work.editions} wyd. · ${work.offers} ${work.offers === 1 ? 'oferta' : [2, 3, 4].includes(work.offers % 10) && ![12, 13, 14].includes(work.offers % 100) ? 'oferty' : 'ofert'}${work.id === group.targetId ? ' · zostaje' : ''}</small></li>`,
       )
@@ -38,6 +38,11 @@ export function mountDuplicates({ $, json, escapeHtml, toast, loadCatalogData })
       body.innerHTML =
         '<p class="inline-note">Te dzieła mają ten sam tytuł i pierwszego autora (albo jedno z nich nie ma autora, a tytuł jest ten sam), więc to najpewniej jedna książka. Połączenie przenosi wszystkie wydania pod dzieło oznaczone „zostaje”.</p>' +
         groups.map(groupMarkup).join('');
+      body.querySelectorAll('[data-open-work]').forEach((link) =>
+        link.addEventListener('click', () =>
+          document.dispatchEvent(new CustomEvent('bookflip-open-work', { detail: { workId: link.dataset.openWork } })),
+        ),
+      );
       body.querySelectorAll('[data-merge-group]').forEach((button) =>
         button.addEventListener('click', () => merge(groups[Number(button.dataset.mergeGroup)], button)),
       );

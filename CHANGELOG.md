@@ -2,6 +2,10 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (80) — Duplikaty: wyrównane przyciski, tytuły jako linki
+
+- Kolejka → Możliwe duplikaty: przyciski „Połącz w jedno” i „To różne książki” są wyrównane do prawej — na kopii bazy wszystkie 7 grup ma przycisk w tym samym miejscu (x = 1103 px; wcześniej 749–809 px). Tytuł każdego dzieła jest linkiem do jego strony książki.
+
 ## 2026-11-15 (79) — Weryfikacja: większe zdjęcie, widoczny przycisk szczegółów
 
 - Kolejka → Weryfikacja: zdjęcie oferty jest większe — na komputerze 280 × 373 px zamiast 170 × 227 px, na telefonie 120 × 160 px zamiast 72 × 108 px (pomiar na kopii bazy).
