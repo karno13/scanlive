@@ -24,6 +24,10 @@ export function fallbackActions(query) {
   ];
 }
 
+/** "1 oferta", "2 oferty", "5 ofert", "22 oferty". */
+export const offersWord = (n) =>
+  n === 1 ? 'oferta' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'oferty' : 'ofert';
+
 export function installCommandPalette({ $, json, escapeHtml, money, showView, openOfferDrawer, openWork, onFallback = () => {}, actions = [] }) {
   const dialog = $('#commandPalette');
   const input = $('#paletteInput');
@@ -97,7 +101,7 @@ export function installCommandPalette({ $, json, escapeHtml, money, showView, op
           group: 'Katalog',
           label: tidyWorkTitle(work.title),
           hint: parseBnPeople((work.authors || []).join(' '), work.authors).join(', ') || `${work.editionCount} ${work.editionCount === 1 ? 'wydanie' : 'wydań'}`,
-          meta: `${work.offerCount} ofert`,
+          meta: `${work.offerCount} ${offersWord(work.offerCount)}`,
           cover: work.cover || null,
           run: () => openWork(work.id),
         })),

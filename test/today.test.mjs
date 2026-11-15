@@ -230,3 +230,15 @@ test('the source list shows failing and no-access sources, and folds the working
   assert.ok(html.indexOf('data-source="D"') < html.indexOf('<summary>'));
   assert.ok(html.indexOf('data-source="A"') > html.indexOf('<summary>'));
 });
+
+test('the command palette says "oferta / oferty / ofert" correctly', async () => {
+  const { offersWord } = await import('../app/views/palette.js');
+  assert.deepEqual([1, 2, 5, 12, 22, 25].map(offersWord), [
+    'oferta',
+    'oferty',
+    'ofert',
+    'ofert',
+    'oferty',
+    'ofert',
+  ]);
+});

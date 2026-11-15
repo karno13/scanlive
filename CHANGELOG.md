@@ -2,6 +2,11 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (85) — Drobne: odmiana „oferty” w palecie, odstęp dolnego paska
+
+- Paleta poleceń: „2 oferty” zamiast „2 ofert” (poprawna odmiana: 1 oferta, 2–4 oferty, 5 ofert, 22 oferty).
+- Telefon: etykieta „Ustawienia” w dolnym pasku nie dotyka już prawej krawędzi — odstęp od krawędzi ekranu 10 px (390 px szerokości; wcześniej 3 px lub mniej).
+
 ## 2026-11-15 (84) — Ustawienia: Allegro i OLX — „brak legalnego dostępu”
 
 - Ustawienia → „Źródła skanowania”: Allegro i OLX mają ten sam opis co na „Dziś” — „brak legalnego dostępu” — zamiast „wymaga CAPTCHA · jeszcze nigdy nie zadziałał” i „odmowa dostępu (403)”.
