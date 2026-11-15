@@ -4,6 +4,8 @@
 import { readSourceHtml } from './marketplaces.mjs';
 import { SOURCE_ROUND_LIMIT } from './marketplace-gate.mjs';
 import { CHECK_TIERS, detectRelists, recordOfferStatus } from './offer-status.mjs';
+import { parseVintedDetail } from './vinted-detail.mjs';
+import { saveShippingCost } from './shipping-backfill.mjs';
 
 // Only sources with a status parser consume the periodic check budget. Allegro and OLX are not
 // here (no legal access, source-blocks.mjs), nor is Dedalus (CAPTCHA): its listing already carries
@@ -248,6 +250,15 @@ export async function checkOfferLifecycle(
       report.unresolved.unrecognizedPage++;
     }
     save(repository, offer, status === 'hidden' ? 'unavailable' : status, at);
+    // The same page carries the delivery price of a listing still for sale.
+    if (offer.source === 'Vinted' && (status === 'available' || status === 'reserved')) {
+      try {
+        const cost = parseVintedDetail(html, offer.url).shippingCost;
+        if (cost != null) saveShippingCost(repository, offer.id, cost, at);
+      } catch {
+        // An unreadable page leaves the price to the backfill job.
+      }
+    }
   }
   // A listing found gone may have been put up again by its seller.
   if (report.removed) report.relisted = detectRelists(repository, { now }).linked;

@@ -5,7 +5,7 @@ Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; lic
 ## 2026-11-15 (89) — Koszt dostawy w ofertach Vinted
 
 - Przy ofercie Vinted widać teraz „Dostawa”: najtańsza cena wysyłki, jaką podaje strona ogłoszenia („od 9,99 zł”), albo „bezpłatna”, gdy Vinted daje 100% rabatu na dostawę (np. 7,05 zł → 0 zł).
-- Odczyt idzie przy okazji czytania strony ogłoszenia (i tak czytanej dla języka) — bez dodatkowych zapytań. Dotyczy ofert, których strona zostanie odczytana od tej wersji; wcześniej zapisane oferty nie mają tej informacji.
+- Odczyt idzie przy okazji czytania strony ogłoszenia (i tak czytanej dla języka) — bez dodatkowych zapytań. Wcześniej zapisane oferty Vinted (dostępne, zarezerwowane lub niepotwierdzone) uzupełniają się w tle: 6 stron co 3 minuty, przez wspólną bramkę z limitami, najdroższe najpierw; każda strona czytana jest raz. Przy blokadzie Vinted zadanie czeka 30 minut. Sprawdzanie dostępności oferty też zapisuje koszt dostawy, bo czyta tę samą stronę.
 
 ## 2026-11-15 (88) — Nowa zakładka „Okazje”
 

@@ -8,6 +8,7 @@ import { enrichOffers } from './offer-enrichment.mjs';
 import { DETAIL_SOURCES } from './source-details.mjs';
 import { checkOfferLifecycle } from './offer-lifecycle.mjs';
 import { fillSetsFromDescriptions } from './set-descriptions.mjs';
+import { fillShippingCosts } from './shipping-backfill.mjs';
 import { lookupUnknownIsbns } from './isbn-lookups.mjs';
 import { rejectForeignEditions } from './language-policy.mjs';
 import { refreshProposals } from './title-proposals.mjs';
@@ -139,6 +140,34 @@ function scheduleSetDescriptions(catalogStore) {
     )
     .finally(() => {
       runningSetDescriptions = null;
+    });
+}
+
+// Vinted offers saved before the delivery price was read: a few listing pages every three minutes.
+let runningShipping = null;
+let shippingNextAt = 0;
+function scheduleShippingBackfill(catalogStore) {
+  if (
+    runningShipping ||
+    Date.now() < shippingNextAt ||
+    String(process.env.BOOKFLIP_DETAIL_ENRICHMENT ?? '1') === '0' ||
+    !catalogStore.repository?.database
+  )
+    return;
+  shippingNextAt = Date.now() + 3 * 60_000;
+  runningShipping = fillShippingCosts(catalogStore.repository, { limit: 6 })
+    .then((report) => {
+      if (report.paused) shippingNextAt = Date.now() + 30 * 60_000;
+      if (report.checked) recordProgress({ type: 'shipping_backfill', ...report });
+    })
+    .catch((error) =>
+      recordProgress({
+        type: 'shipping_backfill_error',
+        code: /^[A-Z0-9_]+$/.test(error?.message) ? error.message : 'SHIPPING_BACKFILL_ERROR',
+      }),
+    )
+    .finally(() => {
+      runningShipping = null;
     });
 }
 
@@ -290,6 +319,7 @@ export function scheduleCatalogResolution(catalogStore) {
       scheduleProposalRefresh(catalogStore);
       scheduleLifecycleCheck(catalogStore);
       scheduleSetDescriptions(catalogStore);
+      scheduleShippingBackfill(catalogStore);
       scheduleIsbnLookups(catalogStore);
       scheduleOfferEditionRecheck(catalogStore);
       scheduleListingSeries(catalogStore);

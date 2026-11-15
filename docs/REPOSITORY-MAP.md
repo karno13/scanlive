@@ -146,6 +146,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `offer-lifecycle.mjs`                           | Sprawdzanie stron ofert, które zniknęły ze skanów                                |
 | `offer-images.mjs`                              | Walidacja i lokalne proxy zdjęć oraz okładek                                     |
 | `offer-sets.mjs`                                | Zestawy: jedna oferta z kilkoma wydaniami                                        |
+| `shipping-backfill.mjs`                         | Koszt dostawy zapisanych ofert Vinted ze strony ogłoszenia                       |
 | `set-descriptions.mjs`                          | Skład zestawu z opisu ogłoszenia                                                 |
 | `price-stats.mjs`                               | Statystyki cen w SQL, w groszach                                                 |
 | `deals.mjs`                                     | „Okazje”: dostępne oferty wyraźnie poniżej wyceny swojego wydania (`/api/deals`) |

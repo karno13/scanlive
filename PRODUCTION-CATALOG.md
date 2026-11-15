@@ -34,7 +34,7 @@ Jedyna pełna lista zmiennych środowiskowych (README tylko tu odsyła). Wartoś
 | `BOOKFLIP_METADATA_TIMEOUT_MS` | Timeout zewnętrznych metadanych |
 | `BOOKFLIP_CATALOG_LEASE_MS`, `BOOKFLIP_CATALOG_RETRY_MS` | Lease i opóźnienie ponowień |
 | `BOOKFLIP_LOCAL_PORT` | Port lokalnego serwera (domyślnie 4317) |
-| `BOOKFLIP_DETAIL_ENRICHMENT=0` | Wyłączenie pracy w tle czytającej strony serwisów: szczegóły ofert, propozycje po tytule, opisy zestawów, ISBN z lubimyczytac.pl |
+| `BOOKFLIP_DETAIL_ENRICHMENT=0` | Wyłączenie pracy w tle czytającej strony serwisów: szczegóły ofert, propozycje po tytule, opisy zestawów, ISBN z lubimyczytac.pl, koszt dostawy zapisanych ofert Vinted |
 | `BOOKFLIP_SCHEDULED_SCANS=0` | Wyłączenie harmonogramu automatycznych skanów |
 | `BOOKFLIP_OFFER_LIFECYCLE=0` | Bez sprawdzania, czy znikające oferty są sprzedane/usunięte |
 | `BOOKFLIP_E_ISBN=0` | Wyłączenie źródła e-ISBN |

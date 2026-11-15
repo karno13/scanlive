@@ -67,6 +67,7 @@
     "scan-profiles-api.mjs",
     "search-policy.mjs",
     "set-descriptions.mjs",
+    "shipping-backfill.mjs",
     "source-blocks.mjs",
     "source-details.mjs",
     "sqlite-concurrency-worker.mjs",
