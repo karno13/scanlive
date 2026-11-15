@@ -3,6 +3,7 @@ import { rejectRepeatsOfRejectedOffers } from './rejected-offers.mjs';
 import { offerStatusHistory, relistLinks, saleWindow } from './offer-status.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { proxiedImage } from './offer-images.mjs';
+import { marketValuations } from './market-valuation.mjs';
 import { authorTokens, scoreCandidate, titleTokens } from './title-proposals.mjs';
 import { createCatalogBundleDetector, looksLikeBundle } from './bundle-detection.mjs';
 import {
@@ -234,7 +235,12 @@ export function listCatalogWorks(repository, options = {}) {
       database,
       editionRows.map((row) => row.id),
     ),
-    byWork = new Map();
+    byWork = new Map(),
+    valuations = marketValuations(
+      database,
+      'work',
+      works.map((row) => row.id),
+    );
   for (const row of editionRows) {
     if (!byWork.has(row.work_id)) byWork.set(row.work_id, []);
     byWork.get(row.work_id).push({
@@ -264,6 +270,7 @@ export function listCatalogWorks(repository, options = {}) {
       offerCount: Number(row.offer_count),
       editions: byWork.get(row.id) ?? [],
       cover: (byWork.get(row.id) ?? []).find((edition) => edition.cover)?.cover ?? null,
+      valuation: valuations.get(row.id) ?? null,
     })),
   };
 }
@@ -626,6 +633,11 @@ export function listCatalogOfferGroups(repository, options = {}) {
     database,
     rows.map((row) => row.edition_id),
   );
+  const valuations = marketValuations(
+    database,
+    'edition',
+    rows.map((row) => row.edition_id),
+  );
   return {
     total,
     unassigned,
@@ -648,6 +660,7 @@ export function listCatalogOfferGroups(repository, options = {}) {
         .filter(Boolean),
       newest: row.newest,
       cover: covers.get(row.edition_id) || null,
+      valuation: valuations.get(row.edition_id) ?? null,
     })),
   };
 }

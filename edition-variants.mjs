@@ -13,6 +13,7 @@ import { isbnKeys } from './isbn-normalization.mjs';
 import { OFFER_KINDS, OFFER_KIND_LABELS, offerKind } from './offer-kinds.mjs';
 import { CONDITION_CLASSES } from './offer-observations.mjs';
 import { groupedPriceStats, vintedSoldStats } from './price-stats.mjs';
+import { marketValuations } from './market-valuation.mjs';
 
 const POLISH = /^(?:pol|pl|polski|polish)?$/i;
 // First words that say nothing about which publisher it is ("Dom Wydawniczy Rebis").
@@ -389,6 +390,15 @@ export function workPriceOverview(repository, workId) {
     overall: { ...NO_STATS, ...groupedPriceStats(db, selected, params, 'all').all },
     // Vinted copies found sold: what this book resells for.
     vintedSold: vintedSoldStats(db, selected, params),
+    // Market value of the book and of each named edition (market-valuation.mjs).
+    valuation: marketValuations(db, 'work', [work.id]).get(work.id),
+    editionValuations: Object.fromEntries(
+      marketValuations(
+        db,
+        'edition',
+        editions.filter((edition) => !unknownIds.has(edition.id)).map((edition) => edition.id),
+      ),
+    ),
     kinds: OFFER_KINDS.map((kind) => ({
       kind,
       label: OFFER_KIND_LABELS[kind],

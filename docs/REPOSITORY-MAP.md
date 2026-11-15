@@ -148,6 +148,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `offer-sets.mjs` | Zestawy: jedna oferta z kilkoma wydaniami |
 | `set-descriptions.mjs` | Skład zestawu z opisu ogłoszenia |
 | `price-stats.mjs` | Statystyki cen w SQL, w groszach |
+| `market-valuation.mjs` | Wycena rynkowa książki/wydania: przedział, wiarygodność, uzasadnienie |
 | `buyback-quotes.mjs`, `buyback-skupksiazek.mjs` | Ceny skupu hurtowego (skupksiazek.pl) |
 
 ### Frontend
@@ -164,6 +165,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `app/core/detail-navigation.js` | Powrót ze szczegółów do listy bez utraty formularza |
 | `app/core/dialogs.js` | Dostępne okna potwierdzeń zamiast `confirm`/`alert` |
 | `app/core/formatters.js` | Formatowanie dat, kwot i HTML |
+| `app/core/valuation.js` | Wycena rynkowa w interfejsie: linia na liście, ramka na stronie książki |
 | `app/core/identification-progress.js` | Postęp kolejki identyfikacji |
 | `app/core/live.js` | Połączenie ze strumieniem `/api/events`, ponowne łączenie |
 | `app/core/preferences.js` | Preferencje interfejsu w `localStorage` |

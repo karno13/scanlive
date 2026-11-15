@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (86) — Szacowana wartość rynkowa książki
+
+- Książki → Lista: pod każdą książką linia „Wartość ~80 zł 70–95 zł · wiarygodność średnia · 2 sprzedaże, 3 oferty”; po najechaniu — pełne uzasadnienie.
+- Strona książki: ramka „Szacowana wartość rynkowa” z kwotą, przedziałem, wiarygodnością (wysoka / średnia / niska / brak danych) i listą powodów; przy każdym wydaniu jego własna wycena.
+- Jak liczona: potwierdzone sprzedaże ważą ×3, ceny ofertowe liczone 10% niżej, nowe książki ze sklepów tylko jako słaba wskazówka (ok. 60% ceny); ceny sprowadzone do egzemplarza w dobrym stanie; ceny nietypowe (daleko od reszty) pominięte; duża podaż przesuwa wycenę w dół. Opisuje też trend cen sprzedaży (90 dni) i obniżki sprzedających. Bez danych — „brak danych do wyceny” zamiast kwoty.
+
 ## 2026-11-15 (85) — Drobne: odmiana „oferty” w palecie, odstęp dolnego paska
 
 - Paleta poleceń: „2 oferty” zamiast „2 ofert” (poprawna odmiana: 1 oferta, 2–4 oferty, 5 ofert, 22 oferty).

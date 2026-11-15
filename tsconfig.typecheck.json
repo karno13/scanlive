@@ -56,6 +56,7 @@
     "offer-workspace-api.mjs",
     "price-analysis.mjs",
     "price-stats.mjs",
+    "market-valuation.mjs",
     "publisher-names.mjs",
     "rejected-offers.mjs",
     "review-batches.mjs",

@@ -2136,3 +2136,44 @@ body.density-compact #view-catalog#view-catalog #catalogList:not(.is-grid):not(.
     align-self: center;
   }
 }
+/* Market value (market-valuation.mjs): a line under a book or edition, a box on the book page */
+.value-line {
+  display: block;
+  color: var(--muted);
+}
+.value-line b {
+  color: var(--text);
+}
+.value-line.is-low,
+.value-line.is-none {
+  color: var(--faint);
+}
+.edition-value {
+  grid-column: 1 / -1;
+}
+.edition-value:empty,
+.bp-value:empty {
+  display: none;
+}
+.value-head strong {
+  font-size: 1.4em;
+}
+.value-confidence {
+  padding: 1px 8px;
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.value-confidence.is-high {
+  background: var(--good-soft);
+  color: var(--good);
+}
+.value-confidence.is-medium {
+  background: var(--chip-bg);
+  color: var(--chip-text);
+}
+.value-why {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
