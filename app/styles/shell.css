@@ -295,7 +295,6 @@
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
   .mobile-bottom-nav {
-    padding-inline: 10px;
     background: var(--surface);
     border-top: 1px solid var(--line);
     box-shadow: var(--shadow-up);

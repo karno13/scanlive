@@ -5,7 +5,7 @@ Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; lic
 ## 2026-11-15 (85) — Drobne: odmiana „oferty” w palecie, odstęp dolnego paska
 
 - Paleta poleceń: „2 oferty” zamiast „2 ofert” (poprawna odmiana: 1 oferta, 2–4 oferty, 5 ofert, 22 oferty).
-- Telefon: etykieta „Ustawienia” w dolnym pasku nie dotyka już prawej krawędzi — odstęp od krawędzi ekranu 10 px (390 px szerokości; wcześniej 3 px lub mniej).
+- Telefon: etykieta „Ustawienia” w dolnym pasku nie dotyka już prawej krawędzi — odstęp od krawędzi ekranu 13 px przy szerokości 390 px (wcześniej ok. 2 px).
 
 ## 2026-11-15 (84) — Ustawienia: Allegro i OLX — „brak legalnego dostępu”
 
