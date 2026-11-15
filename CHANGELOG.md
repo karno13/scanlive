@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (90) — Obcojęzyczne z darmową dostawą zostają
+
+- Przy włączonym „Tylko polskie wydania” oferta Vinted w innym języku (np. angielska) nie jest już odrzucana, jeśli ma bezpłatną dostawę. Trafia do katalogu i weryfikacji jak polska; płatna dostawa — odrzucana jak dotąd.
+- Oferty Vinted nie są już odsiewane po tytule na stronie wyników („english”, „(eng)”) — o języku decyduje pole „Język” i tytuł dopiero po odczycie strony ogłoszenia, bo dopiero tam widać dostawę. Skan czyta przez to trochę więcej stron Vinted.
+- Oferty odrzucone wcześniej jako obcojęzyczne nie wracają same.
+
 ## 2026-11-15 (89) — Koszt dostawy w ofertach Vinted
 
 - Przy ofercie Vinted widać teraz „Dostawa”: najtańsza cena wysyłki, jaką podaje strona ogłoszenia („od 9,99 zł”), albo „bezpłatna”, gdy Vinted daje 100% rabatu na dostawę (np. 7,05 zł → 0 zł).

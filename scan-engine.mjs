@@ -6,7 +6,7 @@ import { scannableSources } from './source-blocks.mjs';
 import { scanCancelled, awaitScan } from './scan-cancellation.mjs';
 import { createVintedDetailCache } from './vinted-detail-cache.mjs';
 import { setTimeout as wait } from 'node:timers/promises';
-import { NEWEST_ORDER_SOURCES, scanMarketplace } from './marketplaces.mjs';
+import { NEWEST_ORDER_SOURCES, isPolishBook, scanMarketplace } from './marketplaces.mjs';
 import { localSourceHosts } from './local-scan.mjs';
 import { ANTIQUARIAN_SOURCES, isCategorySource } from './antiquarian-sources.mjs';
 import { matchesTopic } from './search-policy.mjs';
@@ -595,10 +595,15 @@ async function filterVintedPolishOffers(
         cache.set(offer.url, detail);
       }
       checked++;
-      if (/^(?:pl|pol|polish|polski|język polski)$/i.test(String(detail.language || '')))
+      const polish =
+        /^(?:pl|pol|polish|polski|język polski)$/i.test(String(detail.language || '')) &&
+        isPolishBook(offer.title);
+      // The owner's exception: a foreign edition with free delivery is worth a look.
+      const freeForeign = !polish && !!detail.language && detail.shippingCost === 0;
+      if (polish || freeForeign)
         accepted[index] = {
           ...offer,
-          language: 'Polski',
+          language: polish ? 'Polski' : String(detail.language),
           ...(detail.isbn ? { isbn: detail.isbn, isbnEvidence: 'Vinted — szczegóły oferty' } : {}),
           ...vintedDetailFields(detail, now()),
         };

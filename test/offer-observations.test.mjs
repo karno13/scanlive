@@ -282,3 +282,34 @@ test('Vinted delivery price comes from the selected item price block only', () =
   );
   assert.equal(parseVintedDetail(twice, url).shippingCost, undefined);
 });
+
+test('a foreign Vinted book with free delivery is kept; with paid delivery it is not', async () => {
+  const scanAt = '2026-11-10T12:00:00.000Z';
+  const run = (shippingCost) =>
+    searchOffers(
+      { queries: ['pratchett'], sources: ['Vinted'] },
+      {
+        scanner: async (task) => {
+          const rejected = {};
+          const offers = parseMarketplace(searchPage, task, scanAt, 5001, rejected);
+          return { offers, rejected, pagination: { state: 'end', nextPage: null } };
+        },
+        languageReader: async (url) =>
+          url.includes('9000000001')
+            ? { language: 'Angielski', shippingCost }
+            : { language: 'Polski', shippingCost: 500 },
+        retryWait: async () => {},
+        now: () => new Date(scanAt),
+      },
+    );
+  const free = await run(0);
+  const english = free.offers.find((offer) => offer.url.includes('9000000001'));
+  assert.equal(english?.language, 'Angielski');
+  assert.equal(english?.shippingCost, 0);
+  const paid = await run(700);
+  assert.equal(
+    paid.offers.some((offer) => offer.url.includes('9000000001')),
+    false,
+  );
+  assert.equal(paid.summary.rejected.language, 1);
+});

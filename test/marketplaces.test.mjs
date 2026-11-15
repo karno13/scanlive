@@ -55,7 +55,7 @@ test('Vinted parser from Archiwum imports PLN, skips sold/digital/figurines and 
   assert.equal(rows[0].priceEvidence, 'marketplace_listing');
   assert.equal(rows[0].availability, 'unconfirmed');
 });
-test('Vinted uses the offer language metadata when the local scan requests Polish', () => {
+test('Vinted listings are not dropped by language on the search page: the listing page decides', () => {
   const base = {
     title: 'Warcraft książka',
     url: '/items/12345-horus',
@@ -68,8 +68,8 @@ test('Vinted uses the offer language metadata when the local scan requests Polis
     ]),
     { ...task('Vinted'), title: 'Warcraft', category: 'Warcraft', language: 'pl' },
   );
-  assert.equal(rows.length, 1);
-  assert.match(rows[0].url, /12346/);
+  // The language field and the delivery price are read from each listing page (scan-engine.mjs).
+  assert.equal(rows.length, 2);
 });
 test('Allegro Lokalnie parser uses Product Offer price and skips aggregate and sold records', () => {
   const good = {

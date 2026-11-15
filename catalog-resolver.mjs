@@ -347,11 +347,14 @@ export class CatalogResolver {
     const foreignLanguage =
       currentOffer.language &&
       !/^(?:pl|pol|polish|polski|język polski)$/i.test(String(currentOffer.language).trim());
-    const material =
+    // A foreign edition with free delivery (Vinted) is let in on purpose: the owner wants to see it.
+    const freeDelivery = (currentOffer.shippingCost ?? currentOffer.shipping_cost) === 0;
+    let material =
       offerId && !manualProtected && !operatorEvidence(isbnEvidence)
         ? (notCatalogueMaterial(offerTitleOf(currentOffer)) ??
           (foreignLanguage ? 'foreign_edition' : null))
         : null;
+    if (material === 'foreign_edition' && freeDelivery) material = null;
     if (material) return decision('review_required', [material], proof);
 
     if (isbnEvidence.status === 'missing')

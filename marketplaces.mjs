@@ -64,7 +64,10 @@ export function isPolishBook(title, metadata) {
 }
 /** Why a listing is left out before it is saved: 'language', 'product' (not a book) or 'topic'; null when kept. */
 export function rejectionReason(task, title, metadata) {
-  if (task.language === 'pl' && !isPolishBook(title, metadata)) return 'language';
+  // Vinted listings are decided after their page is read (language field, free delivery):
+  // a foreign book with free delivery is kept (filterVintedPolishOffers in scan-engine.mjs).
+  if (task.language === 'pl' && task.source !== 'Vinted' && !isPolishBook(title, metadata))
+    return 'language';
   if (excludesProduct(title)) return 'product';
   // A category read keeps every book: the scan matches the phrases afterwards (readCategorySource).
   if (task.mode === 'category') return null;

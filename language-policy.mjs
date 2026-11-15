@@ -41,7 +41,9 @@ export function rejectForeignEditions(repository, { now = () => new Date() } = {
        WHERE j.status='review_required' AND json_valid(j.result_json)
          AND json_extract(j.result_json,'$.reason[0]')='foreign_edition'
          AND NOT EXISTS (SELECT 1 FROM offer_matches m WHERE m.offer_id=j.offer_id AND m.status='active' AND m.method IN ('manual','legacy_manual'))
-         AND NOT EXISTS (SELECT 1 FROM offer_sets s WHERE s.offer_id=j.offer_id)`,
+         AND NOT EXISTS (SELECT 1 FROM offer_sets s WHERE s.offer_id=j.offer_id)
+         -- Free delivery: foreign editions are kept (the owner's exception).
+         AND NOT EXISTS (SELECT 1 FROM offers o WHERE o.id=j.offer_id AND o.shipping_cost=0)`,
     )
     .all();
   if (!rows.length) return { rejected: 0 };
