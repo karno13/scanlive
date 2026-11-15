@@ -22,6 +22,15 @@ export function isbn13Of(identifiers = []) {
   return value && digits(value).length === 13 ? digits(value) : null;
 }
 
+/** Book page: saved quotes of these ISBN-13s ({ [isbn]: quote }). */
+export async function buybackQuotes(isbns) {
+  if (!isbns.length) return {};
+  return (await json('/api/buyback/quotes?isbn=' + isbns.join(','))).quotes || {};
+}
+
+/** Book page: a fresh quote, one ISBN at a time (the server paces requests to the shop). */
+export const checkBuyback = (isbn) => post('/api/buyback/check', { isbn, force: true });
+
 // Section in the edition card: last quote, its age and a "check now" button.
 // Buyback prices are a trading aid: hidden while trading mode is off.
 const tradingMode = () => typeof document !== 'undefined' && document.body?.classList.contains('trading-mode');

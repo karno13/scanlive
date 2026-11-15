@@ -1,7 +1,8 @@
 import { mountOfferAssignment } from './offer-assignment.js';
 import { mountEditionHistory } from './edition-history.js';
 import { mountWorkPrices, editionVariantSelect, wireEditionVariantSelects } from './work-prices.js';
-import { mountEditionBuyback, annotateEditionLines } from './buyback.js';
+import { mountEditionBuyback, annotateEditionLines, isbn13Of, buybackQuotes, checkBuyback } from './buyback.js';
+import { bookTilesMarkup, bookOffersMarkup, bookActionsMarkup, bestBuyback, toggleBookPane } from './book-page.js';
 import { openDetailView } from '../core/detail-navigation.js';
 import {markDirty,statusLabel,confirmDiscard,watchForm} from '../core/ux.js';
 import { safeOfferHref , availabilityLabel, isPurchasable } from '../core/formatters.js';
@@ -534,22 +535,26 @@ async function openCatalogDetail(id, { fromHistory = false } = {}) {
     const row = await json(`/api/catalog/works/${encodeURIComponent(id)}`);
     if (request !== detailRequest) return;
     detail.scrollTop = 0;
-    detail.innerHTML = `<button type="button" class="link-button book-back" data-book-back>← Wszystkie książki</button><section class="detail-section"><div class="book-detail-title work-hero">${coverMarkup(workCover(row), tidyWorkTitle(row.title), { size: 'lg', escapeHtml })}<div><span class="status-pill ${['manual', 'verified'].includes(row.verificationStatus) ? 'success' : 'warning'}">${escapeHtml(statusLabel(row.verificationStatus))}</span><h3 title="${escapeHtml(row.title)}">${escapeHtml(tidyWorkTitle(row.title))}</h3><p>${escapeHtml(workAuthors(row) || 'Autor nieznany')}</p></div><strong>${editionsLabel(row.editions.length)}</strong></div></section><section class="detail-section work-offers" aria-live="polite"><h4>Oferty wszystkich wydań</h4><p class="inline-note">Wczytywanie ofert…</p></section><section class="detail-section"><h4>Wydania — wybierz, aby zobaczyć szczegóły wydania</h4><div class="price-list">${unknownEditionLine(row)}${row.editions.map((edition) => `<div class="edition-line-wrap"><button type="button" class="link-button edition-line" data-edition-detail="${escapeHtml(edition.id)}">${coverMarkup(edition.cover || isbnCover(firstIsbn([edition])), edition.title, { size: 'xs', escapeHtml })}<span><strong>${escapeHtml(edition.title)}</strong><small>${escapeHtml([edition.publisher, edition.publicationYear, edition.language, edition.binding, (edition.contributors || []).filter((person) => person.role === 'translator').map((person) => 'tł. ' + person.name).join(', '), edition.originalTitle ? 'oryg. ' + edition.originalTitle : ''].filter(Boolean).join(' / ') || 'Brak szczegółów')}</small></span><b>${escapeHtml(edition.identifiers.find((item) => item.scheme.startsWith('isbn'))?.value || 'bez ISBN')}</b></button>${row.editions.length > 1 ? editionVariantSelect(edition, row.variants || [], escapeHtml) : ''}</div>`).join('') || '<p>Brak wydań.</p>'}</div></section><details class="detail-section"><summary>Pochodzenie danych bibliograficznych</summary><p class="inline-note">${row.externalRecords.length ? row.externalRecords.map((record) => `${escapeHtml(record.provider)}: ${escapeHtml(record.externalId)}`).join(', ') : 'Brak zewnętrznych rekordów bibliograficznych.'}</p></section>`;
+    const isbns = [...new Set(row.editions.map((edition) => isbn13Of(edition.identifiers)).filter(Boolean))];
+    const facts = [editionsLabel(row.editions.length), isbns.length ? '' : 'bez ISBN-13'].filter(Boolean).join(' · ');
+    detail.innerHTML = `<button type="button" class="link-button book-back" data-book-back>← Wszystkie książki</button><header class="bp-head">${coverMarkup(workCover(row), tidyWorkTitle(row.title), { size: 'md', escapeHtml })}<div><h3 title="${escapeHtml(row.title)}">${escapeHtml(tidyWorkTitle(row.title))}</h3><p>${escapeHtml(workAuthors(row) || 'Autor nieznany')}</p><small><span class="status-pill ${['manual', 'verified'].includes(row.verificationStatus) ? 'success' : 'warning'}">${escapeHtml(statusLabel(row.verificationStatus))}</span> ${escapeHtml(facts)}</small></div></header><div class="bp-actions" role="toolbar" aria-label="Akcje książki">${bookActionsMarkup(escapeHtml)}</div><div class="bp-panes"></div><div class="bp-tiles" aria-live="polite">${bookTilesMarkup(null, null, { money, escapeHtml, isbns: isbns.length })}</div><section class="detail-section work-offers" aria-live="polite"><h4>Oferty</h4><p class="inline-note">Wczytywanie ofert…</p></section><section class="detail-section bp-editions"><h4>Wydania · ${row.editions.length} <small>wybierz, aby zobaczyć szczegóły</small></h4><div class="price-list">${unknownEditionLine(row)}${row.editions.map((edition) => `<div class="edition-line-wrap"><button type="button" class="link-button edition-line" data-edition-detail="${escapeHtml(edition.id)}">${coverMarkup(edition.cover || isbnCover(firstIsbn([edition])), edition.title, { size: 'xs', escapeHtml })}<span><strong>${escapeHtml(edition.title)}</strong><small>${escapeHtml([edition.publisher, edition.publicationYear, edition.language, edition.binding, (edition.contributors || []).filter((person) => person.role === 'translator').map((person) => 'tł. ' + person.name).join(', '), edition.originalTitle ? 'oryg. ' + edition.originalTitle : ''].filter(Boolean).join(' / ') || 'Brak szczegółów')}</small></span><b>${escapeHtml(edition.identifiers.find((item) => item.scheme.startsWith('isbn'))?.value || 'bez ISBN')}</b></button>${row.editions.length > 1 ? editionVariantSelect(edition, row.variants || [], escapeHtml) : ''}</div>`).join('') || '<p>Brak wydań.</p>'}</div></section><details class="detail-section bp-more"><summary>Szczegóły cen i pochodzenie danych</summary><p class="inline-note">Pochodzenie danych: ${row.externalRecords.length ? row.externalRecords.map((record) => `${escapeHtml(record.provider)}: ${escapeHtml(record.externalId)}`).join(', ') : 'brak zewnętrznych rekordów bibliograficznych.'}</p></details>`;
     detail.querySelector('[data-book-back]').addEventListener('click', () => closeBookPage());
     void loadWorkOffers(row, detail, request);
     void loadWorkSets(row, detail, request);
+    const reloadWork = () => { if (state.selectedCatalogId === row.id) void openCatalogDetail(row.id); };
+    const tiles = mountBookTiles(row, detail, request, isbns, reloadWork);
+    wireBookActions(row, detail, isbns, tiles);
     // Edition navigation is usable as soon as the buttons appear, even while series load.
     detail.querySelectorAll('[data-edition-detail]').forEach((button) =>
       button.addEventListener('click', () => openEditionDetail(button.dataset.editionDetail)),
     );
     try { await loadSeries(); } catch (error) { /* The editor reports a save error if storage is unavailable. */ }
     if (request !== detailRequest) return;
-    mountWorkActions(row,detail);
-    mountWorkRemoval({ row, detail, json, toast, loadCatalogData, onRemoved: () => closeBookPage() });
-    const reloadWork = () => { if (state.selectedCatalogId === row.id) void openCatalogDetail(row.id); };
+    const panes = detail.querySelector('.bp-panes');
+    mountWorkActions(row, panes);
     wireEditionVariantSelects(detail, { json, toast, reload: reloadWork });
-    void mountWorkPrices({ row, detail, json, money, escapeHtml, toast, reload: reloadWork, isCurrent: () => request === detailRequest });
-    mountSeriesEditor(row, detail, renderSeriesSummary, { annotations: sqliteAnnotations || {}, save: saveSeries });
+    mountSeriesEditor(row, panes, renderSeriesSummary, { annotations: sqliteAnnotations || {}, save: saveSeries });
+    asPane(panes.querySelector('.series-editor'), 'series');
     void mountUniverseEditor(row, detail);
     void annotateEditionLines(row, detail);
   } catch (error) {
@@ -558,7 +563,7 @@ async function openCatalogDetail(id, { fromHistory = false } = {}) {
   }
 }
 
-/** "Oferty wszystkich wydań": every live offer of the book, cheapest first; a row opens the offer. */
+/** Offers of all editions, cheapest first: a row opens the offer, „Ogłoszenie ↗” the listing. */
 async function loadWorkOffers(row, detail, request) {
   const section = detail.querySelector('.work-offers');
   let data;
@@ -569,11 +574,88 @@ async function loadWorkOffers(row, detail, request) {
     return;
   }
   if (request !== detailRequest || !section?.isConnected) return;
-  const items = data.items || [];
-  section.innerHTML = '<h4>Oferty wszystkich wydań' + (data.total ? ' · ' + data.total : '') + '</h4>' + (items.length
-    ? '<div class="work-offer-list">' + items.map((item) => `<button type="button" class="work-offer-row" data-work-offer="${escapeHtml(item.id)}">${coverMarkup(item.image, item.title, { size: 'xs', escapeHtml })}<span><b>${escapeHtml(item.title)}</b><small>${escapeHtml([item.source, item.match?.editionTitle && item.match.editionTitle !== row.title ? item.match.editionTitle : '', availabilityLabel(item)].filter(Boolean).join(' · '))}</small></span><strong>${money(item.currentPrice)}</strong></button>`).join('') + '</div>' + (data.total > items.length ? `<p class="inline-note">Pokazano ${items.length} najtańszych z ${data.total}.</p>` : '')
-    : '<p class="inline-note">Żadna zapisana oferta nie jest przypisana do tej książki.</p>');
-  section.querySelectorAll('[data-work-offer]').forEach((button) => button.addEventListener('click', () => openOfferDrawer(button.dataset.workOffer)));
+  const render = (showAll) => {
+    section.innerHTML = bookOffersMarkup(data, row, { money, escapeHtml, showAll });
+    section.querySelectorAll('[data-work-offer]').forEach((button) => button.addEventListener('click', () => openOfferDrawer(button.dataset.workOffer)));
+    section.querySelector('[data-bp-all-offers]')?.addEventListener('click', () => render(true));
+  };
+  render(false);
+}
+
+/** A section mounted under the action bar becomes a pane, shown by its action button. */
+function asPane(node, key) {
+  if (!node) return;
+  node.dataset.bpPane = key;
+  node.hidden = true;
+}
+
+/** Price tiles: offers statistics and the best buyback quote; also fills „Szczegóły cen”. */
+function mountBookTiles(row, detail, request, isbns, reloadWork) {
+  const view = { overview: null, buyback: null, busy: false };
+  const box = detail.querySelector('.bp-tiles');
+  const render = () => {
+    if (box.isConnected) box.innerHTML = bookTilesMarkup(view.overview, view.buyback, { money, escapeHtml, isbns: isbns.length, buybackBusy: view.busy });
+  };
+  const current = () => request === detailRequest && detail.isConnected;
+  json('/api/catalog/works/' + encodeURIComponent(row.id) + '/prices')
+    .then((overview) => {
+      if (!current()) return;
+      view.overview = overview;
+      render();
+      mountWorkPrices({ row, overview, mount: detail.querySelector('.bp-more'), json, money, escapeHtml, toast, reload: reloadWork });
+    })
+    .catch(() => {});
+  buybackQuotes(isbns)
+    .then((quotes) => {
+      if (!current()) return;
+      view.buyback = bestBuyback(quotes);
+      render();
+    })
+    .catch(() => {});
+  return { view, render };
+}
+
+function wireBookActions(row, detail, isbns, tiles) {
+  const bar = detail.querySelector('.bp-actions');
+  mountWorkRemoval({ row, button: bar.querySelector('[data-bp-action="remove"]'), json, toast, loadCatalogData, onRemoved: () => closeBookPage() });
+  bar.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-bp-action]');
+    if (!button) return;
+    const action = button.dataset.bpAction;
+    if (action === 'remove') return;
+    if (action === 'scan') {
+      const field = $('#queries');
+      if (!field) return;
+      field.value = [tidyWorkTitle(row.title), (row.authors || [])[0]].filter(Boolean).join(' ');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      showView('scanner');
+      field.focus();
+      toast('Wpisano tytuł do skanera. Wybierz źródła i uruchom skan.');
+      return;
+    }
+    if (action === 'buyback') {
+      if (!isbns.length) return toast('Cena skupu wymaga ISBN-13 — żadne wydanie go nie ma.');
+      button.disabled = true;
+      tiles.view.busy = true;
+      tiles.render();
+      const quotes = {};
+      let failed = 0;
+      for (const isbn of isbns) {
+        try {
+          quotes[isbn] = await checkBuyback(isbn);
+        } catch {
+          failed++;
+        }
+      }
+      tiles.view.busy = false;
+      if (Object.keys(quotes).length) tiles.view.buyback = bestBuyback(quotes);
+      tiles.render();
+      button.disabled = false;
+      if (failed) toast(`Nie sprawdzono ${failed} z ${isbns.length} ISBN.`);
+      return;
+    }
+    if (!toggleBookPane(detail, action)) toast('Wczytywanie…');
+  });
 }
 
 /** "Zestawy z tą książką": sets whose composition holds one of its editions; shown only when there are any. */
@@ -595,7 +677,7 @@ async function loadWorkSets(row, detail, request) {
 
 // Which universe shelf a work sits on in the series view. Automatic by default (title words, then
 // the scan phrase); the operator can move a stray work ("Logik der Forschung" under Warcraft).
-async function mountUniverseEditor(row, detail) {
+async function mountUniverseEditor(row, detail, open = false) {
   let universes = [];
   try {
     universes = await loadSeriesTree();
@@ -609,8 +691,10 @@ async function mountUniverseEditor(row, detail) {
   const section = document.createElement('section');
   section.className = 'detail-section universe-editor';
   // One line with the current universe; the choice opens under "Edytuj".
-  section.innerHTML = `<details class="edit-fold"><summary><span class="edit-fold-label">Uniwersum w widoku „Serie”</span> <b>${escapeHtml(current?.name || 'Poza seriami')}</b> <small>${manual ? '(wybrane ręcznie)' : '(automatycznie: tytuł albo fraza skanu)'}</small> <span class="edit-fold-action">Edytuj</span></summary><div class="universe-editor-row"><select aria-label="Uniwersum dzieła"><option value="">Automatycznie</option>${names.map((name) => `<option value="${escapeHtml(name)}"${manual && name === current?.name ? ' selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select><button type="button" class="button secondary">Zapisz uniwersum</button></div></details>`;
-  detail.append(section);
+  section.innerHTML = `<details class="edit-fold"${open ? ' open' : ''}><summary><span class="edit-fold-label">Uniwersum w widoku „Serie”</span> <b>${escapeHtml(current?.name || 'Poza seriami')}</b> <small>${manual ? '(wybrane ręcznie)' : '(automatycznie: tytuł albo fraza skanu)'}</small> <span class="edit-fold-action">Edytuj</span></summary><div class="universe-editor-row"><select aria-label="Uniwersum dzieła"><option value="">Automatycznie</option>${names.map((name) => `<option value="${escapeHtml(name)}"${manual && name === current?.name ? ' selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select><button type="button" class="button secondary">Zapisz uniwersum</button></div></details>`;
+  detail.querySelector('.bp-panes').append(section);
+  asPane(section, 'universe');
+  section.hidden = !open;
   const select = section.querySelector('select');
   const button = section.querySelector('button');
   button.addEventListener('click', async () => {
@@ -625,8 +709,7 @@ async function mountUniverseEditor(row, detail) {
       toast(select.value ? `Przeniesiono do „${select.value}”.` : 'Przywrócono automatyczne uniwersum.');
       if (document.body.dataset.catalogView === 'series') void renderSeriesTree();
       section.remove();
-      void mountUniverseEditor(row, detail);
-    void annotateEditionLines(row, detail);
+      void mountUniverseEditor(row, detail, true);
     } catch (error) {
       toast('Nie zapisano uniwersum: ' + error.message);
       button.disabled = false;
@@ -806,7 +889,7 @@ function mountWorkActions(row,detail) {
     }
     if(!choices.children.length)choices.textContent='Brak innych dzieł. Zmień frazę.';
     }catch(error){message.textContent='Nie udało się wyszukać duplikatów.';}finally{search.disabled=false;}
-  });detail.append(root);
+  });detail.append(root);asPane(root,'edit');
 }
 function mountEditionActions(row,detail) {
   const root=document.createElement('details');root.className='catalog-edit';const summary=document.createElement('summary');summary.textContent='Popraw dane wydania';root.append(summary);

@@ -1055,14 +1055,6 @@
   overflow: hidden;
   font-size: 14px;
 }
-.work-hero {
-  display: flex;
-  align-items: flex-start;
-  gap: 18px;
-}
-.work-hero h3 {
-  font: 600 22px/1.3 var(--font-book);
-}
 .edition-line {
   display: flex !important;
   align-items: center;
@@ -1541,6 +1533,18 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
   display: grid;
   gap: 4px;
 }
+/* Book page: the variant choice sits on the edition's own line; the "?" spine keeps its width. */
+@media (min-width: 901px) {
+  .bp-editions .edition-line-wrap {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+  }
+}
+.bp-editions .edition-line > .book-spine {
+  flex: 0 0 40px;
+  text-align: center;
+}
 .edition-line-wrap.is-unknown .edition-line {
   border-left: 3px solid var(--wp-s0);
   padding-left: 8px;
@@ -1880,16 +1884,156 @@ body.density-compact #view-catalog#view-catalog #catalogList:not(.is-grid):not(.
     margin: 0 auto;
   }
 }
-@media (max-width: 900px) {
-  #catalogDetail .book-back {
-    display: none;
-  }
-}
 #catalogDetail .book-back {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   margin: 0 0 4px;
+}
+/* The phone has its own "Wróć do listy". */
+@media (max-width: 900px) {
+  #catalogDetail .book-back {
+    display: none;
+  }
+}
+/* Book page top (2026-11-15): compact header, action bar, edit panes, price tiles, offer list. */
+.bp-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 12px;
+}
+.bp-head h3 {
+  margin: 0;
+  font: 600 22px/1.25 var(--font-book);
+}
+.bp-head p {
+  margin: 2px 0 4px;
+  color: var(--muted);
+}
+.bp-head small {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.bp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+.bp-actions [data-bp-action='remove'] {
+  margin-left: auto;
+}
+.bp-actions [aria-expanded='true'] {
+  background: var(--selected);
+}
+#catalogDetail .bp-panes > * {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.bp-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.bp-tile {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--tile-line);
+  border-radius: var(--radius);
+  background: var(--tile);
+}
+.bp-tile small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.bp-tile strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.bp-tile.is-key {
+  border-color: var(--brand);
+}
+.bp-tile.is-good strong {
+  color: var(--good);
+}
+.work-offers h4 small,
+.bp-editions h4 small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.bp-offer-list {
+  display: grid;
+}
+.bp-offer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.bp-offer.is-gone {
+  opacity: 0.6;
+}
+.bp-offer-open {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bp-offer-open:hover {
+  background: var(--hover);
+}
+.bp-offer-open > span {
+  display: grid;
+  min-width: 0;
+}
+.bp-offer-open b {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-offer-open small {
+  color: var(--muted);
+}
+.bp-offer-open strong {
+  font-variant-numeric: tabular-nums;
+}
+.bp-offer-link {
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.bp-more-offers {
+  margin-top: 8px;
+}
+.bp-more > summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+@media (max-width: 600px) {
+  .bp-offer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bp-offer-link {
+    justify-self: end;
+  }
 }
 .work-offer-list {
   display: grid;

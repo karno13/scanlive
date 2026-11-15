@@ -1,4 +1,4 @@
-// "Usuń z katalogu": a button on the book page and the "Usunięte z katalogu" panel among the
+// "Usuń z katalogu": a button in the book page's action bar and the "Usunięte z katalogu" panel among the
 // catalogue tools. Removal hides the book with its editions and rejects its offers, also future
 // ones (catalog-removal.mjs); the toast and the panel restore it exactly.
 import { confirmDialog } from '../core/dialogs.js';
@@ -18,25 +18,15 @@ async function restore(workId, { json, toast, loadCatalogData }) {
   changed();
 }
 
-/** Danger-zone section at the bottom of the book page. */
-export function mountWorkRemoval({ row, detail, json, toast, loadCatalogData, onRemoved }) {
-  const section = document.createElement('section');
-  section.className = 'detail-section work-removal';
-  section.innerHTML =
-    '<h4>Usuń z katalogu</h4><p class="inline-note">Dla pozycji, które nie należą do kolekcji. Książka zniknie z list razem z wydaniami, jej oferty zostaną odrzucone, a nowe oferty tej książki będą odrzucane same. Przywrócisz ją w „Narzędzia katalogu → Usunięte z katalogu”.</p>';
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'button secondary danger-text';
-  button.textContent = 'Usuń z katalogu';
-  section.append(button);
-  detail.append(section);
+/** "Usuń z katalogu" in the book page's action bar; the confirmation explains what happens. */
+export function mountWorkRemoval({ row, button, json, toast, loadCatalogData, onRemoved }) {
   button.addEventListener('click', async () => {
     button.disabled = true;
     try {
       const url = '/api/catalog/works/' + encodeURIComponent(row.id) + '/removal';
       const preview = await json(url);
       const confirmed = await confirmDialog(
-        `„${preview.title}”: ${preview.editions} ${preview.editions === 1 ? 'wydanie' : 'wydań'} i ${offersWord(preview.offers)} znikną z katalogu i z weryfikacji. Nowe oferty tej książki będą odrzucane automatycznie.`,
+        `„${preview.title}”: ${preview.editions} ${preview.editions === 1 ? 'wydanie' : 'wydań'} i ${offersWord(preview.offers)} znikną z katalogu i z weryfikacji. Nowe oferty tej książki będą odrzucane automatycznie. Przywrócisz ją w „Narzędzia katalogu → Usunięte z katalogu”.`,
         { title: 'Usunąć z katalogu?', confirmLabel: 'Usuń z katalogu', danger: true },
       );
       if (!confirmed) return;

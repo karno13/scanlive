@@ -2,6 +2,15 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (70) — Krótsza strona książki: kafelki cen, akcje, oferty z linkami
+
+- Na górze strony książki są **kafelki**: najniższa cena i mediana dostępnych ofert, mediana sprzedanych na Vinted, **cena skupu** (najwyższa wycena skupksiazek.pl spośród wydań z ISBN-13) i liczba ofert. Przykład z kopii bazy, „Fourth Wing”: 20,00 zł / 40,00 zł (275 dostępnych) / 30,00 zł (15 sprzedaży) / skup 16,55 zł / 298 ofert.
+- Pod tytułem jest **pasek akcji**: „Szukaj w skanerze” (wpisuje tytuł i autora jako frazę), „Sprawdź skup”, „Popraw dane” (także łączenie duplikatu), „Seria i tom”, „Uniwersum” i „Usuń z katalogu”. Formularze otwierają się pod paskiem, jeden naraz. Cena skupu jest widoczna na stronie książki także poza trybem handlowym.
+- **Oferty** to krótka lista: najpierw dostępne od najtańszej, potem sprzedane (wyszarzone); 15 na start, reszta pod „Pokaż więcej”. Każda ma link **„Ogłoszenie ↗”** otwierający ogłoszenie w nowej karcie; kliknięcie wiersza nadal otwiera szczegóły oferty.
+- Wykres cen, tabele wg rodzaju oferty, stanu i wariantu oraz pochodzenie danych są zwinięte w „Szczegóły cen i pochodzenie danych” na dole. Wybór wariantu cenowego wydania jest w tej samej linii co wydanie. Strona „Fourth Wing” ma teraz ok. 2 600 px wysokości zamiast ok. 9 000 px.
+- **Błąd:** znak „?” przy „Wydanie nieustalone” rozciągał się na pół szerokości wiersza.
+- **Błąd:** na telefonie strona książki miała dwa przyciski powrotu („Wróć do listy” i „← Wszystkie książki”); został jeden.
+
 ## 2026-11-14 (69) — Szybsze sprawdzanie języka na Vinted
 
 - **Błąd:** oferty Vinted, na których stronie sprzedawca nie podał języka, były czytane od nowa w każdym skanie — około 110 stron na pełny skan (ok. 4 minuty przy tempie jednej strony na 2 s). Teraz wynik „brak języka” jest pamiętany przez 7 dni; po tym czasie strona jest czytana ponownie, bo sprzedawca mógł język uzupełnić.

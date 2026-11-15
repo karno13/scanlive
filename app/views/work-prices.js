@@ -114,21 +114,14 @@ export function editionVariantSelect(edition, variants, escapeHtml) {
 }
 
 /**
- * Loads the book's prices into `detail` (after the first section) and wires the variant tools.
- * `reload` re-opens the work detail after a change.
+ * Puts the book's prices (`overview`, from /api/catalog/works/:id/prices) at the start of `mount`
+ * and wires the variant tools. `reload` re-opens the work detail after a change.
  */
-export async function mountWorkPrices({ row, detail, json, money, escapeHtml, toast, reload, isCurrent }) {
-  let overview;
-  try {
-    overview = await json('/api/catalog/works/' + encodeURIComponent(row.id) + '/prices');
-  } catch (error) {
-    return;
-  }
-  if (!detail.isConnected || !isCurrent()) return;
+export function mountWorkPrices({ row, overview, mount, json, money, escapeHtml, toast, reload }) {
   const holder = document.createElement('div');
   holder.innerHTML = workPricesMarkup(overview, { money, escapeHtml });
   const section = holder.firstElementChild;
-  detail.querySelector('.detail-section')?.after(section);
+  mount.querySelector('summary') ? mount.querySelector('summary').after(section) : mount.prepend(section);
   section.querySelector('[data-wp-merge]')?.addEventListener('click', async (event) => {
     const from = section.querySelector('[data-wp-from]').value;
     const to = section.querySelector('[data-wp-to]').value;
