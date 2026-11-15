@@ -10,7 +10,8 @@ test('mobile bottom navigation reaches every BookFlip view', async () => {
   const nav = html.match(/<nav class="mobile-bottom-nav"[\s\S]*?<\/nav>/)?.[0];
   assert.ok(nav);
   // Stage 2: one "Kolejka" entry; sets are a tab inside it.
-  for (const view of ['today', 'queue', 'catalog', 'offers', 'settings'])
+  // „Okazje” took the place of „Źródła” (2026-11-15): source state and the scan are on Dziś.
+  for (const view of ['today', 'queue', 'catalog', 'offers', 'deals', 'settings'])
     assert.match(nav, new RegExp('data-view="' + view + '"'));
   assert.match(html, /id="todayScan">Nowy skan</);
   assert.match(nav, /class="mobile-nav-item active" data-view="today"/);

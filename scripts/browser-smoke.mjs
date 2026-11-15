@@ -341,7 +341,7 @@ try {
   );
   assert.deepEqual(await hiddenButVisible(page), [], 'desktop review: hidden elements stay hidden');
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const view of ['today', 'review', 'sets', 'catalog', 'offers', 'settings']) {
+  for (const view of ['today', 'review', 'sets', 'catalog', 'offers', 'deals', 'settings']) {
     const navView = QUEUE_TAB[view] ? 'queue' : view;
     assert.equal(
       await page.locator(`.mobile-bottom-nav [data-view="${navView}"]`).isVisible(),

@@ -8,7 +8,7 @@ Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; lic
 - Wartość liczona jest z pozostałych ofert i sprzedaży tego samego wydania (sama oferta nie zaniża swojego punktu odniesienia), dla stanu danego egzemplarza. Potrzebne są co najmniej dwie inne ceny; same ceny nowych książek w sklepach nie wystarczają. Zestawy i oferty przypisane do „wydania nieustalonego” są pomijane.
 - Domyślnie widać tylko wyceny o średniej i wysokiej wiarygodności; pole „Pokaż też wyceny o niskiej wiarygodności” odsłania resztę. Sortowanie: różnica w zł, rabat %, najnowsze, najniższa cena.
 - Oferta 70% i więcej poniżej wyceny dostaje ostrzeżenie „sprawdź przypisanie” — tak duża różnica częściej oznacza pomyłkę w przypisaniu niż okazję.
-- Na telefonie zakładki nie ma w dolnym pasku (jest już pełny); otwiera się z palety poleceń lub adresem `?view=deals`.
+- Na telefonie „Okazje” są w dolnym pasku w miejscu „Źródeł”; stan źródeł jest na ekranie „Dziś”, a widok „Źródła” otwiera stamtąd przycisk „Nowy skan” i kafelek „Następny skan”.
 
 ## 2026-11-15 (87) — Wycena: poprawki po sprawdzeniu na danych
 
