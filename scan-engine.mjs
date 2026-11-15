@@ -627,7 +627,14 @@ function vintedDetailFields(detail, now = new Date()) {
   const out = {};
   if (typeof detail.description === 'string' && detail.description)
     out.listingDescription = detail.description.slice(0, 8000);
-  for (const field of ['conditionText', 'listedAtText', 'photoCount', 'favouriteCount', 'sellerId'])
+  for (const field of [
+    'conditionText',
+    'listedAtText',
+    'photoCount',
+    'favouriteCount',
+    'sellerId',
+    'shippingCost',
+  ])
     if (detail[field] != null) out[field] = detail[field];
   if (detail.listedAtText) {
     const listedAt = listedAtFromAge(detail.listedAtText, now);

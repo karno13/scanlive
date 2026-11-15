@@ -2,6 +2,11 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (89) — Koszt dostawy w ofertach Vinted
+
+- Przy ofercie Vinted widać teraz „Dostawa”: najtańsza cena wysyłki, jaką podaje strona ogłoszenia („od 9,99 zł”), albo „bezpłatna”, gdy Vinted daje 100% rabatu na dostawę (np. 7,05 zł → 0 zł).
+- Odczyt idzie przy okazji czytania strony ogłoszenia (i tak czytanej dla języka) — bez dodatkowych zapytań. Dotyczy ofert, których strona zostanie odczytana od tej wersji; wcześniej zapisane oferty nie mają tej informacji.
+
 ## 2026-11-15 (88) — Nowa zakładka „Okazje”
 
 - Menu boczne: „Okazje” — dostępne oferty co najmniej 20% i 5 zł poniżej wartości swojego wydania. Przy każdej: cena, ile egzemplarz jest wart (z przedziałem), różnica w zł i %, wiarygodność wyceny, link do ogłoszenia i do strony książki. Na kopii bazy: 150 okazji, z czego 56 z wyceną średnią lub wysoką.

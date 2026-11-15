@@ -13,7 +13,7 @@ export function observationFacts(offer, { money, date, escapeHtml }) {
   if (offer.condition || CONDITION_LABELS[offer.conditionClass])
     facts.push(['Stan', offer.condition || CONDITION_LABELS[offer.conditionClass]]);
   if (offer.buyerFee != null) facts.push(['Opłata kupującego', money(offer.buyerFee)]);
-  if (offer.shippingCost != null) facts.push(['Dostawa', money(offer.shippingCost)]);
+  if (offer.shippingCost != null) facts.push(['Dostawa', offer.shippingCost === 0 ? 'bezpłatna' : 'od ' + money(offer.shippingCost)]);
   if (offer.sellerName || offer.sellerBusiness != null)
     facts.push(['Sprzedawca', offer.sellerName || (offer.sellerBusiness ? 'firma' : 'osoba prywatna')]);
   if (offer.photoCount != null) facts.push(['Zdjęcia', String(offer.photoCount)]);

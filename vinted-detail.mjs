@@ -125,11 +125,39 @@ function sectionValue(data, code) {
   const value = section?.data?.value;
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
+// The cheapest delivery the buyer pays, from the page's own price block
+// ("pricingServices":{"services":{…,"shipping":{"originalPrice":{"amount":"7.05"},"finalPrice":{"amount":"0"}}}}).
+// Only the selected item has this block (the page repeats it for the buy and the offer button); copies
+// that disagree make the page ambiguous and nothing is read.
+function shippingPrice(data) {
+  const copies = new Set(
+    [...data.matchAll(/"pricingServices"\s*:\s*\{/g)].map((m) =>
+      JSON.stringify(objectAt(data, m.index + m[0].length - 1)?.services?.shipping ?? null),
+    ),
+  );
+  if (copies.size !== 1) return null;
+  const shipping = JSON.parse([...copies][0]);
+  const amount = (price) => {
+    const value = Number(price?.amount);
+    return price?.currencyCode === 'PLN' && Number.isFinite(value) && value >= 0 && value < 10000
+      ? Math.round(value * 100)
+      : null;
+  };
+  const final = amount(shipping?.finalPrice);
+  if (final == null) return null;
+  return { cost: final, original: amount(shipping?.originalPrice) };
+}
 // What the listing page adds to the result card: condition, how long ago it was listed, the photos,
-// likes, the seller. All read from blocks tied to this item id; the shipping price is not in the
-// page (the browser asks for it separately) and neither is the number of views.
+// likes, the seller, the delivery price. All read from blocks tied to this item id; the number of
+// views is not in the page.
 function detailObservation(data, id, candidates) {
   const out = {};
+  const shipping = shippingPrice(data);
+  if (shipping) {
+    out.shippingCost = shipping.cost;
+    if (shipping.original != null && shipping.original > shipping.cost)
+      out.shippingOriginalCost = shipping.original;
+  }
   const condition = sectionValue(data, 'status');
   if (condition) out.conditionText = condition;
   const age = sectionValue(data, 'upload_date');
@@ -169,6 +197,7 @@ function detailObservation(data, id, candidates) {
     condition,
     listedAge: age,
     photos,
+    shipping,
   };
   return out;
 }

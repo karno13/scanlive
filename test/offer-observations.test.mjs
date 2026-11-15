@@ -153,8 +153,9 @@ test('a scanned Vinted listing is saved with condition, fee, seller, description
     assert.ok(
       Math.abs(Date.parse(row.listed_at) - Date.parse('2026-11-10T09:00:00.000Z')) < 60_000,
     );
-    assert.equal(row.shipping_cost, null, 'Vinted pages do not carry the shipping price');
-    assert.equal(row.view_count, null, 'nor the number of views');
+    // The page's price block: delivery from 7.05 zł discounted to 0 — free.
+    assert.equal(row.shipping_cost, 0);
+    assert.equal(row.view_count, null, 'Vinted pages do not carry the number of views');
     // Only the listing in Polish was saved.
     assert.equal(db.prepare('SELECT count(*) AS n FROM offers').get().n, 1);
 
@@ -258,4 +259,26 @@ test('conditions read earlier from listing pages are copied once at start-up', (
   } finally {
     rmSync(directory, { recursive: true, force: true, maxRetries: 3 });
   }
+});
+
+test('Vinted delivery price comes from the selected item price block only', () => {
+  const url = 'https://www.vinted.pl/items/9000000002-faust-erik-terry-pratchett';
+  const free = parseVintedDetail(detailPage, url);
+  assert.equal(free.shippingCost, 0);
+  assert.equal(free.shippingOriginalCost, 705);
+  const paid = parseVintedDetail(
+    detailPage.replace(
+      '\\"finalPrice\\":{\\"amount\\":\\"0\\"',
+      '\\"finalPrice\\":{\\"amount\\":\\"9.99\\"',
+    ),
+    url,
+  );
+  assert.equal(paid.shippingCost, 999);
+  assert.equal(paid.shippingOriginalCost, undefined);
+  // Two price blocks (another item's widget): ambiguous, nothing is read.
+  const twice = detailPage.replace(
+    '{\\"pricingServices\\"',
+    '{\\"pricingServices\\":{}}\n{\\"pricingServices\\"',
+  );
+  assert.equal(parseVintedDetail(twice, url).shippingCost, undefined);
 });
