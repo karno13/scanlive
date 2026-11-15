@@ -2,6 +2,10 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (73) — Lista książek na pełną szerokość po powrocie ze strony książki
+
+- **Błąd:** po otwarciu książki i powrocie („← Wszystkie książki”) widoki „Okładki” i „Serie” zajmowały tylko część szerokości (746 px przy 1440 px), prawa część ekranu była pusta. Lista ma teraz pełną szerokość zawsze, gdy strona książki nie jest otwarta.
+
 ## 2026-11-15 (72) — Lista książek nie zwija się po usunięciu; krótszy pasek serii
 
 - **Błąd:** po rozwinięciu listy „Książki” ponad 100 pozycji kliknięcie „×” (albo „Cofnij”) zwijało ją z powrotem do 100. Teraz przy tych samych filtrach lista zostaje rozwinięta — sprawdzone na kopii bazy: 400 widocznych pozycji przed usunięciem, po nim i po „Cofnij”.

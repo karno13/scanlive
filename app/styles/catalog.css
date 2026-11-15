@@ -1915,7 +1915,11 @@ body.density-compact #view-catalog#view-catalog #catalogList:not(.is-grid):not(.
 /* Review 11.2026, stage 3: "Książki" — the list, or one full-width page of the book. */
 @media (min-width: 901px) {
   body #view-catalog#view-catalog .catalog-layout,
-  body #view-catalog#view-catalog .catalog-layout:has(.catalog-detail > .empty-detail) {
+  body #view-catalog#view-catalog .catalog-layout:has(.catalog-detail > .empty-detail),
+  body[data-catalog-view] #view-catalog#view-catalog .catalog-layout,
+  body[data-catalog-view]
+    #view-catalog#view-catalog
+    .catalog-layout:has(.catalog-detail > .empty-detail) {
     grid-template-columns: minmax(0, 1fr);
   }
   body #view-catalog#view-catalog:not(.is-book-page) #catalogDetail {
