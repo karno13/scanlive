@@ -2,6 +2,10 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (78) — Zakładka „Zestawy?”: przycisk „Zestaw” w pasku akcji
+
+- Kolejka → „Zestawy?”: akcja **„Zestaw” (Z)** jest przyciskiem w głównym pasku akcji, obok „Odrzuć” i „Pomiń”. W pozostałych zakładkach zostaje w menu „Więcej”.
+
 ## 2026-11-15 (77) — „Nowy skan” przewija do formularza
 
 - **Błąd:** na telefonie „Nowy skan” na ekranie „Dziś” otwierał „Źródła” na górze, a formularz skanu był ok. 1100 px niżej, pod „Stanem źródeł”. Teraz po kliknięciu ekran przewija się od razu do formularza.

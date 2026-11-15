@@ -359,6 +359,12 @@ function renderReviewDetail() {
         <p class="rv-approve-hint" id="reviewApproveHint" role="status" hidden></p>
       </footer>
     </div>`;
+  // "Zestawy?": the set action is the likely answer, so it moves from "Więcej" to the main bar (same button, same handler).
+  if (state.reviewBucket === 'bundle') {
+    const setButton = $('#markAsSet');
+    setButton.className = 'button secondary';
+    $('#rejectReview').before(setButton);
+  }
   $('#approveReview').disabled = !reviewTargetChosen();
   // Every guard writes the button's disabled state; the pinned primary action follows it.
   new MutationObserver(() => syncPrimaryAction()).observe($('#approveReview'), { attributes: true, attributeFilter: ['disabled'] });
