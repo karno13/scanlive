@@ -125,6 +125,21 @@ export function todayTiles(data, now = new Date()) {
   return tiles;
 }
 
+/**
+ * Rows of the source list: sources that do not work or have no legal access stand out one by one;
+ * the working ones fold into one "N działa" line. Pure (tested).
+ */
+export function sourceRows(sources, now, escapeHtml) {
+  const row = (item) =>
+    `<li class="is-${escapeHtml(item.state)}"><button type="button" data-source="${escapeHtml(item.source)}" title="Oferty z tego źródła"><i class="source-dot-state" aria-hidden="true"></i><b>${escapeHtml(item.source)}</b><span>${escapeHtml(sourceLine(item, now))}</span></button></li>`;
+  const working = sources.filter((item) => item.state === 'ok');
+  const rest = sources.filter((item) => item.state !== 'ok');
+  const folded = working.length
+    ? `<li class="today-sources-ok"><details><summary>${working.length} działa</summary><ul>${working.map(row).join('')}</ul></details></li>`
+    : '';
+  return rest.map(row).join('') + folded;
+}
+
 export function installTodayView({ $, json, escapeHtml, showView, openOffers }) {
   const root = $('#todayBody');
   if (!root) return { refresh: async () => {} };
@@ -155,12 +170,7 @@ export function installTodayView({ $, json, escapeHtml, showView, openOffers }) 
       ${measures ? `<section class="today-measures" aria-label="Miary katalogu">${measures}</section>` : ''}
       <section class="today-sources" id="todaySources" aria-labelledby="todaySourcesTitle">
         <h3 id="todaySourcesTitle">Źródła</h3>
-        <ul>${(data.sources || [])
-          .map(
-            (row) =>
-              `<li class="is-${escapeHtml(row.state)}"><button type="button" data-source="${escapeHtml(row.source)}" title="Oferty z tego źródła"><i class="source-dot-state" aria-hidden="true"></i><b>${escapeHtml(row.source)}</b><span>${escapeHtml(sourceLine(row, now))}</span></button></li>`,
-          )
-          .join('')}</ul>
+        <ul>${sourceRows(data.sources || [], now, escapeHtml)}</ul>
       </section>`;
     root.querySelectorAll('[data-tile]').forEach((button) =>
       button.addEventListener('click', () => {

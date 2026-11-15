@@ -104,6 +104,16 @@
 .today-sources li.is-no_access {
   opacity: 0.8;
 }
+.today-sources .today-sources-ok > details > summary {
+  min-height: 36px;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 600;
+}
+.today-sources .today-sources-ok > details[open] > summary {
+  margin-bottom: 2px;
+}
 /* Dziś: four measures with a trend, under the tiles. */
 .today-measures {
   display: grid;

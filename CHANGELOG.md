@@ -2,6 +2,10 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (83) — Dziś: działające źródła zwinięte do jednej linii
+
+- Dziś → „Źródła”: źródła niedziałające i bez dostępu są wypisane osobno, a działające zwinięte do jednej rozwijanej linii „N działa” (na kopii bazy „8 działa”). Sekcja ma 281 px wysokości zamiast 611 px.
+
 ## 2026-11-15 (82) — Książki: równe liczniki, stała kolejność narzędzi
 
 - Książki → Lista: liczniki „1 wyd. · 1 oferta” stoją na tej samej wysokości względem wiersza „wydawca · rok” w każdym wierszu — z plakietką „Niezweryfikowane” i bez, z plakietkami „brak: rok / wydawca” i bez (pomiar na kopii bazy, 14 pierwszych wierszy: odstęp 4 px we wszystkich; wcześniej 4 px lub 7 px).

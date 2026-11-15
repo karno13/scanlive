@@ -211,3 +211,22 @@ test('tiles: each opens a filtered list; non-working sources are named and marke
   assert.match(sourceLine(data.sources[2], now), /^działa · ostatnio dziś /);
   assert.match(whenLabel('2026-11-10T20:10:00', now), /^wczoraj 20:10$/);
 });
+
+test('the source list shows failing and no-access sources, and folds the working ones into one line', async () => {
+  const { sourceRows } = await import('../app/views/today.js');
+  const escape = (value) => String(value);
+  const html = sourceRows(
+    [
+      { source: 'A', state: 'ok' },
+      { source: 'B', state: 'down', reason: 'CAPTCHA' },
+      { source: 'C', state: 'ok' },
+      { source: 'D', state: 'no_access' },
+    ],
+    new Date('2026-11-15T12:00:00Z'),
+    escape,
+  );
+  assert.match(html, /<summary>2 działa<\/summary>/);
+  assert.ok(html.indexOf('data-source="B"') < html.indexOf('<summary>'));
+  assert.ok(html.indexOf('data-source="D"') < html.indexOf('<summary>'));
+  assert.ok(html.indexOf('data-source="A"') > html.indexOf('<summary>'));
+});
