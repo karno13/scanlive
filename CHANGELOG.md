@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (75) — Oferty: filtr stanu ogłoszenia i stan w kolumnie
+
+- W „Oferty” jest nowy filtr **„Stan ogłoszenia”**: aktywne / sprzedane / niewidziane (obok filtra statusu). Sprzedane na Vinted to cena odniesienia, więc teraz da się je wylistować.
+- Kolumna „Katalog · ogłoszenie” pokazuje pod „W katalogu” stan ogłoszenia (np. „Sprzedana”, „Widziana dziś”, „Dawno niewidziana”), a nie tylko przypisanie.
+- Wybór: „aktywne” = znalezione w skanie lub potwierdzone na stronie; „niewidziane” = brak w ostatnim skanie lub zdjęte. Dane z kolumny `offers.availability`, bez migracji; „zarezerwowane” nie ma osobnej pozycji filtra.
+
 ## 2026-11-15 (74) — Podejrzane przypisania: komunikat przy braku pozycji
 
 - **Błąd:** w Kolejce → „Podejrzane przypisania” przy 0 pozycji ekran był pusty (panel był ukryty mimo komunikatu). Teraz widać komunikat „Każda przypisana oferta ma w tytule coś wspólnego ze swoim wydaniem.”

@@ -434,6 +434,18 @@ function offerQueryParts(options) {
     "(j.status='completed' AND json_valid(j.result_json) AND json_extract(j.result_json,'$.manualDecision') IN ('excluded','not_book'))";
   if (status === 'rejected') conditions.push(rejectedSql);
   else if (status !== 'all') conditions.push(`NOT coalesce(${rejectedSql},0)`);
+  // Listing state (offers.availability): active = found by a scan or confirmed on its page,
+  // sold = Vinted's reference prices, unseen = missing from the last scan or removed.
+  const availabilityGroups = {
+    active: ['available', 'unconfirmed'],
+    sold: ['sold'],
+    unseen: ['not_seen', 'unavailable'],
+  };
+  const availabilityValues = availabilityGroups[String(options.availability ?? '')];
+  if (availabilityValues) {
+    conditions.push(`o.availability IN (${availabilityValues.map(() => '?').join(',')})`);
+    params.push(...availabilityValues);
+  }
   if (status === 'matched') conditions.push('m.id IS NOT NULL');
   if (status === 'review')
     conditions.push("j.status IN ('queued','running','retry_wait','review_required','failed')");

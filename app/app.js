@@ -273,6 +273,7 @@ async function openOffers(filters = {}) {
   if (filters.scan) await ensureScanRuns().catch(() => {});
   $('#offerSearch').value = '';
   $('#offerStatus').value = '';
+  $('#offerAvailability').value = '';
   $('#offerSource').value = filters.source || '';
   $('#offerMinPrice').value = '';
   $('#offerMaxPrice').value = '';
@@ -482,6 +483,7 @@ function catalogFilters(kind) {
     query,
     source: $('#offerSource').value,
     status: $('#offerStatus').value,
+    availability: $('#offerAvailability').value,
     watched:state.offerView==='watched'?'1':'',target:state.offerView==='target'?'1':'',
     purchaseStatus:['check','negotiating','bought','rejected'].includes(state.offerView)?state.offerView:'',
     scan:$('#offerScan').value,scanChange:$('#offerScanChange').value,
@@ -962,7 +964,7 @@ for (const selector of ['#reviewSource', '#reviewIsbn', '#reviewSort'])
 $('#reviewSearch').addEventListener('input', () => scheduleGlobalCatalogSearch('jobs'));
 $('#catalogSort').addEventListener('change', () => scheduleGlobalCatalogSearch('works'));
 $('#catalogSearch').addEventListener('input', () => scheduleGlobalCatalogSearch('works'));
-for (const selector of ['#offerSource', '#offerStatus', '#offerSort'])
+for (const selector of ['#offerSource', '#offerStatus', '#offerAvailability', '#offerSort'])
   $(selector).addEventListener('change', () => scheduleGlobalCatalogSearch('offers'));
 document.querySelectorAll('#view-offers [data-offer-sort]').forEach((button) =>
   button.addEventListener('click', () => {

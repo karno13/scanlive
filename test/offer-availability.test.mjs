@@ -62,3 +62,19 @@ test('an incomplete scan never marks anything, and a re-seen offer returns to un
   offer(repo, 1, ['Warcraft'], '2026-11-06T10:00:00.000Z'); // listed again
   assert.equal(status(repo, 1), 'unconfirmed');
 });
+
+test('the offer list filters by listing state: active, sold, unseen', async () => {
+  const { listCatalogOffers } = await import('../catalog-api.mjs');
+  const repo = new SqliteCatalogRepository(':memory:');
+  offer(repo, 1, ['A'], T1, 'unconfirmed');
+  offer(repo, 2, ['A'], T1, 'sold');
+  offer(repo, 3, ['A'], T1, 'not_seen');
+  const urls = (availability) =>
+    listCatalogOffers(repo, { status: 'all', availability })
+      .items.map((item) => item.title)
+      .sort();
+  assert.deepEqual(urls('active'), ['T1']);
+  assert.deepEqual(urls('sold'), ['T2']);
+  assert.deepEqual(urls('unseen'), ['T3']);
+  assert.equal(urls('').length, 3);
+});
