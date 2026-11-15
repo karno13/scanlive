@@ -2,6 +2,11 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (72) — Lista książek nie zwija się po usunięciu; krótszy pasek serii
+
+- **Błąd:** po rozwinięciu listy „Książki” ponad 100 pozycji kliknięcie „×” (albo „Cofnij”) zwijało ją z powrotem do 100. Teraz przy tych samych filtrach lista zostaje rozwinięta — sprawdzone na kopii bazy: 400 widocznych pozycji przed usunięciem, po nim i po „Cofnij”.
+- **Błąd:** w widoku „Serie” pasek skrótów miał po jednym przycisku na każde uniwersum (83 na kopii bazy) i, przyklejony do góry, zasłaniał prawie cały ekran. Teraz to jedna linia: lista „Wszystkie serie (83)…” i 10 największych serii; na wąskim ekranie przewija się w poziomie.
+
 ## 2026-11-15 (71) — Usuwanie książki jednym kliknięciem z listy
 
 - Na liście „Książki” (widok „Lista” i „Okładki”) po najechaniu na książkę na okładce pojawia się **„×”**. Kliknięcie od razu usuwa książkę z katalogu, bez okna potwierdzenia — działa jak „Usuń z katalogu” (oferty odrzucone, nowe oferty tej książki odrzucane same). Na telefonie „×” jest widoczny stale.

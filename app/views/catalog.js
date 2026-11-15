@@ -218,6 +218,7 @@ const collapsedUniverses = new Set();
 // Cycles with gaps, by index, for the "find missing" buttons of the current render.
 let missingTargets = [];
 const MAX_SCAN_QUERIES = 10;
+const SERIES_JUMP_LINKS = 10;
 
 function missingQueries(target) {
   // A known title finds the book; "Cycle tom N" is only a fallback.
@@ -425,9 +426,24 @@ async function renderSeriesTree() {
   const gapsBar = missingTotal
     ? `<div class="series-gaps"><span><b>Braki w seriach: ${missingTotal}</b> ${missingTotal === 1 ? 'tom' : pluralForm(missingTotal) === 'few' ? 'tomy' : 'tomów'} w ${missingTargets.length} ${missingTargets.length === 1 ? 'cyklu' : 'cyklach'}</span><button class="button ghost compact" type="button" id="copySeriesGaps">Kopiuj listę braków</button><button class="button ghost compact" type="button" id="saveGapsProfile" title="Zapisz frazy brakujących tomów jako profil skanu; odświeża się sam, gdy zmieniają się braki">Zapisz jako profil skanu</button></div>`
     : '';
+  // Jump bar: one line — the largest universes as links, all of them in a select (83 links
+  // filled the whole screen).
+  const anchor = (universe) => 'series-' + foldText(universe.name).replace(/[^a-z0-9]+/g, '-');
+  const biggest = visible.filter((universe) => universe.name !== 'Poza seriami').slice(0, SERIES_JUMP_LINKS);
+  const jumpSelect = visible.length > biggest.length
+    ? `<select class="series-jump-select" aria-label="Przejdź do serii"><option value="">Wszystkie serie (${visible.length})…</option>${visible.map((universe) => `<option value="${escapeHtml(anchor(universe))}">${escapeHtml(universe.name)} (${universe.works})</option>`).join('')}</select>`
+    : '';
   list.innerHTML = visible.length
-    ? gapsBar + `<nav class="series-jump" aria-label="Uniwersa">${visible.map((universe) => `<a href="#series-${escapeHtml(foldText(universe.name).replace(/[^a-z0-9]+/g, '-'))}">${escapeHtml(universe.name)} <small>${universe.works}</small></a>`).join('')}</nav>` + universeMarkup
+    ? gapsBar + `<nav class="series-jump" aria-label="Uniwersa">${jumpSelect}${biggest.map((universe) => `<a href="#${escapeHtml(anchor(universe))}">${escapeHtml(universe.name)} <small>${universe.works}</small></a>`).join('')}</nav>` + universeMarkup
     : queryEmptyMarkup();
+  list.querySelector('.series-jump-select')?.addEventListener('change', (event) => {
+    const target = event.target.value && document.getElementById(event.target.value);
+    if (target) {
+      target.open = true;
+      target.scrollIntoView({ block: 'start' });
+    }
+    event.target.value = '';
+  });
   list.querySelectorAll('[data-find-missing]').forEach((button) =>
     button.addEventListener('click', () => findMissing(missingTargets[Number(button.dataset.findMissing)])),
   );

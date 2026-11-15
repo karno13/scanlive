@@ -508,6 +508,8 @@ async function loadCatalogPage(kind, { reset = false, pageNumber = null } = {}) 
     // The review queue comes in pages of 50 decisions. Reloading with unchanged filters (after a
     // decision) keeps as many rows as were loaded, so the next offer is the one under the decided.
     const sameFilters = reset && kind === 'jobs' && JSON.stringify(catalogFilters(kind)) === JSON.stringify(page.filters || null);
+    // Books: a reload with the same filters (after a removal or its undo) keeps the list expanded.
+    const sameWorks = reset && kind === 'works' && JSON.stringify(catalogFilters(kind)) === JSON.stringify(page.filters || null);
     const limit = kind === 'offers' ? state.pageSize : kind === 'jobs' ? (sameFilters ? Math.min(250, Math.max(reviewPageSize, state.reviewJobs.length)) : reviewPageSize) : catalogPageSize;
     const requestedPage = pageNumber ?? (reset ? 1 : state.offerPage + 1);
     let offset = kind === 'offers' ? (requestedPage - 1) * limit : reset ? 0 : page.offset;
@@ -541,7 +543,7 @@ async function loadCatalogPage(kind, { reset = false, pageNumber = null } = {}) 
     }
     if (reset || kind === 'offers') {
       state[source.stateKey] = data.items;
-      if (kind === 'works' || kind === 'jobs') state.visibleRows[kind] = 100;
+      if (kind === 'jobs' || (kind === 'works' && !sameWorks)) state.visibleRows[kind] = 100;
     } else {
       const known = new Set(state[source.stateKey].map((row) => row.id));
       state[source.stateKey] = [...state[source.stateKey], ...data.items.filter((row) => !known.has(row.id))];
@@ -621,6 +623,13 @@ async function loadCatalogData({ kinds = null } = {}) {
     );
     for (const kind of wanted) loadedKinds.add(kind);
     if (loaded.some((value) => value !== true)) throw Error('CATALOG_PAGE_LOAD_IN_PROGRESS');
+    // An expanded book list gets back all the rows it showed (pages of 250).
+    while (
+      wanted.includes('works') &&
+      state.catalogWorks.length < Math.min(state.visibleRows.works || 100, state.catalogPages.works.total) &&
+      state.catalogPages.works.offset < state.catalogPages.works.total
+    )
+      if ((await loadCatalogPage('works')) !== true) break;
     $('#reviewNavCount').textContent = `${state.reviewQueueDecisions ?? state.catalog?.reviewQueue?.decisions ?? state.catalogPages.jobs.total} do decyzji`;
     renderReview();
     renderCatalog();

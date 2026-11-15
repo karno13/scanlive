@@ -1176,12 +1176,22 @@ body[data-catalog-view='grid'] #view-catalog .catalog-table-header {
   top: 0;
   z-index: 2;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   margin: 0 -16px 8px;
   padding: 10px 16px;
+  overflow-x: auto;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+/* One line only: it stays on top while scrolling, so it must not cover the shelves. */
+.series-jump > * {
+  flex: 0 0 auto;
+}
+.series-jump-select {
+  max-width: 220px;
+  font-size: 12px;
 }
 .series-jump a:hover {
   border-color: var(--brand);
