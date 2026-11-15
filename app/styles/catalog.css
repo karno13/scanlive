@@ -1530,7 +1530,6 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
   padding: 6px 0;
 }
 #view-catalog .catalog-tools > details[open] {
-  order: 1;
   flex-basis: 100%;
 }
 /* Katalog → "Wydawcy i serie". */
@@ -1780,7 +1779,7 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
   #catalogList:not(.is-grid):not(.is-series)
   .work-row:has(.missing-facts)
   > span:is(:nth-child(2), :nth-child(3)) {
-  margin-bottom: 22px;
+  margin-bottom: 16px;
 }
 body.density-compact
   #view-catalog#view-catalog
