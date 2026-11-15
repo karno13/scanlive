@@ -2,6 +2,10 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (74) — Podejrzane przypisania: komunikat przy braku pozycji
+
+- **Błąd:** w Kolejce → „Podejrzane przypisania” przy 0 pozycji ekran był pusty (panel był ukryty mimo komunikatu). Teraz widać komunikat „Każda przypisana oferta ma w tytule coś wspólnego ze swoim wydaniem.”
+
 ## 2026-11-15 (73) — Lista książek na pełną szerokość po powrocie ze strony książki
 
 - **Błąd:** po otwarciu książki i powrocie („← Wszystkie książki”) widoki „Okładki” i „Serie” zajmowały tylko część szerokości (746 px przy 1440 px), prawa część ekranu była pusta. Lista ma teraz pełną szerokość zawsze, gdy strona książki nie jest otwarta.

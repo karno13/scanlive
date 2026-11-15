@@ -80,7 +80,6 @@ export function mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogDat
     .then((data) => {
       conflicts = data.conflicts;
       setSummary();
-      panel.hidden = !conflicts.length;
     })
     .catch(() => {});
   panel.addEventListener('toggle', () => {
