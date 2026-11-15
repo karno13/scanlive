@@ -453,6 +453,13 @@ function offerQueryParts(options) {
     conditions.push(`o.availability IN (${availabilityValues.map(() => '?').join(',')})`);
     params.push(...availabilityValues);
   }
+  // Delivery price read from the listing page (Vinted): free = 0 zł, unknown = not read.
+  const shipping = {
+    free: 'o.shipping_cost=0',
+    paid: 'o.shipping_cost>0',
+    unknown: 'o.shipping_cost IS NULL',
+  }[String(options.shipping ?? '')];
+  if (shipping) conditions.push(shipping);
   if (status === 'matched') conditions.push('m.id IS NOT NULL');
   if (status === 'review')
     conditions.push("j.status IN ('queued','running','retry_wait','review_required','failed')");

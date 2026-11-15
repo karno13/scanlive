@@ -2,6 +2,10 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (91) — Filtr dostawy w „Ofertach”
+
+- Nowa lista obok „Stanu ogłoszenia”: każda dostawa / bezpłatna / płatna / nieznana. „Nieznana” to oferty, których koszt dostawy nie został jeszcze odczytany (inne źródła niż Vinted i oferty Vinted czekające na uzupełnienie).
+
 ## 2026-11-15 (90) — Obcojęzyczne z darmową dostawą zostają
 
 - Przy włączonym „Tylko polskie wydania” oferta Vinted w innym języku (np. angielska) nie jest już odrzucana, jeśli ma bezpłatną dostawę. Trafia do katalogu i weryfikacji jak polska; płatna dostawa — odrzucana jak dotąd.
