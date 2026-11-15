@@ -40,11 +40,11 @@ Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; lic
 
 ## 2026-11-15 (77) — „Nowy skan” przewija do formularza
 
-- **Błąd:** na telefonie „Nowy skan” na ekranie „Dziś” otwierał „Źródła” na górze, a formularz skanu był ok. 1100 px niżej, pod „Stanem źródeł”. Teraz po kliknięciu ekran przewija się od razu do formularza.
+- **Błąd:** na telefonie „Nowy skan” na ekranie „Dziś” otwierał „Źródła” na górze, a formularz skanu był ok. 1100 px niżej, pod „Stanem źródeł”. Teraz po kliknięciu ekran przewija się od razu do formularza (na kopii bazy formularz jest u góry ekranu, przewinięcie o 1106 px).
 
 ## 2026-11-15 (76) — Telefon: panel wsadowy w Kolejce
 
-- **Błąd:** na telefonie w Kolejce → „Szybkie” (i „Do dodania”) panel wsadowy („N pewnych dopasowań → Zatwierdź zaznaczone”) był ukryty. Teraz jest nad listą ofert; lista kart w panelu przewija się w obrębie panelu (do 45% wysokości ekranu), przycisk zatwierdzenia jest pod nią.
+- **Błąd:** na telefonie w Kolejce → „Szybkie” (i „Do dodania”) panel wsadowy („N pewnych dopasowań → Zatwierdź zaznaczone”) był ukryty. Teraz jest nad listą ofert (na kopii bazy: „22 pewnych dopasowań”, przycisk „Zatwierdź zaznaczone (22)”); karty przewijają się w obrębie panelu (do 45% wysokości ekranu). Poprawiono też odświeżanie panelu po zmianie zakładki, gdy wcześniej nic nie było zaznaczone.
 
 ## 2026-11-15 (75) — Oferty: filtr stanu ogłoszenia i stan w kolumnie
 

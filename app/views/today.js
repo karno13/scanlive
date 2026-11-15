@@ -202,7 +202,7 @@ export function installTodayView({ $, json, escapeHtml, showView, openOffers }) 
   // "Nowy skan" lands on the scan form, not on the source status above it (1100 px higher on a phone).
   $('#todayScan')?.addEventListener('click', () => {
     showView('scanner');
-    $('.scanner-heading')?.scrollIntoView({ block: 'start' });
+    $('.scanner-form-panel')?.scrollIntoView({ block: 'start' });
   });
   $('#todayReview')?.addEventListener('click', () => showView('review'));
   return { refresh, last: () => last };

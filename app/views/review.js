@@ -246,7 +246,8 @@ function renderReview() {
       }
     }),
   );
-  if ($('#reviewDetail').dataset.jobId !== (state.selectedReviewId || '')) renderReviewDetail();
+  if ($('#reviewDetail').dataset.jobId !== (state.selectedReviewId || '') || (batch.wanted(state.reviewBucket) && $('#reviewDetail').dataset.jobId !== 'batch:' + state.reviewBucket && !bulk.isSelecting()))
+    renderReviewDetail();
   // On a desktop the decision panel is never empty: open the first offer of the queue.
   if (!state.selectedReviewId && rows.length && state.activeView === 'review' && !bulk.isSelecting() && !batch.wanted(state.reviewBucket) &&
       window.matchMedia('(min-width: 901px)').matches && !reviewDecisionPending)
