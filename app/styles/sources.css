@@ -1912,6 +1912,10 @@ input:focus {
 #view-scanner .query-stats-fold {
   margin: var(--scan-gap, 20px) 0 0;
 }
+/* The last scan and the phrase statistics use the whole width, not half of it. */
+#view-scanner > :is(.scan-run, .query-stats-fold) {
+  grid-column: 1 / -1;
+}
 #view-scanner .query-stats-fold > .query-stats-panel {
   margin-top: 0;
   border-top-left-radius: 0;
@@ -2226,7 +2230,7 @@ input:focus {
 @media (min-width: 1100px) {
   #view-scanner > .sources-status {
     grid-column: 2;
-    grid-row: 1 / span 6;
+    grid-row: 1;
   }
 }
 /* The dot says the same as on "Dziś" (the id rule above paints every dot green). */

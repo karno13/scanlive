@@ -2,6 +2,10 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (81) — Źródła: ostatni skan i skuteczność fraz na pełną szerokość
+
+- Źródła (≥ 1100 px): „Ostatni skan” i „Skuteczność fraz i profili skanu” zajmują pełną szerokość (1264 px zamiast 618 px przy 1440 px); tabela skuteczności mieści się bez ucinania kolumn (szerokość tabeli 1226 px, bez przewijania poziomego). Formularz skanu i „Stan źródeł” stoją obok siebie jak dotąd.
+
 ## 2026-11-15 (80) — Duplikaty: wyrównane przyciski, tytuły jako linki
 
 - Kolejka → Możliwe duplikaty: przyciski „Połącz w jedno” i „To różne książki” są wyrównane do prawej — na kopii bazy wszystkie 7 grup ma przycisk w tym samym miejscu (x = 1103 px; wcześniej 749–809 px). Tytuł każdego dzieła jest linkiem do jego strony książki.
