@@ -2,6 +2,10 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-15 (84) — Ustawienia: Allegro i OLX — „brak legalnego dostępu”
+
+- Ustawienia → „Źródła skanowania”: Allegro i OLX mają ten sam opis co na „Dziś” — „brak legalnego dostępu” — zamiast „wymaga CAPTCHA · jeszcze nigdy nie zadziałał” i „odmowa dostępu (403)”.
+
 ## 2026-11-15 (83) — Dziś: działające źródła zwinięte do jednej linii
 
 - Dziś → „Źródła”: źródła niedziałające i bez dostępu są wypisane osobno, a działające zwinięte do jednej rozwijanej linii „N działa” (na kopii bazy „8 działa”). Sekcja ma 281 px wysokości zamiast 611 px.

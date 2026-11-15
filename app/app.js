@@ -350,6 +350,7 @@ async function loadSources() {
   const blocked = data.blocked || {};
   // Allegro and OLX: no legal access (docs/SOURCES-ACCESS-2026-11.md) — not in the form, not red.
   const noAccess = data.noAccess || {};
+  state.noAccess = noAccess;
   const scannable = (source) => !Object.hasOwn(noAccess, source);
   const row = (source) => health.items?.find((item) => item.source === source);
   const healthNote = (source) => sourceHealthNote(row(source), { short: true });
@@ -391,7 +392,7 @@ async function loadSources() {
   $('#sourceDeadNote').hidden = true;
   $('#settingsSources').innerHTML = state.sources
     // Same text as Ustawienia's own refresh (it may run first when the page opens on Ustawienia).
-    .map((source) => `<span><b>${escapeHtml(source)}</b><small>${escapeHtml(sourceHealthNote(row(source)))}</small></span>`)
+    .map((source) => `<span><b>${escapeHtml(source)}</b><small>${escapeHtml(sourceHealthNote(row(source), { noAccess: Object.hasOwn(noAccess, source) }))}</small></span>`)
     .join('');
   fillSourceFilters();
   updateScanPlan();

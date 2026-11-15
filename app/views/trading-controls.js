@@ -145,7 +145,7 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
       for(const source of state.sources) {
         const row=health.items.find(item=>item.source===source);
         const item=document.createElement('span'),title=document.createElement('b'),copy=document.createElement('small');title.textContent=source;
-        copy.textContent=sourceHealthNote(row);
+        copy.textContent=sourceHealthNote(row,{noAccess:Object.hasOwn(state.noAccess||{},source)});
         item.append(title,copy);$('#settingsSources').append(item);
       }
       if(!settingsLoaded && document.body.classList.contains('trading-mode')) {

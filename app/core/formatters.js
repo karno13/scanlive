@@ -136,7 +136,9 @@ export const SOURCE_PROBLEMS = {
 export const problemLabel = (code) => SOURCE_PROBLEMS[code]?.[0] || (code ? String(code).toLowerCase().replace(/^source_/, '').replace(/_/g, ' ') : 'błąd');
 
 /** One line about a scan source's recent health; `short` is for the scanner checkbox. */
-export function sourceHealthNote(row, { short = false } = {}) {
+export function sourceHealthNote(row, { short = false, noAccess = false } = {}) {
+  // Allegro and OLX: no legal access, so not scanned; the old CAPTCHA / 403 attempts are history.
+  if (noAccess) return 'brak legalnego dostępu';
   if (!row) return short ? '' : 'Dostępny w programie; jeszcze nie sprawdzono działania.';
   const day = (value) => (value ? new Date(value).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) : null);
   // "SOURCE_HTTP_429, SOURCE_TIMEOUT" → "za dużo zapytań (429), brak odpowiedzi"
