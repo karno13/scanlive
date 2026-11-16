@@ -37,6 +37,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `catalog-migrations.mjs`                                                 | Stosuje migracje z `migrations/` z kontrolą sum                                             |
 | `migrations/NNN_*.sql`                                                   | **Niezmienne** migracje (`001`–`007`, `099`–`132`); nowa zmiana = kolejny numer             |
 | `docs/SCHEMA.sql`, `scripts/dump-schema.mjs`, `test/schema-doc.test.mjs` | Aktualny schemat bazy w jednym pliku (generowany z migracji); test pilnuje, by był aktualny |
+| `docs/pomysly/*.md`                                                      | Pomysły na przyszłość z analizą (nie wdrożone)                                              |
 | `startup-jobs.mjs`                                                       | Naprawy danych przy starcie jako zadania jednorazowe z flagą (`runOnce`)                    |
 | `catalog-data-location.mjs`                                              | Ścieżka bazy w `%LOCALAPPDATA%` i kopia przed migracjami                                    |
 | `auto-backup.mjs`                                                        | Codzienna kopia bazy w `backups` (7 najnowszych), opcjonalnie druga lokalizacja             |
