@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-16 (94) — Dostawa Vinted: cena regularna zamiast promocyjnego 0 zł
+
+- **Błąd:** prawie każda oferta Vinted miała „Dostawa: bezpłatna” (2371 z 2385 odczytanych), przez co przy „Tylko polskie wydania” wpadały ogłoszenia obcojęzyczne (19 angielskich, 1 czeskie). Vinted pokazuje niezalogowanemu promocyjną cenę 0 zł (rabat 100%), której Ty nie dostajesz. Teraz liczy się cena regularna („od 7,05 zł”); dostawa jest bezpłatna tylko wtedy, gdy strona sama tak ją oznacza albo cena regularna wynosi 0 zł.
+- Naprawa zapisanych danych, raz przy starcie: 648 ofert dostaje cenę regularną z zapisanej strony, 1723 wracają do „nieznana” i uzupełnią się w tle (6 stron co 3 minuty — razem z wcześniej czekającymi ok. 30 godzin pracy aplikacji).
+- 20 ofert obcojęzycznych traci automatyczne przypisanie i jest rozpoznawanych ponownie: na kopii bazy 18 zostało odrzuconych jako wydania obce (widać je w „Ostatnie decyzje”, można cofnąć), 2 podręczniki do gier zostają w „Gry / obce”. Ręczne przypisania, zestawy i oferty z decyzją nie są ruszane. Dzieła założone w katalogu przez te oferty zostają — puste można usunąć ręcznie.
+- Nie sprawdzone: ogłoszenie z naprawdę bezpłatną dostawą — w danych nie było ani jednego, więc oznaczenie strony (`isFree`) jest przyjęte bez przykładu.
+
 ## 2026-11-16 (93) — Pięć nowych źródeł: Skupszop i cztery antykwariaty
 
 - **Skupszop.pl** — szukany po frazie przez API listy produktów, które sklep wprost dopuszcza w `robots.txt`. Każda książka ma ISBN (rozpoznanie bez kolejki decyzji), stan i cenę; ceny pozostałych stanów („jak nowa: 29,75 zł (9 szt.)…”) są w opisie oferty. Jedna oferta na książkę — ta, którą sklep pokazuje jako pierwszą.

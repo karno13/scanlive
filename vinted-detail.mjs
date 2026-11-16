@@ -125,8 +125,13 @@ function sectionValue(data, code) {
   const value = section?.data?.value;
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
-// The cheapest delivery the buyer pays, from the page's own price block
-// ("pricingServices":{"services":{…,"shipping":{"originalPrice":{"amount":"7.05"},"finalPrice":{"amount":"0"}}}}).
+// The cheapest delivery of the listing, from the page's own price block
+// ("pricingServices":{"services":{…,"shipping":{"originalPrice":{"amount":"7.05"},"finalPrice":{"amount":"0"},
+// "discountPercentage":100,"isFree":false}}}).
+// The regular price (originalPrice) is the one that counts: a signed-out visitor is shown a
+// promotional finalPrice of 0 on nearly every listing (2371 of 2385 read pages, 11.2026), which
+// the owner does not get. Delivery is free only when the page says so (isFree) or the regular
+// price is 0.
 // Only the selected item has this block (the page repeats it for the buy and the offer button); copies
 // that disagree make the page ambiguous and nothing is read.
 function shippingPrice(data) {
@@ -144,8 +149,11 @@ function shippingPrice(data) {
       : null;
   };
   const final = amount(shipping?.finalPrice);
-  if (final == null) return null;
-  return { cost: final, original: amount(shipping?.originalPrice) };
+  const original = amount(shipping?.originalPrice);
+  const isFree = shipping?.isFree === true;
+  const cost = isFree ? 0 : (original ?? final);
+  if (cost == null) return null;
+  return { cost, original, final, isFree };
 }
 // What the listing page adds to the result card: condition, how long ago it was listed, the photos,
 // likes, the seller, the delivery price. All read from blocks tied to this item id; the number of
@@ -153,11 +161,7 @@ function shippingPrice(data) {
 function detailObservation(data, id, candidates) {
   const out = {};
   const shipping = shippingPrice(data);
-  if (shipping) {
-    out.shippingCost = shipping.cost;
-    if (shipping.original != null && shipping.original > shipping.cost)
-      out.shippingOriginalCost = shipping.original;
-  }
+  if (shipping) out.shippingCost = shipping.cost;
   const condition = sectionValue(data, 'status');
   if (condition) out.conditionText = condition;
   const age = sectionValue(data, 'upload_date');
