@@ -16,11 +16,16 @@ const RULES = [
   {
     sources: [
       'Tezeusz.pl',
+      'Skupszop.pl',
       'BlackBooks.pl',
       'Antykwariat Conroy',
       'Szarlatan.pl',
       'Stara Dobra Książka',
       'Antykwariat NWS',
+      'Antykwariat Toruń',
+      'Kultura Wraca',
+      'Bookway',
+      'Antykwariat Gryf',
     ],
     kind: 'antiquarian',
   },

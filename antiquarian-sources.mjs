@@ -266,8 +266,197 @@ function parseNws(html, book, origin) {
   return rows;
 }
 
+/** Shoper shops: page N of a category is "<category>/N". */
+const shoperPaging = {
+  pageUrl: (/** @type {string} */ category, /** @type {number} */ page) =>
+    page > 1 ? `${category}/${page}` : category,
+  pageNumber: (/** @type {URL} */ url, /** @type {string} */ category) => {
+    if (url.pathname === category) return 1;
+    const match = url.pathname.match(new RegExp(`^${escapeRegExp(category)}/(\\d+)$`));
+    return match ? Number(match[1]) : null;
+  },
+};
+
+// Antykwariat Toruń (Shoper, older theme): "Title / Author", publisher as the producer, price.
+// Every listed product has a basket button. ISBN and condition are on the product page only.
+/** @type {CategorySource['parse']} */
+function parseTorun(html, book, origin) {
+  const cards = segments(html, /<div data-product-id="\d+"[^>]*\bproduct_view-extended\b/);
+  if (!cards.length) throw unrecognized();
+  /** @type {AntiquarianRow[]} */
+  const rows = [];
+  for (const card of cards) {
+    const head = card.match(/^<div\b([^>]*)>/i)?.[1];
+    const link = card.match(/<a\b([^>]*\bclass="prodname\b[^>]*)>/i)?.[1];
+    const title = textOnly(card.match(/<span class="productname">([\s\S]*?)<\/span>/i)?.[1])
+      .replace(/\s+/g, ' ')
+      .trim();
+    const priceBox = card.match(/<div class="price\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] || '';
+    const price = priceText(priceBox.replace(/<del\b[\s\S]*?<\/del>/gi, ''));
+    const href = attribute(link, 'href');
+    if (!href || !title || !price || !book.accept(title)) continue;
+    const image = attribute(card.match(/<img\b([^>]*\bdata-src=[^>]*)>/i)?.[1], 'data-src');
+    const publisher = decodeHtml(attribute(head, 'data-producer'));
+    rows.push({
+      title,
+      url: new URL(href, origin).href,
+      price,
+      available: true,
+      sellerBusiness: true,
+      externalOfferId: attribute(head, 'data-product-id'),
+      ...(image ? { image: new URL(decodeHtml(image), origin).href } : {}),
+      ...(publisher ? { publisher: publisher.slice(0, 500) } : {}),
+    });
+  }
+  return rows;
+}
+
+// Kultura Wraca (Shoper, new theme): name, price and id are attributes of <product-tile>;
+// "Title Author" in one string. A tile that cannot be bought has is-buyable="0".
+/** @type {CategorySource['parse']} */
+function parseKulturaWraca(html, book, origin) {
+  const cards = segments(html, /<product-tile\b/);
+  if (!cards.length) throw unrecognized();
+  /** @type {AntiquarianRow[]} */
+  const rows = [];
+  for (const card of cards) {
+    const head = card.match(/^<product-tile\b([^>]*)>/i)?.[1];
+    const title = decodeHtml(attribute(head, 'name')).replace(/\s+/g, ' ').trim();
+    const amount = Number(attribute(head, 'price'));
+    const href = card.match(/<a\s[^>]*\bhref="(\/pl\/p\/[^"]+)"/i)?.[1];
+    if (!href || !title || !(amount > 0) || !book.accept(title)) continue;
+    const image = card.match(/<img\s[^>]*\bsrc="([^"]+)"/i)?.[1];
+    const buyable = attribute(card.match(/<buy-button\b([^>]*)>/i)?.[1], 'is-buyable');
+    rows.push({
+      title,
+      url: new URL(decodeHtml(href), origin).href,
+      price: amount.toFixed(2),
+      available: buyable !== '0',
+      ...(buyable ? { availabilityKnown: true } : {}),
+      sellerBusiness: true,
+      externalOfferId: attribute(head, 'product-id'),
+      ...(image ? { image: new URL(decodeHtml(image), origin).href } : {}),
+    });
+  }
+  return rows;
+}
+
+// Bookway (Drupal): title and author in separate fields — joined as "Title - Author", because
+// phrases name authors. Listed copies can be bought ("Wyślemy w 24 h").
+/** @type {CategorySource['parse']} */
+function parseBookway(html, book, origin) {
+  const cards = segments(html, /<div class="lk">/);
+  if (!cards.length) throw unrecognized();
+  /** @type {AntiquarianRow[]} */
+  const rows = [];
+  for (const card of cards) {
+    const link = card.match(/<h3 class="lk-tytul">\s*<a\b([^>]*)>([\s\S]*?)<\/a>/i);
+    const name = textOnly(link?.[2]);
+    const author = textOnly(card.match(/<div class="field-autor">([\s\S]*?)<\/div>/i)?.[1]);
+    const title = [name, author].filter(Boolean).join(' - ');
+    const price = priceText(card.match(/<div class="lk-cena">([\s\S]*?)<\/div>/i)?.[1] || '');
+    if (!link || !name || !price || !book.accept(title)) continue;
+    const image = card.match(/<img\b[^>]*\bsrc="([^"]+)"/i)?.[1];
+    rows.push({
+      title,
+      url: new URL(attribute(link[1], 'href'), origin).href,
+      price,
+      available: true,
+      sellerBusiness: true,
+      ...(image ? { image: new URL(decodeHtml(image), origin).href } : {}),
+    });
+  }
+  return rows;
+}
+
+// Antykwariat Gryf (Warszawa, Shopify): "Author Title", price; a sold copy stays on the list with
+// the badge „Wyprzedane”.
+/** @type {CategorySource['parse']} */
+function parseGryf(html, book, origin) {
+  const cards = segments(html, /<li\s+class="grid__item\b/);
+  if (!cards.length) throw unrecognized();
+  /** @type {AntiquarianRow[]} */
+  const rows = [];
+  for (const card of cards) {
+    const link = card.match(/<a\s[^>]*\bhref="(\/products\/[^"?]+)[^"]*"([^>]*)>([\s\S]*?)<\/a>/i);
+    const title = textOnly(link?.[3]);
+    if (!link || !title || !book.accept(title)) continue;
+    const url = new URL(link[1], origin).href;
+    const sold = /\bprice--sold-out\b/.test(card);
+    // A sale shows the current price as "price-item--sale".
+    const amount = /\bprice--on-sale\b/.test(card)
+      ? card.match(/price-item--sale\b[^>]*>([\s\S]*?)<\/span>/i)?.[1]
+      : card.match(/price-item--regular\b[^>]*>([\s\S]*?)<\/span>/i)?.[1];
+    const price = priceText(amount || '');
+    if (sold || !price) {
+      rows.push({
+        title,
+        url,
+        price: 0,
+        available: false,
+        availabilityKnown: true,
+        sellerBusiness: true,
+      });
+      continue;
+    }
+    const image = card.match(/<img\b[^>]*?\bsrc="([^"]+)"/i)?.[1];
+    const id = link[2].match(/product-grid-(\d+)/)?.[1];
+    rows.push({
+      title,
+      url,
+      price,
+      available: true,
+      availabilityKnown: true,
+      sellerBusiness: true,
+      ...(image ? { image: new URL(decodeHtml(image), origin).href } : {}),
+      ...(id ? { externalOfferId: id } : {}),
+    });
+  }
+  return rows;
+}
+
 /** @type {Record<string, CategorySource>} */
 export const ANTIQUARIAN_SOURCES = {
+  'Antykwariat Toruń': {
+    host: 'antykwariat-torun.pl',
+    categories: ['/pl/c/Fantastyka/67'],
+    // 18 listings a page; the sidebar repeats other products with the same attribute.
+    perPage: 18,
+    ...shoperPaging,
+    card: /<div data-product-id="\d+"[^>]*\bproduct_view-extended\b/gi,
+    parse: parseTorun,
+  },
+  'Kultura Wraca': {
+    host: 'kulturawraca.pl',
+    // Used books: fantasy, science fiction and horror (about 130 pages).
+    categories: ['/pl/c/Fantastyka%2C-science-fiction%2C-horror/314'],
+    perPage: 24,
+    ...shoperPaging,
+    card: /<product-tile\b/gi,
+    parse: parseKulturaWraca,
+  },
+  Bookway: {
+    host: 'bookway.pl',
+    categories: ['/ksiazki-kategoria/fantastyka'],
+    perPage: 11,
+    // Drupal counts from zero: page 2 is "?page=1".
+    pageUrl: (category, page) => (page > 1 ? `${category}?page=${page - 1}` : category),
+    pageNumber: (url, category) => {
+      if (url.pathname !== category) return null;
+      const page = url.searchParams.get('page');
+      return page === null ? 1 : /^\d+$/.test(page) ? Number(page) + 1 : null;
+    },
+    card: /<div class="lk">/gi,
+    parse: parseBookway,
+  },
+  'Antykwariat Gryf': {
+    host: 'antykwariatgryf.pl',
+    categories: ['/collections/ksiazki-fantasy-science-fiction-horror'],
+    perPage: 16,
+    ...queryPaging,
+    card: /<li\s+class="grid__item\b/gi,
+    parse: parseGryf,
+  },
   'BlackBooks.pl': {
     host: 'blackbooks.pl',
     // Fantasy, science fiction and horror together (one parent category, no overlap).

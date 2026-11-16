@@ -49,6 +49,37 @@ test('Stara Dobra Książka: a sold copy stays on the list but is not an offer',
   assert.ok(urls.every((url) => !/mechanizm-serca/.test(url)));
 });
 
+test('shops added 16.11: publisher, joined author, shop id and sold copies', () => {
+  const rows = (file, source) =>
+    parseMarketplace(fixture(file).html, task(source, { searchQuery: 'Warhammer' }));
+  const [torun] = rows('antykwariat-torun-category-captured.json', 'Antykwariat Toruń');
+  assert.equal(torun.title, '20 000 mil podmorskiej żeglugi / Juliusz Verne');
+  assert.equal(torun.publisher, 'Wydawnictwo Zielona Sowa');
+  assert.equal(torun.price, 2400);
+  const [tile] = rows('kultura-wraca-category-captured.json', 'Kultura Wraca');
+  assert.equal(tile.title, 'Rozbitkowie z Arki Noego Ryszard. Winer');
+  assert.equal(tile.externalOfferId, '520750');
+  // Bookway prints the author in its own field; phrases name authors.
+  const [bookway] = rows('bookway-category-captured.json', 'Bookway');
+  assert.match(bookway.title, / - Szczepan Twardoch$/);
+  // Gryf keeps sold copies on the list („Wyprzedane”): 4 cards, 2 offers.
+  const gryf = fixture('antykwariat-gryf-category-captured.json');
+  assert.equal((gryf.html.match(/price--sold-out/g) || []).length, 2);
+  assert.equal(rows('antykwariat-gryf-category-captured.json', 'Antykwariat Gryf').length, 2);
+  // Bookway page 3 is "?page=2"; a sort link of a Shoper category is not a page.
+  assert.equal(
+    categoryPageUrl(task('Bookway', { page: 3 })),
+    'https://bookway.pl/ksiazki-kategoria/fantastyka?page=2',
+  );
+  assert.equal(
+    ANTIQUARIAN_SOURCES['Antykwariat Toruń'].pageNumber(
+      new URL('https://antykwariat-torun.pl/pl/c/Fantastyka/67/1/default/9'),
+      '/pl/c/Fantastyka/67',
+    ),
+    null,
+  );
+});
+
 test('pager: next page found per shop; NWS follows the link it prints', () => {
   const expected = {
     'BlackBooks.pl': ['blackbooks-category-captured.json', null],
@@ -67,6 +98,23 @@ test('pager: next page found per shop; NWS follows the link it prints', () => {
     'Antykwariat NWS': [
       'antykwariat-nws-category-captured.json',
       'https://www.antykwariatnws.pl/antykwariat-27---1-Fantasy.html',
+    ],
+    'Antykwariat Toruń': [
+      'antykwariat-torun-category-captured.json',
+      'https://antykwariat-torun.pl/pl/c/Fantastyka/67/2',
+    ],
+    'Kultura Wraca': [
+      'kultura-wraca-category-captured.json',
+      'https://kulturawraca.pl/pl/c/Fantastyka%2C-science-fiction%2C-horror/314/2',
+    ],
+    // Drupal counts pages from zero.
+    Bookway: [
+      'bookway-category-captured.json',
+      'https://bookway.pl/ksiazki-kategoria/fantastyka?page=1',
+    ],
+    'Antykwariat Gryf': [
+      'antykwariat-gryf-category-captured.json',
+      'https://antykwariatgryf.pl/collections/ksiazki-fantasy-science-fiction-horror?page=2',
     ],
   };
   for (const [source, [file, next]] of Object.entries(expected)) {

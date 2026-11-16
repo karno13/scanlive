@@ -28,6 +28,8 @@ const sources = {
   OLX: { host: 'www.olx.pl', path: '/d/oferta/' },
   'Tezeusz.pl': { host: 'tezeusz.pl', path: null },
   'Dedalus.pl': { host: 'dedalus.pl', path: null },
+  // JSON list API, allowed by the shop's robots.txt (docs/SOURCES-ACCESS-2026-11.md).
+  'Skupszop.pl': { host: 'skupszop.pl', path: null },
   // Antiquarian bookshops read by category (antiquarian-sources.mjs).
   ...Object.fromEntries(
     Object.entries(ANTIQUARIAN_SOURCES).map(([name, spec]) => [
@@ -128,6 +130,16 @@ export function searchUrl(task) {
     (!Number.isInteger(task.page) || task.page < 1 || task.page > 10000)
   )
     throw Error('INVALID_MARKETPLACE_PAGE');
+  if (task.source === 'Skupszop.pl') {
+    // The request the shop's own search page sends (read in the browser, 2026-11-16).
+    const api = new URL('https://skupszop.pl/api/search/listing');
+    api.searchParams.set('nodeId', '');
+    api.searchParams.set('routeName', 'listing.search');
+    api.searchParams.set('page', String(task.paginationVersion === 1 ? task.page : 1));
+    api.searchParams.set('perPage', '28');
+    api.searchParams.set('filters[keyword]', query);
+    return api.href;
+  }
   let u;
   if (task.source === 'Allegro') {
     u = new URL('https://allegro.pl/listing');
@@ -229,6 +241,8 @@ export async function readSourceHtml(
   const config = sources[source];
   if (!config) throw Error('UNTRUSTED_MARKETPLACE_TASK');
   const allowed = (h) => h === config.host || h === config.host.replace(/^www\./, '');
+  // Skupszop answers its list API in JSON; every other source is an HTML page.
+  const json = source === 'Skupszop.pl';
   let url = new URL(raw);
   for (let hop = 0; hop < 4; hop++) {
     if (
@@ -244,7 +258,10 @@ export async function readSourceHtml(
     const requestTimeout = AbortSignal.timeout(18000);
     const requestSignal = signal ? AbortSignal.any([signal, requestTimeout]) : requestTimeout;
     const response = await fetcher(url, {
-      headers: { Accept: 'text/html', 'User-Agent': 'BookFlip/1.0 (book price comparison)' },
+      headers: {
+        Accept: json ? 'application/json' : 'text/html',
+        'User-Agent': 'BookFlip/1.0 (book price comparison)',
+      },
       redirect: 'manual',
       signal: requestSignal,
     });
@@ -310,7 +327,11 @@ export async function readSourceHtml(
           : {}),
       });
     }
-    if (!/text\/html|application\/xhtml/i.test(response.headers.get('content-type') || '')) {
+    if (
+      !(json ? /application\/json/i : /text\/html|application\/xhtml/i).test(
+        response.headers.get('content-type') || '',
+      )
+    ) {
       await response.body?.cancel();
       throw Error('SOURCE_NOT_HTML');
     }
@@ -351,6 +372,7 @@ export function parseMarketplace(
     else if (['Tezeusz.pl', 'Dedalus.pl', 'Allegro', 'Empik'].includes(task.source))
       rows = parseBookstore(html, book, task.source);
     else if (isCategorySource(task.source)) rows = parseCategoryPage(html, task.source, book);
+    else if (task.source === 'Skupszop.pl') rows = parseSkupszop(html, book);
     else {
       let recognized = false;
       for (const m of html.matchAll(
@@ -526,6 +548,73 @@ function parseEmpikCards(html, add) {
     });
   }
   return true;
+}
+const SKUPSZOP_CONDITION = {
+  nowa: 'new',
+  'jak nowa': 'very_good',
+  dobry: 'good',
+  'widoczne ślady używania': 'satisfactory',
+};
+function skupszopData(text) {
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw Error('UNRECOGNIZED_MARKETPLACE_DATA');
+  }
+  if (body?.success !== true || !Array.isArray(body.data?.data))
+    throw Error('UNRECOGNIZED_MARKETPLACE_DATA');
+  return body.data;
+}
+// Skupszop.pl: one row per book — the copy the shop lists first (its `price` and `condition`).
+// Every book has an ISBN; the other conditions and their prices go into the description, because
+// all variants share one address.
+function parseSkupszop(text, book) {
+  const rows = [];
+  for (const item of skupszopData(text).data) {
+    const name = String(item?.name || '').trim(),
+      author = String(item?.author_raw || '').trim(),
+      title = [name, author].filter(Boolean).join(' - '),
+      price = Number(item?.price);
+    if (!name || !item.url || !(price > 0) || !book.accept(title)) continue;
+    const condition = String(item.condition || '').trim();
+    const variants = (Array.isArray(item.variants) ? item.variants : [])
+      .filter((v) => v && v.condition && Number(v.price) > 0)
+      .map(
+        (v) => `${v.condition}: ${Number(v.price).toFixed(2)} zł (${Number(v.quantity) || 0} szt.)`,
+      );
+    const isbn = String(item.isbn || '').trim();
+    rows.push({
+      title,
+      url: String(item.url),
+      price,
+      available: item.is_available !== false,
+      availabilityKnown: true,
+      sellerBusiness: true,
+      ...(typeof item.cover === 'string' ? { image: item.cover } : {}),
+      ...(/^[\dXx-]{10,17}$/.test(isbn) ? { isbn } : {}),
+      ...(author ? { author: author.slice(0, 500) } : {}),
+      ...(item.publisher?.name ? { publisher: String(item.publisher.name).slice(0, 500) } : {}),
+      ...(item.binding ? { binding: String(item.binding).slice(0, 100) } : {}),
+      ...(condition
+        ? {
+            conditionText: condition.slice(0, 200),
+            conditionClass: SKUPSZOP_CONDITION[condition.toLowerCase()] || 'unknown',
+          }
+        : {}),
+      ...(variants.length || item.release_date
+        ? {
+            listingDescription: [
+              item.release_date ? `Rok wydania: ${item.release_date}` : '',
+              variants.length ? 'Stany i ceny: ' + variants.join('; ') : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          }
+        : {}),
+    });
+  }
+  return rows;
 }
 function parseBookstore(html, book, source) {
   const host = sources[source].host,
@@ -770,6 +859,14 @@ export function marketplacePageInfo(html, task, offers) {
   const digest = createHash('sha256')
     .update(JSON.stringify(offers.map((o) => o.url)))
     .digest('hex');
+  if (task.source === 'Skupszop.pl') {
+    // The answer lists the page numbers that exist.
+    const pages = skupszopData(html).pages;
+    if (!Array.isArray(pages)) return { page, digest, state: 'unknown', nextPage: null };
+    return pages.includes(page + 1)
+      ? { page, digest, state: 'more', nextPage: page + 1 }
+      : { page, digest, state: 'end', nextPage: null };
+  }
   let ended = false;
   for (const m of html.matchAll(/<(?:a|link|button)\b([^>]*)>([^<]*)/gi)) {
     const attrs = m[1],

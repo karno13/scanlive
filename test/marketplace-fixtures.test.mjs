@@ -20,11 +20,16 @@ const hosts = {
   Empik: 'www.empik.com',
   'Tezeusz.pl': 'tezeusz.pl',
   'Dedalus.pl': 'dedalus.pl',
+  'Skupszop.pl': 'skupszop.pl',
   'BlackBooks.pl': 'blackbooks.pl',
   'Antykwariat Conroy': 'www.antykwariat-conroy.pl',
   'Szarlatan.pl': 'szarlatan.pl',
   'Stara Dobra Książka': 'staradobraksiazka.pl',
   'Antykwariat NWS': 'www.antykwariatnws.pl',
+  'Antykwariat Toruń': 'antykwariat-torun.pl',
+  'Kultura Wraca': 'kulturawraca.pl',
+  Bookway: 'bookway.pl',
+  'Antykwariat Gryf': 'antykwariatgryf.pl',
 };
 for (const filename of files) {
   test('marketplace fixture: ' + filename, () => {

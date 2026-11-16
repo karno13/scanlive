@@ -24,11 +24,16 @@ const allowedMarketplaces = new Map([
   ['Empik', ['empik.com']],
   ['Tezeusz.pl', ['tezeusz.pl']],
   ['Dedalus.pl', ['dedalus.pl']],
+  ['Skupszop.pl', ['skupszop.pl']],
   ['BlackBooks.pl', ['blackbooks.pl']],
   ['Antykwariat Conroy', ['antykwariat-conroy.pl']],
   ['Szarlatan.pl', ['szarlatan.pl']],
   ['Stara Dobra Książka', ['staradobraksiazka.pl']],
   ['Antykwariat NWS', ['antykwariatnws.pl']],
+  ['Antykwariat Toruń', ['antykwariat-torun.pl']],
+  ['Kultura Wraca', ['kulturawraca.pl']],
+  ['Bookway', ['bookway.pl']],
+  ['Antykwariat Gryf', ['antykwariatgryf.pl']],
 ]);
 export function trustedOfferUrl(source, raw) {
   const normalized = normalizeOfferUrl(raw);

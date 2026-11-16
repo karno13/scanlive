@@ -1,0 +1,26 @@
+{
+  "kind": "captured",
+  "source": "Skupszop.pl",
+  "host": "skupszop.pl",
+  "searchQuery": "Pratchett",
+  "category": "Pratchett",
+  "capturedAt": "2026-11-16T21:30:00.000Z",
+  "sanitized": true,
+  "reviewedForPersonalData": true,
+  "note": "The first 3 books of one answer of GET https://skupszop.pl/api/search/listing (filters[keyword]=Pratchett, 2026-11-16), reduced to the fields the parser reads. Shop products only, no personal data.",
+  "html": "{\"success\":true,\"data\":{\"data\":[{\"id\":7955229,\"isbn\":\"9788375103670\",\"name\":\"Nacja\",\"author_raw\":\"Terry Pratchett\",\"binding\":\"Twarda\",\"url\":\"https://skupszop.pl/nacja-terry-pratchett-9788375103670\",\"cover\":\"https://skupszop.pl/images/items/9788375103670/911770/webp/image.webp\",\"price\":21.9,\"condition\":\"dobry\",\"price_regular\":39.9,\"quantity_total\":3,\"release_date\":2009,\"is_available\":true,\"on_stock\":1,\"variants\":[{\"id\":7897007,\"isbn\":\"9788375103670\",\"condition\":\"jak nowa\",\"url\":\"https://skupszop.pl/nacja-terry-pratchett-9788375103670?id=7897007\",\"price\":\"29.75\",\"quantity\":9},{\"id\":7955229,\"isbn\":\"9788375103670\",\"condition\":\"dobry\",\"url\":\"https://skupszop.pl/nacja-terry-pratchett-9788375103670?id=7955229\",\"price\":\"21.90\",\"quantity\":14},{\"id\":8765418,\"isbn\":\"9788375103670\",\"condition\":\"widoczne ślady używania\",\"url\":\"https://skupszop.pl/nacja-terry-pratchett-9788375103670?id=8765418\",\"price\":\"22.88\",\"quantity\":2}],\"publisher\":{\"name\":\"Rebis\"}},{\"id\":89465,\"isbn\":\"9788379611218\",\"name\":\"Długi Mars. Długa Ziemia. Tom 3\",\"author_raw\":\"Terry Pratchett, Stephen Baxter\",\"binding\":\"Miękka\",\"url\":\"https://skupszop.pl/dlugi-mars-dluga-ziemia-tom-3-terry-pratchett-9788379611218\",\"cover\":\"https://skupszop.pl/images/items/9788379611218/803598/webp/image.webp\",\"price\":26.01,\"condition\":\"nowa\",\"price_regular\":32,\"quantity_total\":1,\"release_date\":2015,\"is_available\":true,\"on_stock\":0,\"variants\":[{\"id\":89465,\"isbn\":\"9788379611218\",\"condition\":\"nowa\",\"url\":\"https://skupszop.pl/dlugi-mars-dluga-ziemia-tom-3-terry-pratchett-9788379611218?id=89465\",\"price\":\"26.01\",\"quantity\":6}],\"publisher\":{\"name\":\"Prószyński Media\"}},{\"id\":7173481,\"isbn\":\"9788375062069\",\"name\":\"W hołdzie królowi\",\"author_raw\":\"Martin H. Greenberg (red.), opracowanie zbiorowe, Robert Silverberg, Andre Norton, Terry Pratchett, John Brunner\",\"binding\":\"Miękka\",\"url\":\"https://skupszop.pl/w-holdzie-krolowi-martin-h-greenberg-red-9788375062069\",\"cover\":\"https://skupszop.pl/images/items/9788375062069/1145382/webp/image.webp\",\"price\":7.54,\"condition\":\"widoczne ślady używania\",\"price_regular\":33.87,\"quantity_total\":2,\"release_date\":2008,\"is_available\":true,\"on_stock\":1,\"variants\":[{\"id\":6506224,\"isbn\":\"9788375062069\",\"condition\":\"dobry\",\"url\":\"https://skupszop.pl/w-holdzie-krolowi-martin-h-greenberg-red-9788375062069?id=6506224\",\"price\":\"9.09\",\"quantity\":4},{\"id\":7173481,\"isbn\":\"9788375062069\",\"condition\":\"widoczne ślady używania\",\"url\":\"https://skupszop.pl/w-holdzie-krolowi-martin-h-greenberg-red-9788375062069?id=7173481\",\"price\":\"7.54\",\"quantity\":4}],\"publisher\":{\"name\":\"Zysk i S-ka\"}}],\"hits\":{\"relation\":\"eq\",\"value\":118},\"pages\":[1,2,3,4,5]}}",
+  "expected": [
+    {
+      "url": "https://skupszop.pl/nacja-terry-pratchett-9788375103670",
+      "price": 2190
+    },
+    {
+      "url": "https://skupszop.pl/dlugi-mars-dluga-ziemia-tom-3-terry-pratchett-9788379611218",
+      "price": 2601
+    },
+    {
+      "url": "https://skupszop.pl/w-holdzie-krolowi-martin-h-greenberg-red-9788375062069",
+      "price": 754
+    }
+  ]
+}

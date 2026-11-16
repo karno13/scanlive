@@ -405,7 +405,7 @@ async function scanAllPages(
 }
 // Antiquarian bookshops: a whole category is read once per scan (a few hundred listings, page by
 // page through the gate) and matched against each phrase afterwards. A phrase whose category read
-// finished within CATEGORY_READ_HOURS is not read again: small shops, ~250 pages for all five.
+// finished within CATEGORY_READ_HOURS is not read again: small shops, ~500 pages for all nine.
 export const CATEGORY_READ_HOURS = 20;
 const CATEGORY_LABEL = 'cała kategoria';
 const categoryTaskKey = (source, query) => JSON.stringify([source, query]);

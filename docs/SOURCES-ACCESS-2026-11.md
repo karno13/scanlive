@@ -102,6 +102,15 @@ Wspólna cecha: wyszukiwarka bywa zakazana albo niepotrzebna, za to **strony kat
 
 **Skupszop — stan po 14.11:** z kodu sklepu (`build/assets/Index-*.js`) wynika, że lista idzie przez `GET /api/search/listing` z parametrami `nodeId`, `routeName`, `page` (od 1), `perPage` i `filters[keyword]`; `routeName` pochodzi z ukrytego pola strony `/wyszukaj`, której `robots.txt` zakazuje. Bez niego zapytanie nie zostało sprawdzone — dalsze próby przerwane. Następny krok jak wyżej: odczytać jedno zapytanie w narzędziach deweloperskich przeglądarki.
 
+**Wdrożone 16.11.2026 (wpis 93 w `CHANGELOG.md`):** Skupszop.pl oraz Antykwariat Toruń, Kultura Wraca, Bookway i Antykwariat Gryf.
+
+- **Skupszop** — zapytanie odczytane w przeglądarce ze strony wyników sklepu: `GET /api/search/listing?nodeId=&routeName=listing.search&page=N&perPage=28&filters[keyword]=fraza` (bez `filters[with_filters]`, działa tak samo). `robots.txt`: `Allow: /api/search/listing*`; obok są ogólne `Disallow: *page=*` i `*with_filters*` — dłuższa, dokładniejsza reguła `Allow` ma pierwszeństwo (RFC 9309). Odpowiedź to JSON, więc `readSourceHtml` przyjmuje `application/json` tylko dla tego źródła. Regulamin sklepu przeczytany: nie zakazuje automatycznego odczytu (CAPTCHA dotyczy tylko formularza opinii).
+- **Antykwariat Toruń** (Shoper): `/pl/c/Fantastyka/67`, kolejne strony `/67/N`; 18 na stronę, ok. 470 pozycji. `robots.txt`: kategorie dozwolone, zakazane m.in. `/*/searchquery`, `Crawl-delay: 1`. Regulamin przeczytany, bez zakazu.
+- **Kultura Wraca** (Shoper, ten sam `robots.txt`): `/pl/c/Fantastyka%2C-science-fiction%2C-horror/314` (książki używane), 24 na stronę, 130 stron. **Regulaminu nie znalazłem** — odnośnik „Regulamin sklepu” prowadzi na stronę główną.
+- **Bookway** (Drupal): `/ksiazki-kategoria/fantastyka`, strony `?page=N` liczone od zera, 11 na stronę. `robots.txt`: `Allow: /` dla `*` z sygnałem `ai-train=no` (BookFlip niczego nie trenuje; nazwane boty AI mają `Disallow`). Regulamin przeczytany, bez zakazu.
+- **Antykwariat Gryf** (Warszawa, Shopify): `/collections/ksiazki-fantasy-science-fiction-horror?page=N`, 16 na stronę, 46 stron; wyprzedane pozycje zostają z plakietką „Wyprzedane”. `robots.txt`: kolekcje dozwolone, zakazane sortowanie i filtry. Regulamin przeczytany, bez zakazu.
+- Stron produktów żadnego z tych sklepów skan nie czyta. ISBN na liście ma tylko Skupszop.
+
 ### Do wdrożenia (w tej kolejności)
 
 | #   | Serwis              | Miasto, platforma    | Adres listy                                                                                                               | Na liście                                                                             | robots.txt                                                                                     | Uwagi                                                                                                       |

@@ -10,6 +10,7 @@ export const localSourceHosts = {
   OLX: 'www.olx.pl',
   'Tezeusz.pl': 'tezeusz.pl',
   'Dedalus.pl': 'dedalus.pl',
+  'Skupszop.pl': 'skupszop.pl',
   ...Object.fromEntries(
     Object.entries(ANTIQUARIAN_SOURCES).map(([name, spec]) => [name, spec.host]),
   ),

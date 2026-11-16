@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-16 (93) — Pięć nowych źródeł: Skupszop i cztery antykwariaty
+
+- **Skupszop.pl** — szukany po frazie przez API listy produktów, które sklep wprost dopuszcza w `robots.txt`. Każda książka ma ISBN (rozpoznanie bez kolejki decyzji), stan i cenę; ceny pozostałych stanów („jak nowa: 29,75 zł (9 szt.)…”) są w opisie oferty. Jedna oferta na książkę — ta, którą sklep pokazuje jako pierwszą.
+- **Antykwariat Toruń**, **Kultura Wraca**, **Bookway**, **Antykwariat Gryf** — czytane po kategorii fantastyki, jak dotychczasowe antykwariaty (raz na 20 h, potem dopasowanie do fraz). Rozmiar: Toruń ok. 470 pozycji (27 stron), Kultura Wraca ok. 130 stron po 24, Gryf 46 stron po 16 (wyprzedane egzemplarze zostają na liście i nie są ofertami), Bookway po 11 na stronę.
+- Nowe źródła trzeba zaznaczyć w formularzu skanu albo w profilu — zapisane profile ich nie mają.
+- Sprawdzone na żywo po jednej stronie z każdego źródła (Skupszop: 28 ofert dla „Świat Dysku”). Pełnego skanu nie uruchamiałem.
+
 ## 2026-11-16 (92) — Raport fraz na zapisanych wynikach
 
 - Nowy skrypt `node scripts/query-yield-report.mjs <kopia.sqlite> [--profile "Nazwa"]` (tylko odczyt, bez internetu): dla każdej frazy liczy oferty, oferty znalezione tylko nią, rozpoznane oferty i odsetek duplikatów; wskazuje frazy-szum i proponuje nowe (tytuł bez podtytułu, nazwisko + tytuł, seria/uniwersum, konkretny tom, inna nazwa uniwersum) z rozpoznanych wydań.
