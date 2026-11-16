@@ -2,6 +2,11 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-16 (92) — Raport fraz na zapisanych wynikach
+
+- Nowy skrypt `node scripts/query-yield-report.mjs <kopia.sqlite> [--profile "Nazwa"]` (tylko odczyt, bez internetu): dla każdej frazy liczy oferty, oferty znalezione tylko nią, rozpoznane oferty i odsetek duplikatów; wskazuje frazy-szum i proponuje nowe (tytuł bez podtytułu, nazwisko + tytuł, seria/uniwersum, konkretny tom, inna nazwa uniwersum) z rozpoznanych wydań.
+- Na kopii bazy: 71 fraz, 5283 oferty, 2669 rozpoznanych; tylko 224 (4%) znalazła więcej niż jedna fraza. Szum (<5% rozpoznanych): „Eryk” (354 oferty, 0 rozpoznanych), „Piramidy” (176/1), „Maskarada” (173/2), „Mort” (92/0) i 4 inne.
+
 ## 2026-11-15 (91) — Filtr dostawy w „Ofertach”
 
 - Nowa lista obok „Stanu ogłoszenia”: każda dostawa / bezpłatna / płatna / nieznana. „Nieznana” to oferty, których koszt dostawy nie został jeszcze odczytany (inne źródła niż Vinted i oferty Vinted czekające na uzupełnienie).

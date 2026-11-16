@@ -65,6 +65,7 @@
     "scan-cancellation.mjs",
     "scan-diagnostics.mjs",
     "scan-profiles-api.mjs",
+    "query-yield.mjs",
     "search-policy.mjs",
     "set-descriptions.mjs",
     "shipping-backfill.mjs",

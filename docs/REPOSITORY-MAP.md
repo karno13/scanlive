@@ -64,6 +64,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `marketplace-gate.mjs`                                      | Wspólne, adaptacyjne tempo zapytań na źródło; każde zapytanie przechodzi tędy     |
 | `local-scan.mjs`                                            | Hosty źródeł i uruchomienie skanu z wiersza poleceń                               |
 | `search-policy.mjs`                                         | Dopasowanie oferty do frazy i odsiewanie nie-książek                              |
+| `query-yield.mjs`                                           | Analiza fraz na zapisanych wynikach: duplikaty, szum, propozycje fraz             |
 | `scan-schedule.mjs`                                         | Harmonogram skanów profilu i szybki skan najnowszych                              |
 | `scan-cancellation.mjs`                                     | Anulowanie trwającego skanu                                                       |
 | `scan-diagnostics.mjs`                                      | Ograniczona diagnostyka przebiegu skanu                                           |
@@ -229,18 +230,19 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 
 ### Narzędzia i pomiary
 
-| Plik                                                                 | Rola                                                             |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `scripts/backup-catalog.mjs`, `scripts/restore-catalog.mjs`          | `npm run backup` / `npm run restore` z kontrolą integralności    |
-| `scripts/lookup-isbn.mjs`                                            | Ręczne sprawdzenie ISBN w źródłach metadanych                    |
-| `scripts/benchmark-scan.mjs`, `scripts/benchmark-identification.mjs` | Pomiary na syntetycznej bazie, bez internetu                     |
-| `scripts/ux-review-measure.mjs`                                      | Zrzuty i pomiary na kopii bazy (port 4399)                       |
-| `scripts/ux-shots.mjs`                                               | Zrzuty widoków w obu motywach, przewijanie i cele dotykowe       |
-| `scripts/ux-review-acceptance.mjs`                                   | Kontrola układu przy 390, 1100, 1440 i 1920 px                   |
-| `scripts/ux-review-contact.mjs`                                      | Zestawienia zrzutów do kontroli wizualnej                        |
-| `scripts/measure-quick-tab.mjs`                                      | Liczba akcji w zakładce „Szybkie” (na kopii bazy)                |
-| `scripts/measure-network.mjs`                                        | Zapytania i bajty interfejsu przy starcie i po przejściu widoków |
-| `scripts/page-settle.mjs`                                            | Czekanie na ciszę w sieci z pominięciem `/api/events`            |
+| Plik                                                                 | Rola                                                                          |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `scripts/backup-catalog.mjs`, `scripts/restore-catalog.mjs`          | `npm run backup` / `npm run restore` z kontrolą integralności                 |
+| `scripts/lookup-isbn.mjs`                                            | Ręczne sprawdzenie ISBN w źródłach metadanych                                 |
+| `scripts/benchmark-scan.mjs`, `scripts/benchmark-identification.mjs` | Pomiary na syntetycznej bazie, bez internetu                                  |
+| `scripts/query-yield-report.mjs`                                     | Raport fraz na kopii bazy (bez internetu); test w `test/query-yield.test.mjs` |
+| `scripts/ux-review-measure.mjs`                                      | Zrzuty i pomiary na kopii bazy (port 4399)                                    |
+| `scripts/ux-shots.mjs`                                               | Zrzuty widoków w obu motywach, przewijanie i cele dotykowe                    |
+| `scripts/ux-review-acceptance.mjs`                                   | Kontrola układu przy 390, 1100, 1440 i 1920 px                                |
+| `scripts/ux-review-contact.mjs`                                      | Zestawienia zrzutów do kontroli wizualnej                                     |
+| `scripts/measure-quick-tab.mjs`                                      | Liczba akcji w zakładce „Szybkie” (na kopii bazy)                             |
+| `scripts/measure-network.mjs`                                        | Zapytania i bajty interfejsu przy starcie i po przejściu widoków              |
+| `scripts/page-settle.mjs`                                            | Czekanie na ciszę w sieci z pominięciem `/api/events`                         |
 
 ### Dokumentacja
 
