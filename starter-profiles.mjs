@@ -116,10 +116,42 @@ export function upgradeStarterProfiles(repository, { now = Date.now() } = {}) {
   return { skipped: false, upgraded };
 }
 
+// Niche or broad market is still open (docs/PRODUCT-DIRECTION.md): a few broad-market bestsellers,
+// Vinted only (the resale reference), so the phrase statistics compare how fast each side sells.
+const MEASURE_KEY = 'starter_measure_profile_v1';
+export const MEASURE_PROFILE = {
+  name: 'Pomiar: szeroki rynek',
+  queries: [
+    'Fourth Wing',
+    'Iron Flame',
+    'Onyx Storm',
+    'Sarah J. Maas',
+    'Wiedźmin',
+    'Sapkowski',
+    'Brandon Sanderson',
+    'Harry Potter',
+  ],
+  sources: ['Vinted'],
+};
+
+/** Once: the broad-market measurement profile; a deleted one is not created again. */
+export function addMeasureProfile(repository, { now = Date.now() } = {}) {
+  if (repository.database.prepare('SELECT 1 FROM app_preferences WHERE key=?').get(MEASURE_KEY))
+    return { skipped: true };
+  const { name, ...input } = MEASURE_PROFILE;
+  const { created } = putScanProfile(repository, name, input, { onlyIfAbsent: true });
+  mark(repository, MEASURE_KEY, { created: Boolean(created) }, now);
+  return { skipped: false, created: Boolean(created) };
+}
+
 export function ensureStarterProfiles(repository, { now = Date.now() } = {}) {
   const db = repository.database;
   if (db.prepare('SELECT 1 FROM app_preferences WHERE key=?').get(KEY))
-    return { skipped: true, upgrade: upgradeStarterProfiles(repository, { now }) };
+    return {
+      skipped: true,
+      upgrade: upgradeStarterProfiles(repository, { now }),
+      measure: addMeasureProfile(repository, { now }),
+    };
   const created = [];
   if (!listScanProfiles(repository).length) {
     for (const profile of STARTER_PROFILES) {
@@ -131,6 +163,7 @@ export function ensureStarterProfiles(repository, { now = Date.now() } = {}) {
       );
       created.push(profile.name);
     }
+    if (addMeasureProfile(repository, { now }).created) created.push(MEASURE_PROFILE.name);
     // A nightly rhythm: every profile in turn, one every 12 hours, only while the app runs.
     const hasSchedule = db.prepare("SELECT 1 FROM app_preferences WHERE key='scan_schedule'").get();
     if (!hasSchedule)
@@ -139,5 +172,7 @@ export function ensureStarterProfiles(repository, { now = Date.now() } = {}) {
   mark(repository, KEY, { created, schedule: getScanSchedule(repository).profile || null }, now);
   // A fresh install already has the current version: nothing to upgrade later.
   mark(repository, UPGRADE_KEY, { upgraded: [] }, now);
+  // An operator who already had own profiles gets no starter profile, also not this one.
+  if (!created.length) mark(repository, MEASURE_KEY, { created: false }, now);
   return { skipped: false, created };
 }

@@ -11,6 +11,7 @@ import {
 } from '../scan-schedule.mjs';
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
 import {
+  MEASURE_PROFILE,
   STARTER_PROFILES,
   STARTER_SOURCES,
   ensureStarterProfiles,
@@ -20,9 +21,13 @@ import {
 test('first run creates the niche profiles without blocked sources and a rotating schedule, once', () => {
   const repository = new SqliteCatalogRepository(':memory:');
   try {
-    assert.deepEqual(ensureStarterProfiles(repository).created, ['Uniwersa', 'Autorzy i cykle']);
+    assert.deepEqual(ensureStarterProfiles(repository).created, [
+      'Uniwersa',
+      'Autorzy i cykle',
+      'Pomiar: szeroki rynek',
+    ]);
     const profiles = listScanProfiles(repository);
-    assert.equal(profiles.length, 2);
+    assert.equal(profiles.length, 3);
     assert.ok(
       profiles.every(
         (profile) => !profile.sources.includes('Allegro') && !profile.sources.includes('OLX'),
@@ -104,7 +109,8 @@ test('starter profiles still holding the first version get the current phrases a
       )
       .run();
     assert.deepEqual(ensureStarterProfiles(repository).upgrade.upgraded, ['Uniwersa']);
-    const [authors, universes] = listScanProfiles(repository);
+    const byName = (name) => listScanProfiles(repository).find((p) => p.name === name);
+    const [authors, universes] = [byName('Autorzy i cykle'), byName('Uniwersa')];
     assert.deepEqual(universes.queries, STARTER_PROFILES[0].queries);
     assert.deepEqual(universes.sources, STARTER_SOURCES);
     assert.ok(!universes.sources.includes('Dedalus.pl'));
@@ -112,7 +118,7 @@ test('starter profiles still holding the first version get the current phrases a
     // Once: an operator who puts the old version back keeps it.
     putScanProfile(repository, 'Uniwersa', { queries: ['Warhammer'], sources: v1Sources });
     assert.equal(ensureStarterProfiles(repository).upgrade.skipped, true);
-    assert.deepEqual(listScanProfiles(repository)[1].queries, ['Warhammer']);
+    assert.deepEqual(byName('Uniwersa').queries, ['Warhammer']);
   } finally {
     repository.close();
   }
@@ -123,7 +129,44 @@ test('a fresh install gets the current profiles and nothing to upgrade later', (
   try {
     ensureStarterProfiles(repository);
     assert.equal(upgradeStarterProfiles(repository).skipped, true);
-    assert.deepEqual(listScanProfiles(repository)[1].queries, STARTER_PROFILES[0].queries);
+    const universes = listScanProfiles(repository).find((p) => p.name === 'Uniwersa');
+    assert.deepEqual(universes.queries, STARTER_PROFILES[0].queries);
+  } finally {
+    repository.close();
+  }
+});
+
+test('the broad-market measurement profile is added once to an existing install, Vinted only', () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    putScanProfile(repository, 'Uniwersa', { queries: ['Warhammer'], sources: ['Vinted'] });
+    repository.database
+      .prepare(
+        "INSERT INTO app_preferences(key,value_json,updated_at) VALUES('starter_profiles_v1','{}','x')",
+      )
+      .run();
+    assert.equal(ensureStarterProfiles(repository).measure.created, true);
+    const measure = listScanProfiles(repository).find((p) => p.name === MEASURE_PROFILE.name);
+    assert.deepEqual(measure.sources, ['Vinted']);
+    // Deleted by the operator: not created again.
+    repository.database.prepare('DELETE FROM scan_profiles WHERE name=?').run(MEASURE_PROFILE.name);
+    assert.equal(ensureStarterProfiles(repository).measure.skipped, true);
+    assert.equal(listScanProfiles(repository).length, 1);
+  } finally {
+    repository.close();
+  }
+});
+
+test('an operator with own profiles on first run gets no measurement profile either', () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    putScanProfile(repository, 'Mój', { queries: ['Wiedźmin'], sources: ['Vinted'] });
+    ensureStarterProfiles(repository);
+    ensureStarterProfiles(repository);
+    assert.deepEqual(
+      listScanProfiles(repository).map((p) => p.name),
+      ['Mój'],
+    );
   } finally {
     repository.close();
   }

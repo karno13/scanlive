@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-17 (98) — Tezeusz przez strony autorów; profil „Pomiar: szeroki rynek”
+
+- **Tezeusz** jest czytany przez strony autorów (`/autor/terry-pratchett`), a nie przez wyszukiwarkę, której `robots.txt` serwisu zakazuje. Frazy-nazwiska działają jak dotąd i czytają całą bibliografię autora (Pratchett: 24 strony). Frazy, które nie są nazwiskiem („Warcraft”, „Świat Dysku”), z Tezeusza nic już nie przynoszą — ich książki łapią strony autorów (Pratchett, Golden, Knaak, Abnett, McNeill, King). Na kopii bazy z Tezeusza było 277 ofert, z czego 104 przyszły przez „Świat Dysku”, a 21 przez „Warcraft”. Wcześniej znalezione oferty zostają.
+- **Nowy profil „Pomiar: szeroki rynek”** (tylko Vinted, 8 fraz): Fourth Wing, Iron Flame, Onyx Storm, Sarah J. Maas, Wiedźmin, Sapkowski, Brandon Sanderson, Harry Potter. Służy do porównania w statystykach fraz, jak szybko sprzedaje się szeroki rynek, a jak nisza. Dodawany raz przy starcie; po usunięciu nie wraca.
+- Automatyczny skan uruchamia profile po kolei co 12 h, więc każdy profil będzie skanowany co 36 h zamiast co 24 h. Gdy pomiar się skończy, usuń profil albo wybierz w harmonogramie jeden profil.
+
 ## 2026-11-17 (97) — Gotowe profile skanowania; Dedalus bez legalnego dostępu
 
 - Profile „Uniwersa” i „Autorzy i cykle” dostały nowe frazy i wszystkie działające źródła (14 zamiast 5). Zmienione zostały tylko dlatego, że od założenia 07.11 były nietknięte — profil edytowany ręcznie nie jest ruszany. Zmiana dzieje się raz, przy starcie aplikacji.

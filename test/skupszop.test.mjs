@@ -74,7 +74,7 @@ test('a JSON answer is read only from Skupszop; other sources must answer HTML',
   });
   assert.equal(await readSourceHtml(searchUrl(task()), options('Skupszop.pl')), fixture.html);
   await assert.rejects(
-    readSourceHtml('https://tezeusz.pl/szukaj?szukaj=x', options('Tezeusz.pl')),
+    readSourceHtml('https://tezeusz.pl/autor/x', options('Tezeusz.pl')),
     /SOURCE_NOT_HTML/,
   );
 });

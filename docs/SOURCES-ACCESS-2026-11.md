@@ -57,6 +57,10 @@ Na kopii danych Dedalus działał 11.11 o 08:24, a o 10:12 zaczął przekierowyw
 - **Co zrobiliśmy legalnie:** bazowy odstęp między zapytaniami do Dedalusa wynosi 6 s zamiast 2 s (`SOURCE_INTERVAL_MS`); po blokadzie bramka dalej podwaja odstęp (do 30 s), a skan odpuszcza resztę fraz tego źródła. Dedalus nie bierze udziału w sprawdzaniu dostępności stron ofert (`LIFECYCLE_SOURCES`); jego dostępność wynika z kodu `InStock` na liście wyników.
 - **Co zostaje:** źródło pozostaje w stanie „nie działa (CAPTCHA)” z datą, a skan próbuje je raz na skan i sam wraca, jeśli serwis przestanie blokować. Ma tylko 4 oferty w bazie; nie warto ryzykować więcej. Jeśli Dedalus udostępnia kanał dla partnerów (np. feed produktów), to kontakt z nim jest decyzją właściciela.
 
+## Decyzja z 17.11.2026: Tezeusz — strony autorów zamiast wyszukiwarki
+
+Właściciel zatwierdził. Skan nie używa już `/szukaj?szukaj=…` (zakazane w `robots.txt`), tylko stron autorów `/autor/<imię-nazwisko>?strona=N`, które są dozwolone. Fraza zamieniana jest na adres (`tezeuszAuthorSlug` w `marketplaces.mjs`; dwa wyjątki pisowni: Salvatore → `r-a-salvatore`, Richard Knaak → `richard-a-knaak`). Fraza, która nie jest nazwiskiem autora („Warcraft”, „Świat Dysku”), nie ma strony (404) i z Tezeusza nic nie przynosi — bez błędu i bez uznawania wcześniej znalezionych ofert za zniknięte. Serie fantasy nie mają stron (`/seria/…` to kilkadziesiąt serii dziecięcych i obyczajowych), a kategoria fantasy ma 13 369 książek — za dużo, by czytać ją całą. Sprawdzone na żywo 17.11: Terry Pratchett 31 ofert na stronie 1 (24 strony), R. A. Salvatore 30.
+
 ## Decyzja z 17.11.2026: Dedalus — „brak legalnego dostępu”
 
 Właściciel zatwierdził. `robots.txt` Dedalusa zakazuje adresu wyszukiwania, którego używa skan (`Disallow: /s?q=`), a serwis od 11.11 odpowiada CAPTCHA na każde zapytanie (ostatni udany odczyt 14.11). Dedalus jest teraz na liście `NO_LEGAL_ACCESS` (`source-blocks.mjs`) jak Allegro i OLX: nie jest skanowany, nie liczy się jako awaria, a zapisane profile pomijają go bez komunikatu. 4 zapisane oferty zostają w bazie.
@@ -71,13 +75,13 @@ Tylko rozpoznanie: żadne źródło nie zostało dodane ani wyłączone. Odczyta
 
 ### Obecne źródła a ich robots.txt (grupa `User-agent: *`)
 
-| Źródło           | Adres używany przez skan                      | robots.txt                                                                                                                                                      |
-| ---------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vinted           | `/catalog?search_text=…`, `/items/…`          | dozwolone (`Allow: /`; zakazane m.in. `/member/`, `/inbox`, `/checkout`)                                                                                        |
-| Empik            | `/ksiazki,31,s?q=…&start=…`, strony produktów | dozwolone (zakazane są adresy wyszukiwania z co najmniej trzema `&` i parametry typu `sort=`, `brand=`, `id=`)                                                  |
-| Allegro Lokalnie | `/oferty/q/…`, `/oferta/…`                    | dozwolone (zakazane tylko `/oferty/wystaw/*`); mimo to serwis odpowiada CAPTCHA                                                                                 |
-| **Tezeusz.pl**   | `/szukaj?szukaj=…`                            | **zakazane: `Disallow: /szukaj?`**; strony produktów, autorów (`/autor/…`) i wydawnictw są dozwolone; mapa strony: `feed.tezeusz.pl/sitemaps/sitemap_index.xml` |
-| **Dedalus.pl**   | `/s?q=…`                                      | **zakazane: `Disallow: /s?q=`** (i wzorzec `*?q=*`); serwis i tak odpowiada CAPTCHA                                                                             |
+| Źródło           | Adres używany przez skan                            | robots.txt                                                                                                                                                      |
+| ---------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vinted           | `/catalog?search_text=…`, `/items/…`                | dozwolone (`Allow: /`; zakazane m.in. `/member/`, `/inbox`, `/checkout`)                                                                                        |
+| Empik            | `/ksiazki,31,s?q=…&start=…`, strony produktów       | dozwolone (zakazane są adresy wyszukiwania z co najmniej trzema `&` i parametry typu `sort=`, `brand=`, `id=`)                                                  |
+| Allegro Lokalnie | `/oferty/q/…`, `/oferta/…`                          | dozwolone (zakazane tylko `/oferty/wystaw/*`); mimo to serwis odpowiada CAPTCHA                                                                                 |
+| **Tezeusz.pl**   | `/autor/…` (od 17.11; wcześniej `/szukaj?szukaj=…`) | **zakazane: `Disallow: /szukaj?`**; strony produktów, autorów (`/autor/…`) i wydawnictw są dozwolone; mapa strony: `feed.tezeusz.pl/sitemaps/sitemap_index.xml` |
+| **Dedalus.pl**   | `/s?q=…`                                            | **zakazane: `Disallow: /s?q=`** (i wzorzec `*?q=*`); serwis i tak odpowiada CAPTCHA                                                                             |
 
 Wniosek do decyzji właściciela: wyszukiwarki Tezeusza i Dedalusa są wyłączone z automatycznego odczytu przez same serwisy. `robots.txt` nie jest blokadą techniczną, ale jest wyraźnie wyrażoną wolą serwisu — spójnie z zasadą „nie obchodzimy blokad” należałoby:
 

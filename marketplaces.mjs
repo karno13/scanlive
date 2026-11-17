@@ -78,6 +78,8 @@ export function rejectionReason(task, title, metadata) {
   // Its own fantasy / SF genre is trusted; other genres must still name the topic.
   if (task.source === 'Empik' && /^Książki\/Fantastyka/i.test(String(metadata?.category ?? '')))
     return null;
+  // Tezeusz is read by author page: every listing there is by the author the phrase names.
+  if (task.source === 'Tezeusz.pl') return null;
   if (!matchesTopic(task, title)) return 'topic';
   return null; // Matching query + product exclusions; no mandatory generic book keyword.
 }
@@ -105,6 +107,29 @@ export function sourceAvailable(code) {
 // Sources whose results can be sorted newest first (checked on the live page 2026-11-10). The quick
 // scan reads one such page per phrase; other sources only offer their default order.
 export const NEWEST_ORDER_SOURCES = new Set(['Vinted']);
+// Tezeusz forbids its search address in robots.txt (Disallow: /szukaj?), so a phrase is read as
+// the author page /autor/<slug>, which is allowed. A phrase that names no author has no page (404)
+// and brings nothing from Tezeusz. Pages that exist under another spelling of the name:
+const TEZEUSZ_AUTHOR_ALIASES = { salvatore: 'r-a-salvatore', 'richard-knaak': 'richard-a-knaak' };
+export function tezeuszAuthorSlug(query) {
+  const slug = String(query ?? '')
+    .toLowerCase()
+    .replace(/ł/g, 'l')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return TEZEUSZ_AUTHOR_ALIASES[slug] ?? slug;
+}
+const pageParameter = (source) =>
+  source === 'Allegro'
+    ? 'p'
+    : source === 'Empik'
+      ? 'start'
+      : source === 'Tezeusz.pl'
+        ? 'strona'
+        : 'page';
+
 export function searchUrl(task) {
   if (!sources[task.source] || task.host !== sources[task.source].host)
     throw Error('UNTRUSTED_MARKETPLACE_TASK');
@@ -158,15 +183,16 @@ export function searchUrl(task) {
   else if (task.source === 'OLX')
     u = new URL('https://www.olx.pl/muzyka-edukacja/ksiazki/q-' + encodeURIComponent(query) + '/');
   else if (task.source === 'Tezeusz.pl') {
-    u = new URL('https://tezeusz.pl/szukaj');
-    u.searchParams.set('szukaj', query);
+    const slug = tezeuszAuthorSlug(query);
+    if (!slug) throw Error('INVALID_MARKETPLACE_QUERY');
+    u = new URL('https://tezeusz.pl/autor/' + slug);
   } else {
     u = new URL('https://dedalus.pl/s');
     u.searchParams.set('q', query);
   }
   if (task.paginationVersion === 1 && task.page > 1)
     u.searchParams.set(
-      task.source === 'Allegro' ? 'p' : task.source === 'Empik' ? 'start' : 'page',
+      pageParameter(task.source),
       String(task.source === 'Empik' ? (task.page - 1) * 60 + 1 : task.page),
     );
   return u.href;
@@ -885,7 +911,7 @@ export function marketplacePageInfo(html, task, offers) {
     if (!href) continue;
     try {
       const u = new URL(href.replace(/&amp;/g, '&'), current),
-        parameter = task.source === 'Allegro' ? 'p' : task.source === 'Empik' ? 'start' : 'page',
+        parameter = pageParameter(task.source),
         rawNext = Number(u.searchParams.get(parameter)),
         next = task.source === 'Empik' ? (rawNext - 1) / 60 + 1 : rawNext;
       u.searchParams.delete(parameter);
@@ -911,11 +937,26 @@ export function marketplacePageInfo(html, task, offers) {
   // Empik draws its pager with JavaScript: a full page of 60 tiles means there is another one.
   if (task.source === 'Empik' && !ended && (html.match(/\bta-product-tile\b/g) || []).length >= 60)
     return { page, digest, state: 'more', nextPage: page + 1 };
+  // Tezeusz author pages name the next one in <link rel="next">; the last page has none.
+  if (task.source === 'Tezeusz.pl' && offers.length) ended = true;
   return { page, digest, state: ended ? 'end' : 'unknown', nextPage: null };
 }
 export async function scanMarketplace(task, options = {}) {
-  const html = await readSourceHtml(searchUrl(task), { ...options, source: task.source }),
-    paginated = task.paginationVersion === 1;
+  let html;
+  try {
+    html = await readSourceHtml(searchUrl(task), { ...options, source: task.source });
+  } catch (error) {
+    // No author page for this phrase: nothing to read, not a failure. The state stays "unknown",
+    // so offers found earlier by this phrase are not concluded to be gone.
+    if (task.source !== 'Tezeusz.pl' || error?.message !== 'SOURCE_HTTP_404') throw error;
+    return {
+      offers: [],
+      rejected: {},
+      pagination: { page: task.page || 1, state: 'unknown', nextPage: null, total: 0 },
+      coverage: 'Tezeusz.pl: brak strony autora dla tej frazy.',
+    };
+  }
+  const paginated = task.paginationVersion === 1;
   const rejected = {};
   const offers = parseMarketplace(
     html,
