@@ -2,7 +2,8 @@
 // The "Dziś" start view in one request: what changed since the previous visit (new offers, price
 // changes), the decisions waiting, the state of every source, the last and the next scan. Each count
 // comes with the filters of the list it opens, so the number and the list always agree.
-import { countCatalogOffers, reviewQueueSummary } from './catalog-api.mjs';
+import { countCatalogOffers } from './catalog-api.mjs';
+import { reviewQueueSummary } from './review-queue.mjs';
 import { getScanSchedule, nextQuickRunAt, nextRunAt } from './scan-schedule.mjs';
 import { sourceStatus } from './source-status.mjs';
 import { hasNoLegalAccess } from './source-blocks.mjs';

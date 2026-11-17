@@ -22,7 +22,7 @@ import {
   applySureReviewPlan,
   approveJobAsBook,
   updateReviewSkipped,
-} from '../catalog-api.mjs';
+} from '../review-queue.mjs';
 import { offerEditionDraft, createEditionFromOffer } from '../offer-editions.mjs';
 import { storageMode, createSqliteBook, linkSqliteOffer } from '../sqlite-single-store.mjs';
 import { readJson, send, catalogHistorySnapshot, withHistoryWriteLock } from '../app-runtime.mjs';

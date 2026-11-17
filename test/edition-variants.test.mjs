@@ -2,13 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
+import { getCatalogWork, listCatalogWorks } from '../catalog-api.mjs';
 import {
   approveJobAsBook,
   decideIdentificationJob,
-  getCatalogWork,
-  listCatalogWorks,
   localWorkCandidates,
-} from '../catalog-api.mjs';
+} from '../review-queue.mjs';
 import { reassignOffer } from '../offer-assignment.mjs';
 import {
   bindingClass,

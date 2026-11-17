@@ -1,7 +1,7 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
-import { listIdentificationJobs } from '../catalog-api.mjs';
+import { listIdentificationJobs } from '../review-queue.mjs';
 
 test('Empik references remain reviewable outside the main queue and menu count', () => {
   const repository = new SqliteCatalogRepository(':memory:');

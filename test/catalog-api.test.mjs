@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  decideIdentificationJob,
   getCatalogEdition,
   getCatalogOffer,
   getCatalogWork,
   listCatalogOffers,
   listCatalogWorks,
-  listIdentificationJobs,
 } from '../catalog-api.mjs';
+import { decideIdentificationJob, listIdentificationJobs } from '../review-queue.mjs';
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
 
 const at = new Date('2026-10-31T10:00:00.000Z');

@@ -2,7 +2,7 @@
 // A set is one marketplace offer containing several catalog editions.
 // Price and inventory remain associated with the offer, not its members.
 import { proxiedImage } from './offer-images.mjs';
-import { localEditionCandidates } from './catalog-api.mjs';
+import { localEditionCandidates } from './review-queue.mjs';
 import { fold } from './title-proposals.mjs';
 import { NOT_A_CYCLE, BRAND_ONLY, catalogSeries, cycleKey } from './catalog-series.mjs';
 

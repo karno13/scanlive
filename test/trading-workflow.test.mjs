@@ -7,13 +7,8 @@ import { createProductionCatalog } from '../catalog-production.mjs';
 import { createLocalAppServer } from '../local-app.mjs';
 import { searchOffers } from '../scan-engine.mjs';
 import { persistSqliteScan } from '../sqlite-single-store.mjs';
-import {
-  listCatalogOffers,
-  listCatalogWorks,
-  getCatalogWork,
-  matchIdentificationJobByIsbn,
-  decideIdentificationJob,
-} from '../catalog-api.mjs';
+import { listCatalogOffers, listCatalogWorks, getCatalogWork } from '../catalog-api.mjs';
+import { matchIdentificationJobByIsbn, decideIdentificationJob } from '../review-queue.mjs';
 import { setOfferWorkspace } from '../offer-workspace-api.mjs';
 import { markOfferAsSet, updateSetEdition, listOfferSets } from '../offer-sets.mjs';
 import {

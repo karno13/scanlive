@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
-import { listIdentificationJobs, reviewSkippedIds, updateReviewSkipped } from '../catalog-api.mjs';
+import { listIdentificationJobs, reviewSkippedIds, updateReviewSkipped } from '../review-queue.mjs';
 
 // Review queue paged on the server (view=list): one row per decision, phrase group sizes over the
 // whole filtered queue, skipped offers kept in the database.

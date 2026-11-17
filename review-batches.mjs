@@ -5,7 +5,7 @@
 // review_decisions row and the same guards as one by one; review_batches only groups the rows, so
 // "Ostatnie decyzje" can undo the whole batch.
 import { randomUUID } from 'node:crypto';
-import { applySureReviewPlan, listIdentificationJobs, sureReviewPlan } from './catalog-api.mjs';
+import { applySureReviewPlan, listIdentificationJobs, sureReviewPlan } from './review-queue.mjs';
 import { createEditionFromOffer, offerEditionDraft } from './offer-editions.mjs';
 import { reopenReviewDecision } from './api-routes.mjs';
 import { proxiedImage } from './offer-images.mjs';

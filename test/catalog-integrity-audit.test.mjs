@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
-import { decideIdentificationJob, listCatalogWorks } from '../catalog-api.mjs';
+import { listCatalogWorks } from '../catalog-api.mjs';
+import { decideIdentificationJob } from '../review-queue.mjs';
 
 test('not_book decision supersedes any active offer-to-edition match', () => {
   const repo = new SqliteCatalogRepository(':memory:');

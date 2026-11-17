@@ -2,11 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createProductionCatalog } from '../catalog-production.mjs';
 import { persistSqliteScan } from '../sqlite-single-store.mjs';
-import {
-  decideIdentificationJob,
-  listCatalogOffers,
-  listIdentificationJobs,
-} from '../catalog-api.mjs';
+import { listCatalogOffers } from '../catalog-api.mjs';
+import { decideIdentificationJob, listIdentificationJobs } from '../review-queue.mjs';
 import { rejectionTitleKey } from '../rejected-offers.mjs';
 
 const catalog = () =>

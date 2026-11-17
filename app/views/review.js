@@ -32,7 +32,7 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') document.querySelectorAll('.review-toolbar details[open]').forEach(panel => { panel.open = false; });
 });
 // The server filters, sorts, merges offers that share an ISBN decision and pages the queue
-// (catalog-api.mjs, view=list); offers skipped in this session vanish at once, before the next page.
+// (review-queue.mjs, view=list); offers skipped in this session vanish at once, before the next page.
 function filteredReviewOffers() {
   return reviewOffers().filter((job) => !state.skippedReviewIds.has(job.id));
 }

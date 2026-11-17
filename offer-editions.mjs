@@ -7,7 +7,7 @@ import { isbnKeys, normalizeISBN } from './isbn-normalization.mjs';
 import { fold } from './title-proposals.mjs';
 import { findWorkByKey } from './work-grouping.mjs';
 import { universeOf } from './catalog-series.mjs';
-import { decideIdentificationJob } from './catalog-api.mjs';
+import { decideIdentificationJob } from './review-queue.mjs';
 import { persistMetadataResults } from './metadata-lookup.mjs';
 import { enrichEdition } from './catalog-bibliography.mjs';
 import { chooseAmongRecords } from './catalog-resolver.mjs';

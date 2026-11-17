@@ -4,12 +4,8 @@
 import { mergeVariants, setEditionVariant, workPriceOverview } from '../edition-variants.mjs';
 import { historyBookLabels } from '../history-brief.mjs';
 import { listWorkSeries, updateWorkSeries } from '../work-series-api.mjs';
-import {
-  getCatalogEdition,
-  getCatalogWork,
-  listCatalogWorks,
-  reviewQueueSummary,
-} from '../catalog-api.mjs';
+import { getCatalogEdition, getCatalogWork, listCatalogWorks } from '../catalog-api.mjs';
+import { reviewQueueSummary } from '../review-queue.mjs';
 import { bookHistory } from '../price-analysis.mjs';
 import { sqliteHistoryModel } from '../sqlite-history-read.mjs';
 import { catalogInsights } from '../catalog-insights.mjs';

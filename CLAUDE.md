@@ -40,7 +40,7 @@ One line per file: `docs/REPOSITORY-MAP.md`. Database: `docs/SCHEMA.sql` (genera
 - `offer-ingest.mjs` — the only way scanned offers are saved (`ScannedOffer`, one shape); `sqlite-single-store.mjs` — the scan write.
 - `catalog-resolver.mjs` + `identification-worker.mjs` — ISBN → edition; `metadata-sources/*` — BN, Open Library, e-ISBN, Google Books adapters.
 - `background-jobs.mjs` — `schedule*` jobs after each identification pass; `startup-jobs.mjs` — data repairs at start.
-- `catalog-api.mjs` — read models for lists (works, offers, groups, review queue); `sqlite-catalog-repository.mjs` — writes.
+- `catalog-api.mjs` — read models for lists (works, offers, groups); `review-queue.mjs` — review queue (jobs, buckets, sure plan, decisions); `sqlite-catalog-repository.mjs` — writes.
 - `app-runtime.mjs` — the open catalogue (`getProductionCatalog`), `send` / `readJson`, event log, history write lock.
 - Frontend: `app/index.html`, `app/app.js` (shell, tabs, wiring), `app/views/<area>.js`, `app/core/*`, `app/styles/*.css`.
 - Tests: `test/` (server), next to the module in `app/` (frontend units), `scripts/*.test.mjs`.
@@ -81,5 +81,5 @@ Other docs: `docs/DATA-MIGRATION.md` (updating, migrations, legacy tools), `docs
 ## Open items (known, not decided)
 
 - 24 test files still read the source text of `app/` files; replacing them needs a DOM harness.
-- About 38 backend modules are not type-checked yet (mostly default-parameter typing).
+- 45 backend modules (root, `routes/`, `metadata-sources/`) have no `// @ts-check` yet (mostly default-parameter typing).
 - Root modules could move to `src/`; it would change the start command in the `.cmd` launchers.

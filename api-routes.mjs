@@ -21,7 +21,7 @@ import {
   listRejectionRules,
 } from './rejection-rules.mjs';
 import { dismissOfferSet } from './offer-sets.mjs';
-import { reviewQueueSummary } from './catalog-api.mjs';
+import { reviewQueueSummary } from './review-queue.mjs';
 import { getScanSchedule, saveScanSchedule, nextRunAt, nextQuickRunAt } from './scan-schedule.mjs';
 import { getPolishOnly, setPolishOnly } from './language-policy.mjs';
 import { listNames, mergeNames, removeNameAlias } from './name-aliases.mjs';

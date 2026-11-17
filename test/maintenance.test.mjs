@@ -8,7 +8,7 @@ import { createRouter } from '../router.mjs';
 import { apiRoutes } from '../api-routes.mjs';
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
 import { createProductionCatalog } from '../catalog-production.mjs';
-import { listIdentificationJobs } from '../catalog-api.mjs';
+import { listIdentificationJobs } from '../review-queue.mjs';
 import { findWorkByKey, refreshWorkKeys } from '../work-grouping.mjs';
 import { DEFAULT_UNIVERSES, saveUniverse, setUniverses } from '../universes.mjs';
 import { runOnce } from '../startup-jobs.mjs';

@@ -50,7 +50,8 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `history-brief.mjs`                                                      | Lekkie etykiety książek dla listy ofert                                                     |
 | `sqlite-history-read.mjs`                                                | Odczyt zgodny z dawnym `/api/history` (tylko eksport i narzędzia)                           |
 | `price-analysis.mjs`                                                     | Agregaty cen książek dla eksportu historii                                                  |
-| `catalog-api.mjs`                                                        | Odczyty list: dzieła, oferty, grupy ofert, kolejka weryfikacji                              |
+| `catalog-api.mjs`                                                        | Odczyty list: dzieła, wydania, oferty, grupy ofert                                          |
+| `review-queue.mjs`                                                       | Kolejka weryfikacji: zadania, koszyki, plan „Szybkie”, decyzje, kandydaci lokalni           |
 | `offer-workspace-api.mjs`                                                | Notatki, cena docelowa i obserwowanie ofert                                                 |
 | `scan-profiles-api.mjs`                                                  | Zapisane profile skanowania w SQLite                                                        |
 | `work-series-api.mjs`                                                    | Ręczne adnotacje serii dzieła                                                               |

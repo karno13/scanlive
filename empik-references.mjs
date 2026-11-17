@@ -1,7 +1,7 @@
 // @ts-check
 // Conservative reference-price assignments: a known book, never a guessed edition.
 import { randomUUID } from 'node:crypto';
-import { sureReviewPlan } from './catalog-api.mjs';
+import { sureReviewPlan } from './review-queue.mjs';
 import { ensureUnknownEdition } from './edition-variants.mjs';
 import { looksLikeBundle, createCatalogBundleDetector } from './bundle-detection.mjs';
 

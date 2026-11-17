@@ -24,7 +24,7 @@ import { spawn } from 'node:child_process';
 import { setTimeout as wait } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { localSourceHosts } from './local-scan.mjs';
-import { reviewQueueSummary } from './catalog-api.mjs';
+import { reviewQueueSummary } from './review-queue.mjs';
 import { storageMode } from './sqlite-single-store.mjs';
 import { createIdentificationScheduler } from './identification-scheduler.mjs';
 import {

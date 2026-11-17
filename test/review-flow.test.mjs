@@ -5,7 +5,7 @@ import { createProductionCatalog } from '../catalog-production.mjs';
 import { enrichOffers, pendingEnrichment } from '../offer-enrichment.mjs';
 import { requeueReviewsWithKnownIsbn } from '../identification-retry.mjs';
 import { chooseAmongRecords } from '../catalog-resolver.mjs';
-import { listIdentificationJobs, sureReviewPlan } from '../catalog-api.mjs';
+import { listIdentificationJobs, sureReviewPlan } from '../review-queue.mjs';
 import {
   offerEditionDraft,
   createEditionFromOffer,

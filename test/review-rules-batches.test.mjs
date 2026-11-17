@@ -19,7 +19,7 @@ import {
   listRejectionRules,
   ruleMatches,
 } from '../rejection-rules.mjs';
-import { decideIdentificationJob } from '../catalog-api.mjs';
+import { decideIdentificationJob } from '../review-queue.mjs';
 import { dismissOfferSet, listOfferSets, markOfferAsSet } from '../offer-sets.mjs';
 import { queueSummary, reopenReviewDecision } from '../api-routes.mjs';
 

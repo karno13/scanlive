@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { localEditionCandidates } from '../catalog-api.mjs';
+import { localEditionCandidates } from '../review-queue.mjs';
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
 
 test('offers without ISBN get catalogue editions of the same work; universe names alone do not match', () => {
