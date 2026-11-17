@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-17 (96) — Profil pokazuje źródła, których nie skanuje
+
+- Źródła → nad frazami: „Profil **Uniwersa** nie skanuje działających źródeł (10): Skupszop.pl, BlackBooks.pl, …” z przyciskami „Dodaj do profilu” i „Nie teraz”. Profil zapisany przed dodaniem źródła nigdy go nie skanował, także w skanie automatycznym, bo harmonogram uruchamia zapisane profile.
+- Na kopii bazy: oba profile („Uniwersa”, „Autorzy i cykle”) mają 5 źródeł, z czego Dedalus jest blokowany (CAPTCHA). Skan automatyczny 17.11 czytał 4 źródła i dał 23 nowe oferty; ręczny skan 16.11 z 15 źródłami — 218. Skupszop: 157 z 199 ofert rozpoznanych po ISBN bez kolejki decyzji.
+- Źródła niedziałające (np. Dedalus) nie są proponowane. „Nie teraz” ukrywa podpowiedź do czasu, aż pojawi się kolejne nowe źródło.
+
 ## 2026-11-17 (95) — Poprawki po przeglądzie kodu
 
 - **Błąd:** obcojęzyczna oferta Vinted z bezpłatną dostawą była przyjmowana tylko przy pierwszym odczycie. Przy następnej frazie albo kolejnym skanie odpowiedź brana z pamięci podręcznej nie miała ceny dostawy, więc oferta była odrzucana jako obce wydanie, a po pełnym skanie wyglądała na sprzedaną („nie widziana”). Pamięć podręczna zapisuje teraz cenę dostawy, a cena zapisana przy ofercie ma pierwszeństwo.

@@ -23,6 +23,25 @@ export function stalePhrases(queries, items = []) {
   });
 }
 
+/** Working sources of the form that a saved profile does not scan (e.g. added after it was saved). */
+export function missingSources(profile, working = []) {
+  const own = new Set(profile?.sources || []);
+  return working.filter(source => !own.has(source));
+}
+
+// "Not now" on the coverage note, per profile: the missing list it was given for. A source added
+// later changes the list, so the note comes back. Per-viewer convenience only.
+const COVERAGE_KEY = 'bookflip.profileCoverageDismissed';
+function readDismissed() {
+  try {
+    const value = JSON.parse(localStorage.getItem(COVERAGE_KEY) || '{}');
+    return value && typeof value === 'object' ? value : {};
+  } catch { return {}; }
+}
+function writeDismissed(value) {
+  try { localStorage.setItem(COVERAGE_KEY, JSON.stringify(value)); } catch {}
+}
+
 export async function installScanProfiles({ queriesInput, sourceGrid, panel, toast, json, deadSources = () => new Set(), startScan = null }) {
   if (!queriesInput || !sourceGrid || !panel) return;
   if (typeof json !== 'function') throw Error('SCAN_PROFILES_API_REQUIRED');
@@ -30,6 +49,7 @@ export async function installScanProfiles({ queriesInput, sourceGrid, panel, toa
   let freshness = null;
   const chips = document.querySelector('#profileChips');
   const staleNote = document.querySelector('#queryFreshness');
+  const coverage = document.querySelector('#profileCoverage');
   const root = document.createElement('details');
   root.className = 'scan-profiles';
   const title = document.createElement('summary');
@@ -122,6 +142,43 @@ export async function installScanProfiles({ queriesInput, sourceGrid, panel, toa
     } else toast(note ? 'Wczytano profil. ' + note : 'Wczytano profil „' + profile.name + '”.');
   });
 
+  // A profile saved before a source existed never scans it (the schedule runs saved profiles).
+  function workingSources() {
+    const dead = deadSources() || new Set();
+    return [...sourceGrid.querySelectorAll('input[type="checkbox"]')].map(input => input.value).filter(id => !dead.has(id));
+  }
+  function renderCoverage() {
+    if (!coverage) return;
+    const working = workingSources();
+    const dismissed = readDismissed();
+    const rows = profiles
+      .map(profile => ({ name: profile.name, missing: missingSources(profile, working) }))
+      .filter(row => row.missing.length && dismissed[row.name] !== row.missing.join('|'));
+    coverage.hidden = !rows.length;
+    coverage.innerHTML = rows.map(row =>
+      `<p>Profil <b>${escapeHtml(row.name)}</b> nie skanuje działających źródeł (${row.missing.length}): ${escapeHtml(row.missing.join(', '))}. <button type="button" class="link-button" data-coverage-add="${escapeHtml(row.name)}">Dodaj do profilu</button> <button type="button" class="link-button" data-coverage-skip="${escapeHtml(row.name)}">Nie teraz</button></p>`).join('');
+  }
+  coverage?.addEventListener('click', async event => {
+    const target = event.target.closest('[data-coverage-add], [data-coverage-skip]');
+    const profile = target && profiles.find(item => item.name === (target.dataset.coverageAdd ?? target.dataset.coverageSkip));
+    if (!profile) return;
+    const working = workingSources();
+    const missing = missingSources(profile, working);
+    if (target.dataset.coverageSkip !== undefined) {
+      writeDismissed({ ...readDismissed(), [profile.name]: missing.join('|') });
+      return renderCoverage();
+    }
+    target.disabled = true;
+    try {
+      await json('/api/scan-profiles/' + encodeURIComponent(profile.name), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ queries: profile.queries, sources: [...profile.sources, ...missing] }) });
+      await reload(picker.value);
+      toast('Profil „' + profile.name + '” skanuje teraz też: ' + missing.join(', ') + '.');
+    } catch {
+      target.disabled = false;
+      toast('Nie zapisano profilu. Spróbuj ponownie.');
+    }
+  });
+
   function refresh(selected = '') {
     picker.replaceChildren();
     const empty = document.createElement('option');
@@ -137,6 +194,7 @@ export async function installScanProfiles({ queriesInput, sourceGrid, panel, toa
     picker.value = selected;
     importButton.hidden = readLegacyProfiles().length === 0;
     renderChips();
+    renderCoverage();
   }
   async function reload(selected = '') {
     const response = await json('/api/scan-profiles');

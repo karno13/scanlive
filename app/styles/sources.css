@@ -466,6 +466,12 @@ input:focus {
   font-size: 12px;
   color: var(--warn);
 }
+.profile-coverage p {
+  margin: 0;
+}
+.profile-coverage p + p {
+  margin-top: 4px;
+}
 .scan-plan {
   margin: 10px 0 0;
   font-size: 12px;
