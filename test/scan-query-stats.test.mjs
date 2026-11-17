@@ -92,3 +92,37 @@ test('niche measures: sold within 14 days of offers old enough, median sold pric
   );
   repo.close();
 });
+
+test('per profile: identified offers and the editions they belong to', async () => {
+  const { putScanProfile } = await import('../scan-profiles-api.mjs');
+  const repo = new SqliteCatalogRepository(':memory:');
+  repo.createWork({ id: 'w', title: 'W', authors: ['A'], at: '2026-01-01T00:00:00Z' });
+  for (const id of ['e1', 'e2'])
+    repo.createEdition({ id, workId: 'w', title: id, at: '2026-01-01T00:00:00Z' });
+  const offer = (n, query, edition) => {
+    const row = repo.upsertOffer({
+      source: 'Vinted',
+      normalizedUrl: `https://www.vinted.pl/items/${n}`,
+      originalTitle: 'T' + n,
+      currentPrice: 1000,
+      matchedQueries: [query],
+    });
+    if (edition)
+      repo.assignOfferToEdition(row.id, edition, {
+        id: 'm' + n,
+        method: 'manual',
+        status: 'active',
+        createdBy: 't',
+        at: '2026-01-01T00:00:00Z',
+      });
+  };
+  offer(1, 'Fourth Wing', 'e1');
+  offer(2, 'Fourth Wing', 'e1');
+  offer(3, 'Fourth Wing', 'e2');
+  offer(4, 'Fourth Wing');
+  offer(5, 'Warcraft', 'e2');
+  putScanProfile(repo, 'Szeroki', { queries: ['Fourth Wing'], sources: ['Vinted'] });
+  const profile = scanQueryStats(repo).profiles.find((item) => item.name === 'Szeroki');
+  assert.deepEqual([profile.offers, profile.matched, profile.editions], [4, 3, 2]);
+  repo.close();
+});

@@ -4,7 +4,7 @@ import { deleteUniverse, listUniverses, saveUniverse } from './universes.mjs';
 import { recentRelistDecisions, undoRelist } from './offer-status.mjs';
 import { listScanProfiles } from './scan-profiles-api.mjs';
 import { groupedPriceStats } from './price-stats.mjs';
-import { listDeals } from './deals.mjs';
+import { listDeals, removeDealVerdict, saveDealVerdict } from './deals.mjs';
 import { readdir, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { backupCatalog } from './scripts/backup-catalog.mjs';
@@ -321,11 +321,21 @@ export function scanQueryStats(repo, at = Date.now()) {
       )
       .get(cutoff, cutoff, ...params);
     const stats = groupedPriceStats(db, selected, params, 'grp').p;
+    // Identified offers and the editions they belong to: many offers on few editions is a crowded
+    // market (Fourth Wing), many editions is a wide one.
+    const identified = db
+      .prepare(
+        `SELECT count(DISTINCT m.offer_id) AS matched, count(DISTINCT m.edition_id) AS editions
+         FROM offer_matches m WHERE m.status='active' AND m.offer_id IN (SELECT offer_id FROM (${selected}))`,
+      )
+      .get(...params);
     return {
       name: profile.name,
       queries: profile.queries,
       sources: profile.sources,
       offers: Number(row.offers || 0),
+      matched: Number(identified?.matched || 0),
+      editions: Number(identified?.editions || 0),
       live: stats?.live ?? 0,
       liveMedian: stats?.median ?? null,
       ...marketFields(row, stats),
@@ -493,6 +503,12 @@ export const apiRoutes = createRouter()
   .add('PUT', '/api/trading-defaults', ({ repo, input }) => saveTradingDefaults(repo, input))
   .add('GET', '/api/scan-runs', ({ repo }) => ({ items: listScanRuns(repo) }))
   .add('GET', '/api/deals', ({ repo }) => listDeals(repo))
+  .add('PUT', '/api/deals/:offerId/verdict', ({ repo, input, params }) =>
+    saveDealVerdict(repo, params.offerId, input?.verdict),
+  )
+  .add('DELETE', '/api/deals/:offerId/verdict', ({ repo, params }) =>
+    removeDealVerdict(repo, params.offerId),
+  )
   // offers_seen: listings this source returned in its last checked scan, so a source whose
   // health row predates per-phrase success tracking is not shown as dead while it delivers offers.
   .add('GET', '/api/source-health', ({ repo }) => ({

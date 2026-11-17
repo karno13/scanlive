@@ -62,3 +62,27 @@ test('a deal row shows price, worth, saving and the links; a suspicious one warn
     /sprawdź, czy oferta/,
   );
 });
+
+test('rated deals are hidden unless asked for or rated in this visit; the summary says how often the list was right', async () => {
+  const { verdictSummaryLabel } = await import('./deals.js');
+  const items = [deal({ offerId: 'a' }), deal({ offerId: 'b', verdict: 'good' }), deal({ offerId: 'c', verdict: 'wrong_match' })];
+  const ids = (options) => visibleDeals(items, options).map((item) => item.offerId);
+  assert.deepEqual(ids(), ['a']);
+  assert.deepEqual(ids({ showRated: true }), ['a', 'b', 'c']);
+  assert.deepEqual(ids({ keep: new Set(['c']) }), ['a', 'c']);
+  assert.equal(dealsCountLabel(items, visibleDeals(items)), '1 okazja · 2 ocenione ukryte');
+  assert.match(dealMarkup(items[0], { escapeHtml, money }), /data-deal-rate="a" data-verdict="wrong_match"/);
+  const rated = dealMarkup(items[1], { escapeHtml, money });
+  assert.match(rated, /Ocena: <b>Trafna<\/b>/);
+  assert.match(rated, /data-deal-unrate="b"/);
+  assert.doesNotMatch(rated, /data-deal-rate=/);
+  assert.match(verdictSummaryLabel(null), /^Ocenione: 0\./);
+  assert.equal(
+    verdictSummaryLabel({
+      total: 4,
+      counts: { good: 3, wrong_match: 1, condition: 0, overvalued: 0 },
+      byConfidence: { medium: { total: 3, good: 2 }, high: { total: 1, good: 1 } },
+    }),
+    'Ocenione: 4 — trafna 3 (75%) · złe przypisanie 1. Przy wiarygodności wysokiej trafne 1 z 1; przy wiarygodności średniej trafne 2 z 3.',
+  );
+});

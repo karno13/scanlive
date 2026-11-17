@@ -3,7 +3,8 @@ import test from 'node:test';
 
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
 import { createLocalAppServer } from '../local-app.mjs';
-import { listDeals } from '../deals.mjs';
+import { apiRoute } from '../api-routes.mjs';
+import { listDeals, removeDealVerdict, saveDealVerdict } from '../deals.mjs';
 
 function catalogue() {
   const repository = new SqliteCatalogRepository(':memory:');
@@ -92,6 +93,72 @@ test('GET /api/deals returns the list', async () => {
     );
   } finally {
     await new Promise((resolve) => server.close(() => resolve(null)));
+    repository.close();
+  }
+});
+
+test('a verdict is stored with the deal as listed, replaces the previous one and can be taken back', () => {
+  const { repository, add } = catalogue();
+  try {
+    add('a', 4000);
+    add('b', 4200);
+    add('c', 4400);
+    add('cheap', 2000);
+    add('fair', 4300);
+    const at = Date.parse('2026-11-17T12:00:00Z');
+    const saved = saveDealVerdict(repository, 'cheap', 'wrong_match', { at });
+    assert.equal(saved.verdict, 'wrong_match');
+    const row = repository.database
+      .prepare('SELECT verdict, price, worth, confidence FROM deal_verdicts WHERE offer_id=?')
+      .get('cheap');
+    assert.deepEqual(
+      { ...row },
+      {
+        verdict: 'wrong_match',
+        price: 2000,
+        worth: listDeals(repository).items[0].worth,
+        confidence: listDeals(repository).items[0].confidence,
+      },
+    );
+    saveDealVerdict(repository, 'cheap', 'good', { at });
+    // An offer that is not on the list can still be rated; its snapshot is empty.
+    saveDealVerdict(repository, 'fair', 'overvalued', { at });
+    const { items, verdicts } = listDeals(repository);
+    assert.equal(items.find((item) => item.offerId === 'cheap').verdict, 'good');
+    assert.equal(verdicts.total, 2);
+    assert.deepEqual(verdicts.counts, { good: 1, wrong_match: 0, condition: 0, overvalued: 1 });
+    assert.equal(verdicts.byConfidence.none.total, 1, 'the off-list verdict has no confidence');
+    assert.equal(removeDealVerdict(repository, 'cheap').verdicts.total, 1);
+    assert.equal(listDeals(repository).items[0].verdict, null);
+    assert.throws(() => saveDealVerdict(repository, 'cheap', 'maybe'), /INVALID_DEAL_VERDICT/);
+    assert.throws(() => saveDealVerdict(repository, 'nope', 'good'), /OFFER_NOT_FOUND/);
+  } finally {
+    repository.close();
+  }
+});
+
+test('PUT and DELETE /api/deals/:offerId/verdict', async () => {
+  const { repository, add } = catalogue();
+  try {
+    add('a', 4000);
+    add('b', 4200);
+    add('c', 4400);
+    add('cheap', 2500);
+    const path = '/api/deals/cheap/verdict';
+    const saved = await apiRoute({
+      repo: repository,
+      method: 'PUT',
+      path,
+      input: { verdict: 'good' },
+    });
+    assert.equal(saved.verdicts.counts.good, 1);
+    await assert.rejects(
+      apiRoute({ repo: repository, method: 'PUT', path, input: { verdict: 'x' } }),
+      (error) => error.statusCode === 400,
+    );
+    const removed = await apiRoute({ repo: repository, method: 'DELETE', path });
+    assert.equal(removed.verdicts.total, 0);
+  } finally {
     repository.close();
   }
 });

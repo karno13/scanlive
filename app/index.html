@@ -56,8 +56,9 @@
         </section>
         <section class="view" id="view-deals" data-title="Okazje" hidden>
           <div class="view-heading"><div><p class="section-eyebrow">OFERTY PONIŻEJ WYCENY</p><h2>Okazje</h2><p>Dostępne oferty co najmniej 20% i 5 zł poniżej wartości swojego wydania. Wartość liczona z pozostałych ofert i sprzedaży tego wydania, dla stanu danego egzemplarza.</p></div></div>
-          <div class="deals-toolbar"><label class="check-row"><input type="checkbox" id="dealsIncludeLow"> <span>Pokaż też wyceny o niskiej wiarygodności</span></label><label class="field deals-sort"><span>Sortuj</span><select id="dealsSort"><option value="saving">Największa różnica w zł</option><option value="discount">Największy rabat %</option><option value="newest">Najnowsze oferty</option><option value="price">Najniższa cena</option></select></label><span class="state-badge neutral" id="dealsCount" role="status">Wczytywanie…</span></div>
+          <div class="deals-toolbar"><label class="check-row"><input type="checkbox" id="dealsIncludeLow"> <span>Pokaż też wyceny o niskiej wiarygodności</span></label><label class="check-row"><input type="checkbox" id="dealsShowRated"> <span>Pokaż ocenione</span></label><label class="field deals-sort"><span>Sortuj</span><select id="dealsSort"><option value="saving">Największa różnica w zł</option><option value="discount">Największy rabat %</option><option value="newest">Najnowsze oferty</option><option value="price">Najniższa cena</option></select></label><span class="state-badge neutral" id="dealsCount" role="status">Wczytywanie…</span></div>
           <p class="inline-note deals-note">Dostępne oferty co najmniej 20% i 5 zł poniżej wartości swojego wydania. Wartość liczona z pozostałych ofert i sprzedaży tego samego wydania, dla stanu danego egzemplarza — bez kosztów wysyłki i opłat.</p>
+          <p class="inline-note deals-verdicts" id="dealsVerdicts" role="status"></p>
           <div id="dealsList" class="deals-list" aria-live="polite"><p class="inline-note">Wczytywanie okazji…</p></div>
         </section>
         <section class="view" id="view-scanner" data-title="Źródła" hidden>

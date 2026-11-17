@@ -2,7 +2,8 @@
 // "Okazje": offers that can be bought now for clearly less than their edition is worth. The worth
 // is the market valuation (market-valuation.mjs) of the edition counted WITHOUT the offer itself —
 // otherwise a cheap listing would pull its own reference down — and brought to the offer's
-// condition. Read-only: nothing is stored, the list is computed from the current offers.
+// condition. The list is computed from the current offers; only the owner's verdict on an entry
+// ("was it a real deal?", deal_verdicts) is stored, to measure how often the list is right.
 import {
   CONDITION_FACTOR,
   estimateValue,
@@ -17,6 +18,8 @@ export const DEAL_MIN_SAVING = 500;
 /** This far below the worth is more often a wrong assignment than a bargain. */
 export const DEAL_SUSPICIOUS_DISCOUNT = 0.7;
 const BUYABLE = ['available', 'unconfirmed'];
+/** Owner's verdicts on a deal: real, wrong book or edition, other condition or a set, worth too high. */
+export const DEAL_VERDICTS = ['good', 'wrong_match', 'condition', 'overvalued'];
 
 /**
  * @param {{ database: import('node:sqlite').DatabaseSync }} repository
@@ -41,6 +44,12 @@ export function listDeals(repository, { at = Date.now() } = {}) {
     ...new Set(rows.map((row) => String(row.editionId))),
   ]);
   const options = valuationOptions(database);
+  const verdicts = new Map(
+    database
+      .prepare('SELECT offer_id, verdict FROM deal_verdicts')
+      .all()
+      .map((row) => [String(row.offer_id), String(row.verdict)]),
+  );
   const items = [];
   for (const row of rows) {
     const others = (observations.get(String(row.editionId)) ?? []).filter(
@@ -81,8 +90,75 @@ export function listDeals(repository, { at = Date.now() } = {}) {
       sold: value.sold,
       live: value.live,
       reasons: value.reasons,
+      verdict: verdicts.get(String(row.id)) ?? null,
     });
   }
   items.sort((a, b) => b.saving - a.saving);
-  return { items };
+  return { items, verdicts: dealVerdictSummary(repository) };
+}
+
+/**
+ * All verdicts so far, also on offers that are no longer deals: counts per verdict and, per
+ * valuation confidence at the time of the verdict, how many were real deals.
+ * @param {{ database: import('node:sqlite').DatabaseSync }} repository
+ */
+export function dealVerdictSummary(repository) {
+  const rows = repository.database
+    .prepare(
+      `SELECT verdict, coalesce(confidence,'none') AS confidence, count(*) AS n
+       FROM deal_verdicts GROUP BY 1, 2`,
+    )
+    .all();
+  /** @type {Record<string, number>} */
+  const counts = Object.fromEntries(DEAL_VERDICTS.map((verdict) => [verdict, 0]));
+  /** @type {Record<string, { total: number, good: number }>} */
+  const byConfidence = {};
+  let total = 0;
+  for (const row of rows) {
+    const n = Number(row.n);
+    total += n;
+    counts[String(row.verdict)] += n;
+    const bucket = (byConfidence[String(row.confidence)] ??= { total: 0, good: 0 });
+    bucket.total += n;
+    if (row.verdict === 'good') bucket.good += n;
+  }
+  return { total, counts, byConfidence };
+}
+
+/**
+ * Stores the owner's verdict on a deal, with the deal's price, worth and confidence as listed now
+ * (null when the offer is no longer on the list). A new verdict replaces the previous one.
+ * @param {{ database: import('node:sqlite').DatabaseSync }} repository
+ * @param {string} offerId
+ * @param {unknown} verdict
+ */
+export function saveDealVerdict(repository, offerId, verdict, { at = Date.now() } = {}) {
+  if (typeof verdict !== 'string' || !DEAL_VERDICTS.includes(verdict))
+    throw Object.assign(Error('INVALID_DEAL_VERDICT'), { statusCode: 400 });
+  const database = repository.database;
+  if (!database.prepare('SELECT 1 FROM offers WHERE id=?').get(offerId))
+    throw Object.assign(Error('OFFER_NOT_FOUND'), { statusCode: 404 });
+  const deal = listDeals(repository, { at }).items.find((item) => item.offerId === offerId);
+  database
+    .prepare(
+      `INSERT INTO deal_verdicts(offer_id, verdict, price, worth, confidence, created_at)
+       VALUES (?,?,?,?,?,?)
+       ON CONFLICT(offer_id) DO UPDATE SET verdict=excluded.verdict, price=excluded.price,
+         worth=excluded.worth, confidence=excluded.confidence, created_at=excluded.created_at`,
+    )
+    .run(
+      offerId,
+      verdict,
+      deal?.price ?? null,
+      deal?.worth ?? null,
+      deal?.confidence ?? null,
+      new Date(at).toISOString(),
+    );
+  return { verdict, verdicts: dealVerdictSummary(repository) };
+}
+
+/** Takes a verdict back. @param {{ database: import('node:sqlite').DatabaseSync }} repository */
+export function removeDealVerdict(repository, offerId) {
+  repository.database.prepare('DELETE FROM deal_verdicts WHERE offer_id=?').run(offerId);
+  return { verdict: null, verdicts: dealVerdictSummary(repository) };
 }

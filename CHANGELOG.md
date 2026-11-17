@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-17 (99) — Ocena okazji; profile: rozpoznane i ofert na wydanie
+
+- **Okazje:** przy każdej okazji cztery przyciski — „Trafna”, „Złe przypisanie”, „Inny stan / zestaw”, „Wycena zawyżona”. Nad listą podsumowanie, np. „Ocenione: 12 — trafna 7 (58%) · złe przypisanie 3 … przy wiarygodności średniej trafne 4 z 6”. Po to, żeby zmierzyć, jak często lista ma rację, zanim zaczniemy jej ufać przy zakupach.
+- Ocenione okazje znikają z listy (zostają do odświeżenia widoku, z przyciskiem „Cofnij”); pole „Pokaż ocenione” pokazuje je z powrotem. Ocena zapamiętuje cenę, wycenę i wiarygodność z chwili oceny, więc liczy się też wtedy, gdy oferta przestanie być okazją.
+- Ocena niczego nie zmienia w katalogu: złe przypisanie poprawiasz jak dotąd w szczegółach oferty (klik w tytuł).
+- **Źródła → Skuteczność fraz → Profile skanu:** nowe kolumny „Rozpoznane” i „Ofert na wydanie”. Na kopii bazy fraza „Fourth Wing” ma 310 rozpoznanych ofert na 10 wydań (31 na wydanie), a „Warhammer” 211 na 129 (1,6) — tłok na kilku tytułach kontra szeroki wybór. Razem ze „Sprzedane w 14 dni” to dane do decyzji nisza / szeroki rynek; pierwszy wynik nowego profilu „Pomiar: szeroki rynek” po 01.12.
+
 ## 2026-11-17 (98) — Tezeusz przez strony autorów; profil „Pomiar: szeroki rynek”
 
 - **Tezeusz** jest czytany przez strony autorów (`/autor/terry-pratchett`), a nie przez wyszukiwarkę, której `robots.txt` serwisu zakazuje. Frazy-nazwiska działają jak dotąd i czytają całą bibliografię autora (Pratchett: 24 strony). Frazy, które nie są nazwiskiem („Warcraft”, „Świat Dysku”), z Tezeusza nic już nie przynoszą — ich książki łapią strony autorów (Pratchett, Golden, Knaak, Abnett, McNeill, King). Na kopii bazy z Tezeusza było 277 ofert, z czego 104 przyszły przez „Świat Dysku”, a 21 przez „Warcraft”. Wcześniej znalezione oferty zostają.

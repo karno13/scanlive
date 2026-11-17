@@ -547,8 +547,16 @@ body.density-compact .work-row .cover-md {
 .deal-row.is-suspicious .deal-saving {
   color: var(--warn);
 }
-.deals-note {
+.deals-note,
+.deals-verdicts {
   margin: 0 0 12px;
+}
+.deal-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
 }
 .deals-list > .inline-note {
   margin: 14px;
