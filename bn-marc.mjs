@@ -50,7 +50,8 @@ export function trimPunctuation(value) {
 }
 
 const ROLE_PATTERNS = [
-  [/^aut/i, 'author'],
+  // "Tekst" / "Scenariusz" is how BN names the author of a comic or an illustrated book.
+  [/^(?:aut|tekst|scenar)/i, 'author'],
   [/^t[łl]um/i, 'translator'],
   [/^ilustr/i, 'illustrator'],
   [/^(?:red|oprac|wyb)/i, 'editor'],

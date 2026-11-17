@@ -78,6 +78,21 @@ test('title keeps subtitle and part number in record order', () => {
   assert.equal(catalogTitle(parseBnMarc(parallel)), 'Mort', 'a parallel title is not a subtitle');
 });
 
+test('"Tekst" and "Scenariusz" mark the author of a comic, so the work gets an author', () => {
+  const comic = (role) => ({
+    marc: {
+      fields: [
+        f('100', [{ a: 'Abnett, Dan' }, { e: role }]),
+        f('245', [{ a: 'Witamy w Badrock /' }]),
+        f('700', [{ a: 'Więckowski, Jacek' }, { e: 'Tłumaczenie' }]),
+      ],
+    },
+  });
+  for (const role of ['Tekst', 'Scenariusz', 'Autor'])
+    assert.deepEqual(parseBnMarc(comic(role)).authors, ['Dan Abnett'], role);
+  assert.deepEqual(parseBnMarc(comic('Redakcja')).authors, [], 'an editor is not an author');
+});
+
 test('names are shown given name first and keep initials', () => {
   assert.equal(displayName('Werner, C. L.'), 'C. L. Werner');
   assert.equal(displayName('Sanders, Rob.'), 'Rob Sanders');
