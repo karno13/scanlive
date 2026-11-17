@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DISCWORLD_TITLES, scanSeriesOptions, installScanSeries } from './scan-series.js';
+import { MAX_SCAN_QUERIES } from '../core/scan-limits.js';
 
 test('Discworld is available without catalogue data and contains every main novel', () => {
   const series = scanSeriesOptions()[0];
@@ -18,7 +19,7 @@ test('catalogue data cannot add series to the agreed lists', () => {
       { title: 'Diuna / Dune' }, { title: 'diuna / Dune' },
     ], missingTitles: { 2: 'Mesjasz Diuny' } }] },
   ] });
-  assert.deepEqual(options.map((option) => option.name), ['Świat Dysku', 'Herezja Horusa', 'Gotrek i Felix']);
+  assert.deepEqual(options.map((option) => option.name), ['Świat Dysku', 'Herezja Horusa', 'Gotrek i Felix', 'Warhammer — wszystko', 'Warhammer 40 000', 'Warhammer Fantasy i Age of Sigmar', 'Forgotten Realms', 'Dragonlance']);
 });
 
 test('selecting a series fills the editable scanner form without network access', (t) => {
@@ -49,7 +50,7 @@ test('selecting a series fills the editable scanner form without network access'
     json: () => assert.fail('Series selection must not read the catalogue'),
   });
   picker.dispatchEvent(new Event('focus'));
-  assert.equal(picker.children.length, 4);
+  assert.equal(picker.children.length, scanSeriesOptions().length + 1);
   picker.value = 'discworld';
   picker.dispatchEvent(new Event('change'));
   assert.deepEqual(input.value.split('\n'), DISCWORLD_TITLES);
@@ -62,5 +63,22 @@ test('selecting a series fills the editable scanner form without network access'
     assert.deepEqual(input.value.split('\n'), series.titles);
     assert.match(elements.get('#scanSeriesNote').textContent, new RegExp(series.name));
   }
-  assert.equal(inputs, 3);
+  assert.equal(inputs, scanSeriesOptions().length);
+});
+
+test('whole universes: every list fits one scan, has no duplicates and no bare common words', () => {
+  const universes = scanSeriesOptions().slice(3);
+  // Bare words the phrase report showed as noise, and common words that must carry an author.
+  const bare = new Set(['zabójca', 'ojczyzna', 'wygnanie', 'upadek', 'zagłada', 'smoki', 'legion', 'dominium', 'krieg', 'xenos']);
+  for (const series of universes) {
+    assert.ok(series.titles.length > 40 && series.titles.length <= MAX_SCAN_QUERIES, series.name);
+    const keys = series.titles.map((title) => title.toLowerCase());
+    assert.equal(new Set(keys).size, keys.length, `${series.name}: duplicates`);
+    for (const key of keys) assert.ok(!bare.has(key), `${series.name}: bare "${key}"`);
+  }
+  const all = universes.find((series) => series.id === 'warhammer-all');
+  for (const id of ['warhammer-40k', 'warhammer-fantasy'])
+    for (const title of universes.find((series) => series.id === id).titles) assert.ok(all.titles.includes(title), title);
+  assert.ok(all.titles.includes('Wywyższenie Horusa'), 'the Horus Heresy is part of the whole of Warhammer');
+  assert.ok(all.titles.includes('Legion Abnett') && !all.titles.includes('Legion'));
 });

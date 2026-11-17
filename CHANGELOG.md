@@ -2,6 +2,18 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-17 (100) — Całe uniwersa w „Szukaj po serii”: Warhammer, Forgotten Realms, Dragonlance
+
+- Źródła → formularz skanu → „Szukaj po serii” ma pięć nowych list, każdy polski tytuł jako osobna fraza:
+  - **Warhammer — wszystko** (174 tytuły): Herezja Horusa, Warhammer 40 000, Fantasy i Age of Sigmar razem;
+  - **Warhammer 40 000** (61): Duchy Gaunta, Prymarchowie, Ognisty Brzask, Eisenhorn, Kosmiczny Wilk, Bitwy Kosmicznych Marines i inne;
+  - **Warhammer Fantasy i Age of Sigmar** (65): Gotrek i Felix (także w Age of Sigmar), Malus, Czasy Końca, Ulrika, Thanquol, Archaon i starsze tomy Czarnej Biblioteki;
+  - **Forgotten Realms** (88): Legenda Drizzta do „Króla orków”, Cunningham, Wojna Pajęczej Królowej, Wrota Baldura, antologie „Krainy…” i inne wydane po polsku;
+  - **Dragonlance** (49): Kroniki, Legendy, Wojna Dusz, Bohaterowie, Mroczny Uczeń i inne wydane po polsku.
+- Tytuł, który sam jest zwykłym słowem, ma dopisane nazwisko autora albo nazwę uniwersum: „Ojczyzna Salvatore”, „Smoki Dragonlance”, w liście zbiorczej także „Legion Abnett”. Sprawdzone na żywo na kopii bazy (Vinted): „Ojczyzna” dała 314 ofert, z czego 3 to Salvatore, i czytała 10 stron; „Ojczyzna Salvatore” — 4 oferty, wszystkie trafne, 1 strona.
+- Źródła list: katalog wydawcy (copcorp.pl), polska Wikipedia i tytuły rozpoznane po ISBN w katalogu. Nowsze tomy Drizzta (po „Królu orków”) i część starych wydań Warhammera mogą brakować — frazy można dopisać ręcznie przed skanem.
+- Duży skan trwa: przy 174 frazach i kilku źródłach to raczej godzina niż minuty (Vinted czyta każdą frazę osobno, Allegro Lokalnie co 8 s). To skan ręczny — nie zmienia profili ani harmonogramu.
+
 ## 2026-11-17 (99) — Ocena okazji; profile: rozpoznane i ofert na wydanie
 
 - **Okazje:** przy każdej okazji cztery przyciski — „Trafna”, „Złe przypisanie”, „Inny stan / zestaw”, „Wycena zawyżona”. Nad listą podsumowanie, np. „Ocenione: 12 — trafna 7 (58%) · złe przypisanie 3 … przy wiarygodności średniej trafne 4 z 6”. Po to, żeby zmierzyć, jak często lista ma rację, zanim zaczniemy jej ufać przy zakupach.
