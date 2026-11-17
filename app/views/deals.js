@@ -2,6 +2,7 @@
 // (deals.mjs on the server). The list is read on every visit; filter and order are applied here.
 import { coverMarkup, tidyOfferTitle } from '../core/bibliography.js';
 import { dateMarkup, safeOfferHref } from '../core/formatters.js';
+import { plural, zl } from '../core/valuation.js';
 
 const CONDITION_LABELS = { new: 'nowa', very_good: 'bardzo dobra', good: 'dobra', satisfactory: 'zadowalająca', unknown: 'stan nieznany' };
 const SORTS = {
@@ -10,7 +11,6 @@ const SORTS = {
   newest: (a, b) => String(b.firstSeenAt || '').localeCompare(String(a.firstSeenAt || '')),
   price: (a, b) => a.price - b.price,
 };
-const zl = (grosze) => `${Math.round(grosze / 100)} zł`;
 
 /** The deals to show: without low-confidence valuations unless asked, in the chosen order. */
 export function visibleDeals(items, { includeLow = false, sort = 'saving' } = {}) {
@@ -19,13 +19,12 @@ export function visibleDeals(items, { includeLow = false, sort = 'saving' } = {}
 
 /** "12 okazji · 94 ukryte (niska wiarygodność wyceny)". */
 export function dealsCountLabel(items, shown) {
-  const plural = (n, one, few, many) => (n === 1 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many);
   const hidden = items.length - shown.length;
   return `${shown.length} ${plural(shown.length, 'okazja', 'okazje', 'okazji')}${hidden ? ` · ${hidden} ${plural(hidden, 'ukryta', 'ukryte', 'ukrytych')} (niska wiarygodność wyceny)` : ''}`;
 }
 
 export function dealMarkup(item, { escapeHtml, money, now = new Date() }) {
-  const basis = [item.sold ? `${item.sold} sprzed.` : '', item.live ? `${item.live} ofert` : ''].filter(Boolean).join(', ');
+  const basis = [item.sold ? `${item.sold} ${plural(item.sold, 'sprzedaż', 'sprzedaże', 'sprzedaży')}` : '', item.live ? `${item.live} ${plural(item.live, 'oferta', 'oferty', 'ofert')}` : ''].filter(Boolean).join(', ');
   return `<article class="deal-row${item.suspicious ? ' is-suspicious' : ''}" data-deal-offer="${escapeHtml(item.offerId)}">${coverMarkup(item.image, item.title, { size: 'sm', escapeHtml })}<div class="deal-copy"><button type="button" class="link-button deal-title" data-deal-open="${escapeHtml(item.offerId)}" title="${escapeHtml(item.title)}">${escapeHtml(tidyOfferTitle(item.title))}</button><small>${escapeHtml(item.source)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)} · wykryta ${dateMarkup(item.firstSeenAt, now)} · <a href="${escapeHtml(safeOfferHref(item.url))}" target="_blank" rel="noopener noreferrer">ogłoszenie ↗</a></small><small>↳ <button type="button" class="link-button" data-deal-work="${escapeHtml(item.workId)}" title="Strona książki">${escapeHtml(item.workTitle)}</button></small>${item.suspicious ? '<small class="deal-warning">Bardzo daleko od wyceny — sprawdź, czy oferta jest przypisana do właściwej książki i czy to jeden egzemplarz.</small>' : ''}</div><div class="deal-numbers" title="${escapeHtml((item.reasons || []).join(' '))}"><b>${money(item.price)}</b><span>warta ~${zl(item.worth)} <small>(${Math.round(item.worthLow / 100)}–${zl(item.worthHigh)})</small></span><strong class="deal-saving">−${zl(item.saving)} · −${item.discount}%</strong><small><span class="value-confidence is-${escapeHtml(item.confidence)}">wiarygodność ${escapeHtml(item.confidenceLabel)}</span> ${escapeHtml(basis)}</small></div></article>`;
 }
 

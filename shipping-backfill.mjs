@@ -93,9 +93,15 @@ export function repairPromotionalShippingCosts(repository, { now = () => new Dat
   return report;
 }
 
+// Failed reads per offer since the app started: a page that keeps failing is given up after a few
+// tries instead of being read again every round at the top of the queue.
+const readFailures = new Map();
+const MAX_READ_FAILURES = 3;
+
 /**
  * @param {{ database: import('node:sqlite').DatabaseSync }} repository
- * @param {{ limit?: number, fetchHtml?: (url: string) => Promise<string>, now?: () => Date }} [options]
+ * @param {{ limit?: number, fetchHtml?: (url: string) => Promise<string>, now?: () => Date,
+ *   failures?: Map<string, number> }} [options]
  */
 export async function fillShippingCosts(
   repository,
@@ -103,9 +109,18 @@ export async function fillShippingCosts(
     limit = 6,
     fetchHtml = (url) => readSourceHtml(url, /** @type {any} */ ({ source: 'Vinted' })),
     now = () => new Date(),
+    failures = readFailures,
   } = {},
 ) {
-  const report = { checked: 0, found: 0, free: 0, missing: 0, removed: 0, paused: false };
+  const report = {
+    checked: 0,
+    found: 0,
+    free: 0,
+    missing: 0,
+    removed: 0,
+    failed: 0,
+    paused: false,
+  };
   for (const offer of pendingShippingChecks(repository, { limit })) {
     const at = now().toISOString();
     let html;
@@ -123,8 +138,17 @@ export async function fillShippingCosts(
         report.paused = true;
         break;
       }
+      // Anything else (a redirect off Vinted, a page that is not HTML, a 5xx, a timeout) is tried
+      // again in later rounds, up to MAX_READ_FAILURES times; then the page is left like a gone one.
+      report.failed += 1;
+      const count = (failures.get(offer.id) ?? 0) + 1;
+      if (count >= MAX_READ_FAILURES) {
+        failures.delete(offer.id);
+        saveShippingCost(repository, offer.id, null, at);
+      } else failures.set(offer.id, count);
       continue;
     }
+    failures.delete(offer.id);
     report.checked += 1;
     const detail = /** @type {{ shippingCost?: number }} */ (parseVintedDetail(html, offer.url));
     const cost = detail.shippingCost;

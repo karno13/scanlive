@@ -35,7 +35,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | `catalog-production.mjs`                                                 | Otwiera bazę, składa źródła metadanych, uruchamia `startup-jobs.mjs`                        |
 | `catalog-migrations.mjs`                                                 | Stosuje migracje z `migrations/` z kontrolą sum                                             |
-| `migrations/NNN_*.sql`                                                   | **Niezmienne** migracje (`001`–`007`, `099`–`132`); nowa zmiana = kolejny numer             |
+| `migrations/NNN_*.sql`                                                   | **Niezmienne** migracje (`001`–`007`, `099`–`136`); nowa zmiana = kolejny numer             |
 | `docs/SCHEMA.sql`, `scripts/dump-schema.mjs`, `test/schema-doc.test.mjs` | Aktualny schemat bazy w jednym pliku (generowany z migracji); test pilnuje, by był aktualny |
 | `docs/pomysly/*.md`                                                      | Pomysły na przyszłość z analizą (nie wdrożone)                                              |
 | `startup-jobs.mjs`                                                       | Naprawy danych przy starcie jako zadania jednorazowe z flagą (`runOnce`)                    |

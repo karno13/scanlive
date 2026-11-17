@@ -241,9 +241,9 @@ export async function readSourceHtml(
   const config = sources[source];
   if (!config) throw Error('UNTRUSTED_MARKETPLACE_TASK');
   const allowed = (h) => h === config.host || h === config.host.replace(/^www\./, '');
-  // Skupszop answers its list API in JSON; every other source is an HTML page.
-  const json = source === 'Skupszop.pl';
   let url = new URL(raw);
+  // Skupszop answers its list API in JSON; its product pages and every other source are HTML.
+  const json = source === 'Skupszop.pl' && url.pathname.startsWith('/api/');
   for (let hop = 0; hop < 4; hop++) {
     if (
       url.protocol !== 'https:' ||

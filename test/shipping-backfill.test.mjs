@@ -58,6 +58,7 @@ test('saved Vinted offers get their delivery price from the listing page, once',
       found: 1,
       free: 0,
       missing: 1,
+      failed: 0,
       removed: 1,
       paused: false,
     });
@@ -185,5 +186,37 @@ test('promotional 0 zł delivery prices are corrected once and foreign offers ar
     assert.equal(row('5').cost, 999);
   } finally {
     repository.close?.();
+  }
+});
+
+test('a listing page that keeps failing is given up after three rounds, so the queue moves on', async () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    for (const [id, price] of [
+      ['broken', 5000],
+      ['next', 1000],
+    ])
+      repository.upsertOffer({
+        id,
+        source: 'Vinted',
+        normalizedUrl: `https://www.vinted.pl/items/${id === 'broken' ? 9000000011 : 9000000012}-${id}`,
+        originalTitle: id,
+        currentPrice: price,
+      });
+    const failures = new Map();
+    const fetchHtml = async (url) => {
+      if (url.endsWith('-broken')) throw Error('SOURCE_NOT_HTML');
+      return '<html></html>';
+    };
+    const round = () => fillShippingCosts(repository, { limit: 1, fetchHtml, failures });
+    for (let i = 0; i < 3; i += 1) assert.equal((await round()).failed, 1);
+    assert.deepEqual(
+      pendingShippingChecks(repository).map((offer) => offer.id),
+      ['next'],
+    );
+    assert.equal((await round()).checked, 1);
+    assert.equal(failures.size, 0);
+  } finally {
+    repository.close();
   }
 });

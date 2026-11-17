@@ -1,5 +1,5 @@
 -- BookFlip: current SQLite schema (generated, do not edit).
--- All migrations up to 134_shipping_checked.sql applied to an empty database.
+-- All migrations up to 136_offers_first_seen_index.sql applied to an empty database.
 -- Regenerate after adding a migration: node scripts/dump-schema.mjs
 
 -- app_preferences
@@ -481,6 +481,7 @@ CREATE TABLE offers (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 , image_url TEXT CHECK (image_url IS NULL OR (length(image_url) <= 1000 AND image_url LIKE 'https://%')), availability_checked_at TEXT, availability_changed_at TEXT, condition_text TEXT CHECK (condition_text IS NULL OR length(condition_text) <= 200), condition_class TEXT CHECK (condition_class IS NULL OR condition_class IN ('new','very_good','good','satisfactory','unknown')), buyer_fee INTEGER CHECK (buyer_fee IS NULL OR buyer_fee >= 0), shipping_cost INTEGER CHECK (shipping_cost IS NULL OR shipping_cost >= 0), seller_id TEXT CHECK (seller_id IS NULL OR length(seller_id) <= 100), seller_name TEXT CHECK (seller_name IS NULL OR length(seller_name) <= 200), seller_business INTEGER CHECK (seller_business IS NULL OR seller_business IN (0,1)), photo_count INTEGER CHECK (photo_count IS NULL OR photo_count >= 0), listed_at TEXT, listed_at_text TEXT CHECK (listed_at_text IS NULL OR length(listed_at_text) <= 60), favourite_count INTEGER CHECK (favourite_count IS NULL OR favourite_count >= 0), view_count INTEGER CHECK (view_count IS NULL OR view_count >= 0), source_availability TEXT CHECK (source_availability IS NULL OR length(source_availability) <= 100), shipping_checked_at TEXT) STRICT;
+CREATE INDEX idx_offers_first_seen ON offers(first_seen_at);
 CREATE INDEX idx_offers_lifecycle ON offers(availability, availability_checked_at, last_seen_at);
 CREATE INDEX idx_offers_seller ON offers(source, seller_id) WHERE seller_id IS NOT NULL;
 CREATE UNIQUE INDEX uq_offers_source_external
@@ -673,7 +674,7 @@ CREATE TABLE vinted_detail_cache (
   isbn TEXT,
   expires_at INTEGER NOT NULL,
   fetched_at TEXT NOT NULL
-) STRICT;
+, shipping_cost INTEGER CHECK (shipping_cost IS NULL OR shipping_cost >= 0)) STRICT;
 CREATE INDEX idx_vinted_detail_cache_expiry ON vinted_detail_cache(expires_at);
 
 -- work_keys

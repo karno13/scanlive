@@ -2,6 +2,15 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-17 (95) — Poprawki po przeglądzie kodu
+
+- **Błąd:** obcojęzyczna oferta Vinted z bezpłatną dostawą była przyjmowana tylko przy pierwszym odczycie. Przy następnej frazie albo kolejnym skanie odpowiedź brana z pamięci podręcznej nie miała ceny dostawy, więc oferta była odrzucana jako obce wydanie, a po pełnym skanie wyglądała na sprzedaną („nie widziana”). Pamięć podręczna zapisuje teraz cenę dostawy, a cena zapisana przy ofercie ma pierwszeństwo.
+- **Błąd:** książka z jednym prawdziwym wydaniem mogła mieć „zależnie od wydania” i zakres cen, bo do porównania wliczał się koszyk „nieznane wydanie”. Ten koszyk już się nie liczy.
+- **Błąd:** uzupełnianie ceny dostawy w tle mogło w kółko czytać te same strony, które kończyły się błędem (przekierowanie, nie-HTML, 5xx), i nie dochodzić do reszty kolejki. Po 3 nieudanych próbach strona jest pomijana jak usunięta.
+- **Błąd:** zdjęcie oferty Skupszop bez okładki nie dało się pobrać ze strony produktu (aplikacja oczekiwała tam JSON-a). Teraz JSON jest oczekiwany tylko od API listy.
+- **Błąd:** „Okazje” pisały „1 ofert”, „2 ofert”, „2 sprzed.” — teraz „1 oferta”, „3 oferty”, „2 sprzedaże”.
+- Listy i strona książki szybciej liczą wycenę: nowy indeks na dacie pierwszego zobaczenia oferty.
+
 ## 2026-11-16 (94) — Dostawa Vinted: cena regularna zamiast promocyjnego 0 zł
 
 - **Błąd:** prawie każda oferta Vinted miała „Dostawa: bezpłatna” (2371 z 2385 odczytanych), przez co przy „Tylko polskie wydania” wpadały ogłoszenia obcojęzyczne (19 angielskich, 1 czeskie). Vinted pokazuje niezalogowanemu promocyjną cenę 0 zł (rabat 100%), której Ty nie dostajesz. Teraz liczy się cena regularna („od 7,05 zł”); dostawa jest bezpłatna tylko wtedy, gdy strona sama tak ją oznacza albo cena regularna wynosi 0 zł.

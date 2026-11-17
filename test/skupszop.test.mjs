@@ -78,3 +78,17 @@ test('a JSON answer is read only from Skupszop; other sources must answer HTML',
     /SOURCE_NOT_HTML/,
   );
 });
+
+test('a Skupszop product page is read as HTML (its photo), only the list API as JSON', async () => {
+  const page = '<html><meta property="og:image" content="https://skupszop.pl/x.jpg"></html>';
+  const html = await readSourceHtml('https://skupszop.pl/mort-terry-pratchett', {
+    source: 'Skupszop.pl',
+    gate: createMarketplaceGate({ intervalMs: 0 }),
+    pause: async () => {},
+    fetcher: async (_url, init) => {
+      assert.equal(init.headers.Accept, 'text/html');
+      return new Response(page, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    },
+  });
+  assert.equal(html, page);
+});

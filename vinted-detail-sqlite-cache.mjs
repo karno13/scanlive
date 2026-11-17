@@ -2,7 +2,9 @@
 import { identifyOffer } from './offer-identity.mjs';
 
 // TTL-backed, bounded cache in the same SQLite catalog as scanned offers.
-// Store only stable language/ISBN evidence, never HTML or failed responses.
+// Store only stable language/ISBN evidence and the delivery price, never HTML or failed responses.
+// The delivery price decides the free-delivery exception for foreign editions; the offers row is
+// asked too, because the shipping backfill keeps its price current.
 // A listing's language does not change, so decisions are kept for 90 days. Offers already in the
 // catalogue passed the Polish check when they were first saved: they need no detail read at all.
 // A page that was read and recognised but names no language (about 110 listings in every full
@@ -19,36 +21,43 @@ export function createSqliteVintedDetailCache(
 ) {
   const db = repository.database;
   const get = db.prepare(
-    'SELECT language,isbn,expires_at FROM vinted_detail_cache WHERE offer_url=?',
+    'SELECT language,isbn,shipping_cost,expires_at FROM vinted_detail_cache WHERE offer_url=?',
   );
   const set = db.prepare(`INSERT INTO vinted_detail_cache
-    (offer_url, language, isbn, expires_at, fetched_at) VALUES(?,?,?,?,?)
+    (offer_url, language, isbn, shipping_cost, expires_at, fetched_at) VALUES(?,?,?,?,?,?)
     ON CONFLICT(offer_url) DO UPDATE SET
-      language=excluded.language,isbn=excluded.isbn,
+      language=excluded.language,isbn=excluded.isbn,shipping_cost=excluded.shipping_cost,
       expires_at=excluded.expires_at,fetched_at=excluded.fetched_at`);
   const deleteExpired = db.prepare('DELETE FROM vinted_detail_cache WHERE expires_at <= ?');
   const trim = db.prepare(`DELETE FROM vinted_detail_cache WHERE offer_url IN
     (SELECT offer_url FROM vinted_detail_cache ORDER BY fetched_at DESC,offer_url DESC
     LIMIT -1 OFFSET ?)`);
   const known = db.prepare(
-    "SELECT language, observed_isbn FROM offers WHERE id=? AND source='Vinted'",
+    "SELECT language, observed_isbn, shipping_cost FROM offers WHERE id=? AND source='Vinted'",
   );
   let insertions = 0;
   return {
     get(url) {
       const row = get.get(url);
-      if (row && row.expires_at > now())
-        return { language: row.language || null, ...(row.isbn ? { isbn: row.isbn } : {}) };
       let stored = null;
       try {
         stored = known.get(identifyOffer({ source: 'Vinted', url }).id);
       } catch {
-        return undefined;
+        if (!row) return undefined;
       }
+      const shipping = stored?.shipping_cost ?? row?.shipping_cost;
+      const shippingCost = typeof shipping === 'number' ? { shippingCost: shipping } : {};
+      if (row && row.expires_at > now())
+        return {
+          language: row.language || null,
+          ...(row.isbn ? { isbn: row.isbn } : {}),
+          ...shippingCost,
+        };
       if (!stored?.language) return undefined;
       return {
         language: stored.language,
         ...(stored.observed_isbn ? { isbn: stored.observed_isbn } : {}),
+        ...shippingCost,
       };
     },
     set(url, detail) {
@@ -63,10 +72,15 @@ export function createSqliteVintedDetailCache(
         return this;
       const isbn =
         typeof detail?.isbn === 'string' && detail.isbn.length <= 20 ? detail.isbn : null;
+      const shipping =
+        Number.isInteger(detail?.shippingCost) && detail.shippingCost >= 0
+          ? detail.shippingCost
+          : null;
       set.run(
         url,
         language,
         isbn,
+        shipping,
         now() + (missing ? missingTtlMs : ttlMs),
         new Date(now()).toISOString(),
       );

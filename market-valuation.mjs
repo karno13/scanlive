@@ -64,7 +64,7 @@ function roundPrice(grosze) {
 /**
  * @typedef {{ price: number, state: 'live'|'sold'|'gone', kind: string, condition: string,
  *   firstSeenAt?: string|null, soldAt?: string|null, firstPrice?: number|null,
- *   editionId?: string, offerId?: string }} Observation
+ *   editionId?: string, unknownEdition?: boolean, offerId?: string }} Observation
  */
 
 /**
@@ -287,7 +287,7 @@ export function marketObservations(database, by, ids) {
   const key = by === 'work' ? 'e.work_id' : 'm.edition_id';
   const rows = database
     .prepare(
-      `SELECT ${key} AS k, m.edition_id AS editionId, o.id AS offerId, o.current_price AS price, o.availability AS availability,
+      `SELECT ${key} AS k, m.edition_id AS editionId, e.is_unknown AS unknownEdition, o.id AS offerId, o.current_price AS price, o.availability AS availability,
          coalesce(o.condition_class,'unknown') AS condition, ${offerKindSql('o')} AS kind,
          o.first_seen_at AS firstSeenAt, o.availability_changed_at AS changedAt,
          (SELECT h.price FROM offer_price_history h WHERE h.offer_id=o.id ORDER BY h.observed_at LIMIT 1) AS firstPrice
@@ -302,6 +302,7 @@ export function marketObservations(database, by, ids) {
     grouped.get(String(row.k))?.push({
       offerId: String(row.offerId),
       editionId: String(row.editionId),
+      unknownEdition: Number(row.unknownEdition) === 1,
       price: Number(row.price),
       state:
         availability === 'sold'
@@ -323,13 +324,15 @@ export function marketObservations(database, by, ids) {
  * Editions of one work priced apart (hardcover against paperback, a sought-after first edition):
  * one amount for the book would blend them, so the book gets the range of its editions' values.
  * Counts editions with at least two prices; apart means ×1.5 or more between their estimates.
+ * The work's "unknown edition" bucket is not an edition: it has no valuation of its own to show.
  */
 function editionSpread(observations, at, options) {
   const byEdition = new Map();
   for (const item of observations)
-    (byEdition.get(item.editionId) ?? byEdition.set(item.editionId, []).get(item.editionId)).push(
-      item,
-    );
+    if (!item.unknownEdition)
+      (byEdition.get(item.editionId) ?? byEdition.set(item.editionId, []).get(item.editionId)).push(
+        item,
+      );
   if (byEdition.size < 2) return {};
   const estimates = [];
   for (const list of byEdition.values()) {

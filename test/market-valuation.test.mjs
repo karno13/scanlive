@@ -208,6 +208,12 @@ test('a book whose editions are priced apart gets the range of its editions', ()
       marketValuations(repository.database, 'edition', ['hard']).get('hard').editionRange,
       undefined,
     );
+    // The "unknown edition" bucket is not an edition: one named edition gives no range.
+    repository.database.exec("UPDATE editions SET is_unknown=1 WHERE id='soft'");
+    assert.equal(
+      marketValuations(repository.database, 'work', ['w']).get('w').editionRange,
+      undefined,
+    );
   } finally {
     repository.close();
   }

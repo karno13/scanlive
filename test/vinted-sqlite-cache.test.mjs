@@ -50,3 +50,16 @@ test('Vinted SQLite cache never retains unknown or overly long language data', (
   assert.equal(cache.size(), 0);
   repo.close();
 });
+
+test('a cached read keeps the delivery price, so a free-delivery foreign edition stays accepted', () => {
+  const repo = new SqliteCatalogRepository(':memory:');
+  const cache = createSqliteVintedDetailCache(repo);
+  cache.set('https://www.vinted.pl/items/5', { language: 'angielski', shippingCost: 0 });
+  cache.set('https://www.vinted.pl/items/6', { language: 'angielski', shippingCost: 'free' });
+  assert.deepEqual(cache.get('https://www.vinted.pl/items/5'), {
+    language: 'angielski',
+    shippingCost: 0,
+  });
+  assert.deepEqual(cache.get('https://www.vinted.pl/items/6'), { language: 'angielski' });
+  repo.close();
+});

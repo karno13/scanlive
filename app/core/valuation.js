@@ -1,7 +1,10 @@
 // Market value (market-valuation.mjs on the server) as the owner sees it: a range, the
 // confidence and the reasons. Amounts arrive in grosze.
 
-const zl = (grosze) => `${Math.round(grosze / 100)} zł`;
+export const zl = (grosze) => `${Math.round(grosze / 100)} zł`;
+
+/** Polish count form: 1 oferta, 2 oferty, 5 ofert. */
+export const plural = (n, one, few, many) => (n === 1 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many);
 
 /** "70–95 zł" or "80 zł" when the range collapses. */
 export function valuationRange(valuation) {
@@ -18,7 +21,6 @@ export function valuationEditionRange(valuation) {
 /** Short basis for a list line: "3 sprzedaże, 2 oferty". */
 export function valuationBasis(valuation) {
   if (!valuation || valuation.estimate == null) return 'brak cen';
-  const plural = (n, one, few, many) => (n === 1 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many);
   return [
     valuation.sold ? `${valuation.sold} ${plural(valuation.sold, 'sprzedaż', 'sprzedaże', 'sprzedaży')}` : 'bez sprzedaży',
     valuation.live ? `${valuation.live} ${plural(valuation.live, 'oferta', 'oferty', 'ofert')}` : '',

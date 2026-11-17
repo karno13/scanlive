@@ -50,6 +50,8 @@ test('a deal row shows price, worth, saving and the links; a suspicious one warn
   assert.match(row, /warta ~40 zł/);
   assert.match(row, /−20 zł · −50%/);
   assert.match(row, /wiarygodność średnia/);
+  assert.match(row, /2 sprzedaże, 3 oferty/);
+  assert.match(dealMarkup(deal({ sold: 0, live: 1 }), { escapeHtml, money }), /1 oferta</);
   assert.match(row, /data-deal-open="o1"/);
   assert.match(row, /data-deal-work="w"/);
   assert.match(row, /href="https:\/\/example.test\/o1"/);
