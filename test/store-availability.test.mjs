@@ -41,8 +41,8 @@ test('store pages: Empik meta, Allegro Lokalnie microdata, JSON-LD of Tezeusz', 
   assert.equal(parseStoreAvailability('{"availability":"https://schema.org/Whatever"}'), null);
 });
 
-test('Allegro and OLX have no legal access: not scanned, not in the lifecycle', () => {
-  assert.deepEqual(Object.keys(NO_LEGAL_ACCESS).sort(), ['Allegro', 'OLX']);
+test('Allegro, OLX and Dedalus have no legal access: not scanned, not in the lifecycle', () => {
+  assert.deepEqual(Object.keys(NO_LEGAL_ACCESS).sort(), ['Allegro', 'Dedalus.pl', 'OLX']);
   assert.equal(hasNoLegalAccess('Allegro'), true);
   assert.equal(hasNoLegalAccess('Allegro Lokalnie'), false);
   assert.deepEqual(scannableSources(['Vinted', 'Allegro', 'OLX', 'Empik']), ['Vinted', 'Empik']);

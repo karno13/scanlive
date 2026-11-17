@@ -15,11 +15,11 @@ test('local app validates saved sources and query limits', () => {
 });
 test('local app combines offers, deduplicates URLs and preserves source errors', async () => {
   const result = await searchOffers(
-    { queries: ['Warcraft', 'Warhammer'], sources: ['Empik', 'Dedalus.pl'] },
+    { queries: ['Warcraft', 'Warhammer'], sources: ['Empik', 'Tezeusz.pl'] },
     {
       now: () => new Date('2026-10-29T20:00:00Z'),
       scanner: async (task) => {
-        if (task.source === 'Dedalus.pl')
+        if (task.source === 'Tezeusz.pl')
           throw Object.assign(Error('SOURCE_CAPTCHA'), { status: 403, blocked: true });
         return {
           offers: [
@@ -40,7 +40,7 @@ test('local app combines offers, deduplicates URLs and preserves source errors',
   assert.equal(result.summary.unavailable, 2);
   assert.deepEqual(result.offers[0].matchedQueries, ['Warcraft', 'Warhammer']);
   assert.equal(
-    result.results.find((row) => row.source === 'Dedalus.pl').diagnostic.code,
+    result.results.find((row) => row.source === 'Tezeusz.pl').diagnostic.code,
     'SOURCE_CAPTCHA',
   );
 });

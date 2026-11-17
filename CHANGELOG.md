@@ -2,6 +2,15 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-17 (97) — Gotowe profile skanowania; Dedalus bez legalnego dostępu
+
+- Profile „Uniwersa” i „Autorzy i cykle” dostały nowe frazy i wszystkie działające źródła (14 zamiast 5). Zmienione zostały tylko dlatego, że od założenia 07.11 były nietknięte — profil edytowany ręcznie nie jest ruszany. Zmiana dzieje się raz, przy starcie aplikacji.
+- **Uniwersa** (11 fraz): dotychczasowe 6 oraz „Zapomniane Krainy”, „Diablo”, „StarCraft”, „Star Wars”, „Gwiezdne Wojny” — wszystkie uniwersa zdefiniowane w katalogu, także pod polską nazwą.
+- **Autorzy i cykle** (14 fraz): dotychczasowe 10 oraz „Duchy Gaunta”, „Przygody Gotreka i Felixa”, „Kosmiczny wilk”, „Drizzt”. Raport fraz na kopii bazy: te cykle mają 6–21 rozpoznanych ofert, z których część nie łapie żadna obecna fraza.
+- Celowo bez pojedynczych słów z tytułów („Mort”, „Piramidy”, „Zabójca”, „Legion”): na kopii bazy „Zabójca” dał 720 ofert, rozpoznanych 63; „Maskarada” 173 i 2.
+- **Dedalus.pl** — „brak legalnego dostępu”, jak Allegro i OLX: `robots.txt` zakazuje adresu wyszukiwania, a od 11.11 każde zapytanie kończy się CAPTCHA. Nie jest już skanowany ani pokazywany jako awaria.
+- Więcej fraz to dłuższy skan: Vinted czyta każdą frazę osobno, antykwariaty raz na 20 h niezależnie od liczby fraz.
+
 ## 2026-11-17 (96) — Profil pokazuje źródła, których nie skanuje
 
 - Źródła → nad frazami: „Profil **Uniwersa** nie skanuje działających źródeł (10): Skupszop.pl, BlackBooks.pl, …” z przyciskami „Dodaj do profilu” i „Nie teraz”. Profil zapisany przed dodaniem źródła nigdy go nie skanował, także w skanie automatycznym, bo harmonogram uruchamia zapisane profile.

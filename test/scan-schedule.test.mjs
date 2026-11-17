@@ -112,14 +112,14 @@ test('scheduled scans leave out sources that failed less than a day ago and repo
   saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 6 });
   const db = repo.database;
   db.prepare("UPDATE scan_profiles SET sources_json=? WHERE name='Fantasy'").run(
-    JSON.stringify(['Vinted', 'Dedalus.pl', 'Tezeusz.pl']),
+    JSON.stringify(['Vinted', 'Allegro Lokalnie', 'Tezeusz.pl']),
   );
   const clock = Date.parse('2026-11-07T12:00:00Z');
   const insert = db.prepare(
     'INSERT INTO source_health(source,last_checked_at,last_success_at,last_error_at,last_error,status) VALUES(?,?,?,?,?,?)',
   );
   insert.run(
-    'Dedalus.pl',
+    'Allegro Lokalnie',
     '2026-11-07T08:00:00.000Z',
     null,
     '2026-11-07T08:00:00.000Z',
@@ -156,9 +156,9 @@ test('scheduled scans leave out sources that failed less than a day ago and repo
   assert.deepEqual(outcome, {
     ran: true,
     result: 'partial',
-    skipped: ['Dedalus.pl'],
+    skipped: ['Allegro Lokalnie'],
     problems: ['Tezeusz.pl'],
   });
-  assert.deepEqual(getScanSchedule(repo).lastSkipped, ['Dedalus.pl']);
+  assert.deepEqual(getScanSchedule(repo).lastSkipped, ['Allegro Lokalnie']);
   assert.deepEqual(getScanSchedule(repo).lastProblems, ['Tezeusz.pl']);
 });

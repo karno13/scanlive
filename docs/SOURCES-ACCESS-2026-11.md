@@ -57,6 +57,10 @@ Na kopii danych Dedalus działał 11.11 o 08:24, a o 10:12 zaczął przekierowyw
 - **Co zrobiliśmy legalnie:** bazowy odstęp między zapytaniami do Dedalusa wynosi 6 s zamiast 2 s (`SOURCE_INTERVAL_MS`); po blokadzie bramka dalej podwaja odstęp (do 30 s), a skan odpuszcza resztę fraz tego źródła. Dedalus nie bierze udziału w sprawdzaniu dostępności stron ofert (`LIFECYCLE_SOURCES`); jego dostępność wynika z kodu `InStock` na liście wyników.
 - **Co zostaje:** źródło pozostaje w stanie „nie działa (CAPTCHA)” z datą, a skan próbuje je raz na skan i sam wraca, jeśli serwis przestanie blokować. Ma tylko 4 oferty w bazie; nie warto ryzykować więcej. Jeśli Dedalus udostępnia kanał dla partnerów (np. feed produktów), to kontakt z nim jest decyzją właściciela.
 
+## Decyzja z 17.11.2026: Dedalus — „brak legalnego dostępu”
+
+Właściciel zatwierdził. `robots.txt` Dedalusa zakazuje adresu wyszukiwania, którego używa skan (`Disallow: /s?q=`), a serwis od 11.11 odpowiada CAPTCHA na każde zapytanie (ostatni udany odczyt 14.11). Dedalus jest teraz na liście `NO_LEGAL_ACCESS` (`source-blocks.mjs`) jak Allegro i OLX: nie jest skanowany, nie liczy się jako awaria, a zapisane profile pomijają go bez komunikatu. 4 zapisane oferty zostają w bazie.
+
 ## Empik — ISBN ze strony produktu (sprawdzone 17.11.2026)
 
 Strona produktu Empiku nie zawiera ISBN ani EAN (sprawdzona jedna strona przez bramkę, 1,7 MB HTML). Empik dociąga te dane przez `/gateway/api/graphql/products`, a ten adres jest w `robots.txt` **zakazany** (`Disallow: /gateway/api/graphql/products`). Odczytu ISBN z Empiku więc nie wdrażamy. Oferty Empiku zostają rozpoznawane jak dotąd: kategoria ze strony (język) i przypisanie do dzieła przez wydanie „nieustalone” (`auto_empik_work_v1`). Na kopii bazy z 17.11: 797 ofert Empiku, 0 z ISBN, 309 czeka w zakładce odniesienia.

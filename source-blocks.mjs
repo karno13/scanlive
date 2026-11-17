@@ -33,12 +33,15 @@ export function blockedSources(repository, { recentRuns = 3 } = {}) {
 /**
  * Sources BookFlip does not read because there is no legal way in (docs/SOURCES-ACCESS-2026-11.md):
  * Allegro answers automated search with a CAPTCHA and has no public offer search in its API; OLX
- * answers 403 and its partner API is for one's own adverts only. They are not scanned, not counted
+ * answers 403 and its partner API is for one's own adverts only; Dedalus forbids its search address
+ * in robots.txt and answers CAPTCHA since 2026-11-11. They are not scanned, not counted
  * as failures and not shown in red — a stated fact, not an error.
  */
 export const NO_LEGAL_ACCESS = Object.freeze({
   Allegro: 'brak legalnego dostępu do wyszukiwania ofert (REST API nie ma wyszukiwarki ofert)',
   OLX: 'brak legalnego dostępu do wyszukiwania ofert (API partnera służy tylko do własnych ogłoszeń)',
+  'Dedalus.pl':
+    'brak legalnego dostępu do wyszukiwania ofert (robots.txt zakazuje adresu wyszukiwania, serwis odpowiada CAPTCHA)',
 });
 
 /** @param {unknown} source */

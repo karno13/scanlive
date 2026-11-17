@@ -10,7 +10,12 @@ import {
   saveScanSchedule,
 } from '../scan-schedule.mjs';
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
-import { STARTER_SOURCES, ensureStarterProfiles } from '../starter-profiles.mjs';
+import {
+  STARTER_PROFILES,
+  STARTER_SOURCES,
+  ensureStarterProfiles,
+  upgradeStarterProfiles,
+} from '../starter-profiles.mjs';
 
 test('first run creates the niche profiles without blocked sources and a rotating schedule, once', () => {
   const repository = new SqliteCatalogRepository(':memory:');
@@ -68,6 +73,57 @@ test('the rotating schedule scans one profile per run, in turn', async () => {
     }
     assert.deepEqual(scanned, ['a1', 'b1', 'a1']);
     assert.equal(nextProfile([], null), null);
+  } finally {
+    repository.close();
+  }
+});
+
+test('starter profiles still holding the first version get the current phrases and sources, once', () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    const v1Sources = ['Vinted', 'Allegro Lokalnie', 'Tezeusz.pl', 'Empik', 'Dedalus.pl'];
+    putScanProfile(repository, 'Uniwersa', {
+      queries: [
+        'Warhammer',
+        'Warcraft',
+        'Forgotten Realms',
+        'Dragonlance',
+        'Świat Dysku',
+        'Terry Pratchett',
+      ],
+      sources: v1Sources,
+    });
+    // Edited by the operator (one phrase added): stays as it is.
+    putScanProfile(repository, 'Autorzy i cykle', {
+      queries: ['Dan Abnett', 'Moja fraza'],
+      sources: v1Sources,
+    });
+    repository.database
+      .prepare(
+        "INSERT INTO app_preferences(key,value_json,updated_at) VALUES('starter_profiles_v1','{}','x')",
+      )
+      .run();
+    assert.deepEqual(ensureStarterProfiles(repository).upgrade.upgraded, ['Uniwersa']);
+    const [authors, universes] = listScanProfiles(repository);
+    assert.deepEqual(universes.queries, STARTER_PROFILES[0].queries);
+    assert.deepEqual(universes.sources, STARTER_SOURCES);
+    assert.ok(!universes.sources.includes('Dedalus.pl'));
+    assert.deepEqual(authors.queries, ['Dan Abnett', 'Moja fraza']);
+    // Once: an operator who puts the old version back keeps it.
+    putScanProfile(repository, 'Uniwersa', { queries: ['Warhammer'], sources: v1Sources });
+    assert.equal(ensureStarterProfiles(repository).upgrade.skipped, true);
+    assert.deepEqual(listScanProfiles(repository)[1].queries, ['Warhammer']);
+  } finally {
+    repository.close();
+  }
+});
+
+test('a fresh install gets the current profiles and nothing to upgrade later', () => {
+  const repository = new SqliteCatalogRepository(':memory:');
+  try {
+    ensureStarterProfiles(repository);
+    assert.equal(upgradeStarterProfiles(repository).skipped, true);
+    assert.deepEqual(listScanProfiles(repository)[1].queries, STARTER_PROFILES[0].queries);
   } finally {
     repository.close();
   }

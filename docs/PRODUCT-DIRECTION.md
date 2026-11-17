@@ -19,7 +19,7 @@ Właściciel projektu nie handluje w tej chwili. Rozwój koncentruje się na **s
 - Interesują nas polskie wydania („Tylko polskie wydania” jest domyślnie włączone); nie zbieramy wydań obcojęzycznych.
 - Wybór między niszą (dotychczasowe frazy to fantastyka i powieści z uniwersów gier) a szerokim rynkiem jest otwarty — rozstrzygać danymi, nie założeniem.
 - Ręczna weryfikacja może odbywać się codziennie, więc kolejka decyzji jest normalnym trybem pracy, a nie wyjątkiem.
-- Allegro i OLX nie mają legalnej drogi dostępu ([rozpoznanie](SOURCES-ACCESS-2026-11.md)); nie obchodzimy CAPTCHA ani blokad.
+- Allegro, OLX i (od 17.11.2026) Dedalus nie mają legalnej drogi dostępu ([rozpoznanie](SOURCES-ACCESS-2026-11.md)); nie obchodzimy CAPTCHA ani blokad.
 - Praca nad kodem ma być prosta i tania: bez frameworka, bundlera i zależności produkcyjnych; nowe narzędzie tylko wtedy, gdy wyraźnie coś oszczędza.
 
 ## Główne procesy

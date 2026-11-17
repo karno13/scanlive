@@ -110,7 +110,7 @@ Test przeglądarkowy (`scripts/browser-smoke.mjs`) uruchamia Chromium na izolowa
 | Jak działa identyfikacja i jakie są zmienne środowiskowe | [Katalog i konfiguracja](PRODUCTION-CATALOG.md) |
 | Aktualizacja programu, migracje, dawne narzędzia JSON | [Dane i migracje](docs/DATA-MIGRATION.md) |
 | Telefon przez Tailscale | [docs/TAILSCALE.md](docs/TAILSCALE.md) |
-| Dlaczego nie ma Allegro i OLX | [Rozpoznanie dostępu](docs/SOURCES-ACCESS-2026-11.md) |
+| Dlaczego nie ma Allegro, OLX i Dedalusa | [Rozpoznanie dostępu](docs/SOURCES-ACCESS-2026-11.md) |
 | Co się zmieniło i kiedy | [CHANGELOG](CHANGELOG.md); starsze wpisy i dawne raporty w `docs/archive/` (tylko historia) |
 
 ## Pomiar wydajności (bez internetu)

@@ -33,8 +33,8 @@ function seed() {
     { source: 'OLX', query: 'x', code: 'SOURCE_HTTP_403' },
   ]);
   run('2026-11-11T08:00:00.000Z', [captcha('Allegro')]);
-  run('2026-11-11T09:00:00.000Z', [captcha('Allegro'), captcha('Dedalus.pl')]);
-  run('2026-11-11T19:00:00.000Z', [captcha('Allegro'), captcha('Dedalus.pl')]);
+  run('2026-11-11T09:00:00.000Z', [captcha('Allegro'), captcha('Allegro Lokalnie')]);
+  run('2026-11-11T19:00:00.000Z', [captcha('Allegro'), captcha('Allegro Lokalnie')]);
   health('Allegro', {
     checked: '2026-11-11T19:00:00.000Z',
     errorAt: '2026-11-11T19:00:00.000Z',
@@ -47,7 +47,7 @@ function seed() {
     error: 'SOURCE_HTTP_403',
     status: 'failed',
   });
-  health('Dedalus.pl', {
+  health('Allegro Lokalnie', {
     checked: '2026-11-11T19:00:00.000Z',
     success: '2026-11-11T08:00:00.000Z',
     errorAt: '2026-11-11T19:00:00.000Z',
@@ -65,16 +65,22 @@ function seed() {
 test('each source: works, down since the first failed scan after its last success; Allegro and OLX have no legal access', () => {
   const repository = seed();
   try {
-    const rows = sourceStatus(repository, ['Vinted', 'Allegro', 'OLX', 'Dedalus.pl', 'Empik']);
+    const rows = sourceStatus(repository, [
+      'Vinted',
+      'Allegro',
+      'OLX',
+      'Allegro Lokalnie',
+      'Empik',
+    ]);
     const by = Object.fromEntries(rows.map((row) => [row.source, row]));
     assert.deepEqual(
       rows.map((row) => row.state),
       ['down', 'unknown', 'ok', 'no_access', 'no_access'],
       'non-working first, sources without legal access last',
     );
-    assert.equal(by['Dedalus.pl'].state, 'down');
-    assert.equal(by['Dedalus.pl'].downSince, '2026-11-11T09:00:00.000Z');
-    assert.equal(by['Dedalus.pl'].reason, 'serwis żąda CAPTCHA (blokada automatów)');
+    assert.equal(by['Allegro Lokalnie'].state, 'down');
+    assert.equal(by['Allegro Lokalnie'].downSince, '2026-11-11T09:00:00.000Z');
+    assert.equal(by['Allegro Lokalnie'].reason, 'serwis żąda CAPTCHA (blokada automatów)');
     // Not an error: a stated fact (docs/SOURCES-ACCESS-2026-11.md), never red and never retried.
     assert.equal(by.Allegro.state, 'no_access');
     assert.equal(by.Allegro.downSince, null);
@@ -132,7 +138,7 @@ test('Dziś counts what changed since the visit, with the filters of the list it
     assert.equal(listCatalogOffers(repository, visit.newOffers.filters).total, 1);
     assert.equal(listCatalogOffers(repository, visit.priceChanges.filters).items[0].id, old.id);
     assert.equal(visit.lastScan.at, '2026-11-11T19:00:00.000Z');
-    assert.deepEqual(visit.lastScan.failedSources, ['Dedalus.pl']);
+    assert.deepEqual(visit.lastScan.failedSources, ['Allegro Lokalnie']);
     // Runs saved before the duration was recorded have none.
     assert.equal(visit.lastScan.durationMs, null);
     assert.equal(visit.nextScan.enabled, false);
