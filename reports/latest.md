@@ -1,9 +1,11 @@
 # Najnowszy raport BookFlip
 
-Nie opublikowano jeszcze pełnego raportu w nowym formacie.
+**Data:** 2026-11-19
 
-Raporty archiwalne będą zapisywane w [archive/](archive/), pod nazwą `YYYY-MM-DD.md`. Ten plik będzie wskazywał najnowszy raport i będzie aktualizowany przy każdej kolejnej publikacji.
+Raport wskazuje pilną potrzebę wyłączenia automatycznych wyszukiwarek Tezeusza i Dedalusa oraz dalszego zaostrzenia weryfikacji kontekstu ISBN. Jako nowy kandydat źródła ofert wskazano Bookway, ale przed adapterem wymagany jest ręczny audyt danych i potwierdzenie warunków automatycznego dostępu.
 
-Instrukcja dla autora raportu i Claude Code: [README.md](README.md).
+[Otwórz pełny raport z 2026-11-19](archive/2026-11-19.md).
 
-**Ważne:** raporty są materiałem analitycznym. Nie stanowią zgody na modyfikowanie kodu ani innych plików repozytorium.
+Raport jest materiałem analitycznym dla właściciela i Claude Code, nie zgodą na wdrożenie zmian.
+
+Instrukcja raportowania: [README.md](README.md).
