@@ -1,26 +1,68 @@
 // @ts-check
 // ISBN ↔ title consistency. Sellers often type the ISBN of a different book (or a scanner reads
 // one from "recommended offers"), so an ISBN alone can file "Logik der Forschung" under Warcraft.
-// The check is deliberately lenient: one shared word (title, series, universe or author surname)
-// is enough. Only a listing that shares *nothing* with the record is held back for review.
+// The check is lenient: one shared title word is enough. A shared word that only names the
+// universe, its line or cycle, or the author does not tell one book of it from another, so when
+// both sides also have title words of their own and none of those agree ("Warcraft Wichry wojny"
+// against "Warcraft. Wojna starożytnych"), the listing is held back for review as well.
 import { titleTokens, fold } from './title-proposals.mjs';
 import { universeSynonyms } from './universes.mjs';
 
-// The same universe written two ways on covers and in BN records.
-
 const stem = (token) => token.slice(0, 5);
 
+// Words that say what kind of listing it is, not which book.
+const GENERIC = new Set(
+  [
+    'tom',
+    'tomy',
+    'tomow',
+    'tomie',
+    'czesc',
+    'czesci',
+    'seria',
+    'serii',
+    'series',
+    'cykl',
+    'cyklu',
+    'zestaw',
+    'komplet',
+    'kolekcja',
+    'pakiet',
+    'powiesc',
+    'fantasy',
+    'fantastyka',
+    'opowiadania',
+    'antologia',
+    'edycja',
+    'limitowana',
+    'ekskluzywna',
+    'specjalna',
+  ].map(stem),
+);
+// Numbers and roman numerals ("40000", "II") are volumes or lines, not titles.
+const NUMBER = /^(?:\d+|[ivx]{1,4})$/;
+
+/**
+ * Word stems of a text. Names, lines and markers of one universe stand for each other
+ * (universes table), so a universe named in the text adds all of them; those stems are also
+ * returned as `universe` — they name the universe, not a book of it. A word of a longer name
+ * ("świat" of "Świat Dysku") counts as the universe only when the whole name is in the text.
+ */
 function stems(text) {
   let folded = fold(text);
-  // Names, lines and markers of one universe stand for each other (universes table).
   const words = ` ${folded} `;
+  const universe = new Set();
   for (const group of universeSynonyms())
-    if (group.some((name) => name && words.includes(` ${name} `))) folded += ' ' + group.join(' ');
-  return new Set(
+    if (group.some((name) => name && words.includes(` ${name} `))) {
+      folded += ' ' + group.join(' ');
+      for (const token of titleTokens(group.join(' '))) universe.add(stem(token));
+    }
+  const all = new Set(
     titleTokens(folded)
       .filter((token) => !/^\d{1,3}$/.test(token))
       .map(stem),
   );
+  return { all, universe };
 }
 
 function authorText(authors) {
@@ -36,19 +78,40 @@ function authorText(authors) {
 }
 
 /**
- * True when the offer title and the catalogue record have no word in common.
- * `record`: { title, workTitle?, authors? }. Offers without usable words ("Książka", "zestaw")
- * never conflict - there is nothing to compare.
+ * True when the offer title and the catalogue record name different books: no word in common,
+ * or only universe / cycle / author words in common while both have other title words that
+ * differ. `record`: { title, workTitle?, authors? }. Offers without usable words ("Książka",
+ * "zestaw") or with nothing beyond the universe and the author never conflict.
  */
 export function titleConflict(offerTitle, record = {}) {
   const offer = stems(offerTitle);
-  if (!offer.size) return false;
-  const known = stems(
-    [record.title, record.workTitle, authorText(record.authors)].filter(Boolean).join(' '),
+  if (!offer.all.size) return false;
+  const authors = stems(authorText(record.authors)).all;
+  const known = stems([record.title, record.workTitle].filter(Boolean).join(' '));
+  const knownAll = new Set([...known.all, ...authors]);
+  if (!knownAll.size) return false;
+  const umbrella = (token) =>
+    offer.universe.has(token) || known.universe.has(token) || authors.has(token);
+  const shared = [...offer.all].filter((token) => knownAll.has(token));
+  if (!shared.length) return true;
+  if (shared.some((token) => !umbrella(token))) return false;
+  const ownOf = (tokens) =>
+    [...tokens].filter((token) => !umbrella(token) && !GENERIC.has(token) && !NUMBER.test(token));
+  const offerOwn = ownOf(offer.all);
+  const knownOwn = ownOf(knownAll);
+  if (!offerOwn.length || !knownOwn.length) return false;
+  // One word written apart on the other side ("Roleplay" / "Role Play") is still the same word.
+  const joined = (text) => fold(text).replace(/ /g, '');
+  const offerJoined = joined(offerTitle);
+  const knownJoined = joined([record.title, record.workTitle].filter(Boolean).join(' '));
+  const fullWords = (text) => titleTokens(text).filter((token) => token.length >= 5);
+  const counts = (word) => !umbrella(stem(word)) && !GENERIC.has(stem(word));
+  return !(
+    fullWords(offerTitle).some((word) => counts(word) && knownJoined.includes(word)) ||
+    fullWords([record.title, record.workTitle].filter(Boolean).join(' ')).some(
+      (word) => counts(word) && offerJoined.includes(word),
+    )
   );
-  if (!known.size) return false;
-  for (const token of offer) if (known.has(token)) return false;
-  return true;
 }
 
 /** Active automatic assignments whose offer title shares nothing with the edition. */

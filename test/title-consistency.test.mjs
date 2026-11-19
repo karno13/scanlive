@@ -50,6 +50,56 @@ test('one shared word (title, series, universe or author) is enough', () => {
   assert.equal(titleConflict('Książka', { title: 'Logik der Forschung' }), false);
 });
 
+test('a shared universe, cycle or author alone does not make two titles one book', () => {
+  // Same universe, different book.
+  assert.equal(
+    titleConflict('Warcraft Wichry wojny', { title: 'Warcraft. Wojna starożytnych' }),
+    true,
+  );
+  // Same cycle (a universe marker), different book.
+  assert.equal(
+    titleConflict('Herezja Horusa Vulkan żyje', { title: 'Stara Ziemia : Herezja Horusa' }),
+    true,
+  );
+  // Same author, different book.
+  assert.equal(
+    titleConflict('Pratchett Kolor magii', {
+      title: 'Zimistrz / Wintersmith',
+      authors: ['Pratchett, Terry'],
+    }),
+    true,
+  );
+  // Universe, cycle and volume only: nothing that could name another book.
+  assert.equal(
+    titleConflict('Warhammer 40000 Herezja Horusa tom 47', {
+      title: 'Stara Ziemia : Herezja Horusa',
+    }),
+    false,
+  );
+  // Listing-kind words do not count as a title of their own.
+  assert.equal(
+    titleConflict('Warcraft zestaw powieść fantasy', { title: 'Warcraft. Wojna starożytnych' }),
+    false,
+  );
+  // A shared title word still settles it, whatever else the listing says.
+  assert.equal(
+    titleConflict('Warhammer Vulkan żyje Abnett twarda', {
+      title: 'Vulkan żyje',
+      authors: ['Kyme, Nick'],
+    }),
+    false,
+  );
+  // One word written together on one side and apart on the other.
+  assert.equal(
+    titleConflict('Warhammer Fantasy Roleplay podręcznik', {
+      title: 'Warhammer Fantasy Role Play',
+    }),
+    false,
+  );
+  // The record names only the universe: nothing to contradict.
+  assert.equal(titleConflict('Warcraft Wichry wojny', { title: 'World of Warcraft' }), false);
+});
+
 function fixture(repo) {
   const work = repo.createWork({ title: 'Logik der Forschung', authors: ['Popper, Karl'] });
   const edition = repo.createEdition({ workId: work.id, title: 'Logik der Forschung' });

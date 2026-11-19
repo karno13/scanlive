@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (101) — Ostrzejsze sprawdzanie tytułu przy przypisaniu po ISBN
+
+- **Błąd:** oferta trafiała do wydania o swoim ISBN, jeśli z jego tytułem łączyło ją choćby jedno słowo, także samo „Warcraft”, „Pratchett” czy „Dragonlance”. Teraz wspólne uniwersum, cykl albo autor nie wystarczą: gdy reszta tytułu się różni („Kolor magii” kontra „Straż! Straż!”), oferta idzie do kolejki decyzji.
+- Ta sama reguła działa w „Podejrzanych przypisaniach”. Na kopii bazy (2605 przypisań automatycznych) lista miała wcześniej 0 pozycji, teraz ma 42. Większość to inna książka (np. „Fourth Wing” → „Onyx Storm”) albo cała trylogia lub zestaw przypisane do jednego tomu. Część to fałszywe alarmy (np. „Warcraft początek” → „Warcraft: oficjalna powieść filmu”), które zatwierdza się jednym kliknięciem „To prawidłowe”.
+- Nic nie jest przepinane samo. Przypisania ręczne i ISBN wpisany ręcznie w kolejce nie są sprawdzane.
+
 ## 2026-11-17 (100) — Całe uniwersa w „Szukaj po serii”: Warhammer, Forgotten Realms, Dragonlance
 
 - Źródła → formularz skanu → „Szukaj po serii” ma pięć nowych list, każdy polski tytuł jako osobna fraza:

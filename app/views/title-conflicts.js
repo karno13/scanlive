@@ -40,11 +40,11 @@ export function mountTitleConflicts({ $, json, escapeHtml, toast, loadCatalogDat
       ({ conflicts } = await json('/api/catalog/title-conflicts'));
       setSummary();
       if (!conflicts.length) {
-        body.innerHTML = '<p class="inline-note">Każda przypisana oferta ma w tytule coś wspólnego ze swoim wydaniem.</p>';
+        body.innerHTML = '<p class="inline-note">Tytuł każdej przypisanej oferty zgadza się z jej wydaniem.</p>';
         return;
       }
       body.innerHTML =
-        '<p class="inline-note">Tytuł ogłoszenia nie ma ani jednego wspólnego słowa z wydaniem, do którego trafiło po ISBN — najczęściej sprzedający wpisał numer innej książki. „Do weryfikacji” cofa przypisanie i wraca ofertę do kolejki; „To prawidłowe” zostawia je na stałe.</p>' +
+        '<p class="inline-note">Tytuł ogłoszenia nie zgadza się z wydaniem, do którego trafiło po ISBN: nie ma z nim wspólnego słowa albo wspólne jest tylko uniwersum, cykl lub autor — najczęściej sprzedający wpisał numer innej książki albo sprzedaje cały cykl. „Do weryfikacji” cofa przypisanie i wraca ofertę do kolejki; „To prawidłowe” zostawia je na stałe.</p>' +
         conflicts.map(rowMarkup).join('');
     } catch (error) {
       body.innerHTML = `<p class="inline-note">Nie udało się sprawdzić przypisań: ${escapeHtml(error.message)}</p>`;

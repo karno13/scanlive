@@ -27,10 +27,6 @@ function text(value) {
     .toLowerCase();
 }
 
-function arrays(value) {
-  return Array.isArray(value) ? value : value == null ? [] : [value];
-}
-
 function canonicalEvidence(raw) {
   if (raw?.values && raw?.status) return raw;
   if (!Array.isArray(raw)) return null;
@@ -77,81 +73,6 @@ function canonicalEvidence(raw) {
     observations,
     autoAssignable: status === 'valid' && TRUSTED.has(classification),
     reviewRequired: ['conflict', 'review', 'uncertain'].includes(status),
-  };
-}
-
-function contextForOffer(offer = {}) {
-  return {
-    title: offer.original_title ?? offer.originalTitle ?? offer.title ?? null,
-    authors: offer.authors ?? (offer.author ? [offer.author] : []),
-    publisher: offer.publisher ?? null,
-    publicationYear: offer.publication_year ?? offer.publicationYear ?? offer.year ?? null,
-    language: offer.language ?? null,
-    binding: offer.binding ?? offer.variant ?? null,
-  };
-}
-
-export function compareOfferContext(offer, record) {
-  const context = contextForOffer(offer);
-  const matches = [];
-  const conflicts = [];
-  const offerTitle = text(context.title);
-  const recordTitle = text(record.title);
-  if (offerTitle && recordTitle) {
-    if (offerTitle.includes(recordTitle) || recordTitle.includes(offerTitle)) matches.push('title');
-    else conflicts.push({ field: 'title', offer: context.title, catalog: record.title });
-  }
-  const offerAuthors = arrays(context.authors).map(text).filter(Boolean);
-  const recordAuthors = arrays(record.authors).map(text).filter(Boolean);
-  if (offerAuthors.length && recordAuthors.length) {
-    if (
-      offerAuthors.some((left) =>
-        recordAuthors.some(
-          (right) => left === right || left.includes(right) || right.includes(left),
-        ),
-      )
-    )
-      matches.push('authors');
-    else conflicts.push({ field: 'authors', offer: context.authors, catalog: record.authors });
-  } else if (
-    offerTitle &&
-    recordAuthors.some((author) =>
-      author.split(' ').some((part) => part.length >= 4 && offerTitle.includes(part)),
-    )
-  ) {
-    matches.push('authors_in_title');
-  }
-  for (const field of ['publisher', 'language', 'binding']) {
-    if (context[field] != null && record[field] != null) {
-      if (text(context[field]) === text(record[field])) matches.push(field);
-      else conflicts.push({ field, offer: context[field], catalog: record[field] });
-    }
-  }
-  if (context.publicationYear != null && record.publicationYear != null) {
-    if (Number(context.publicationYear) === Number(record.publicationYear))
-      matches.push('publicationYear');
-    else
-      conflicts.push({
-        field: 'publicationYear',
-        offer: context.publicationYear,
-        catalog: record.publicationYear,
-      });
-  }
-  const sufficient =
-    matches.includes('title') ||
-    matches.filter((field) => field !== 'authors_in_title').length >= 2;
-  return { matches, conflicts, sufficient, context };
-}
-
-function localRecord(repository, edition) {
-  const work = repository.database.prepare('SELECT * FROM works WHERE id=?').get(edition.work_id);
-  return {
-    title: edition.title || work?.title,
-    authors: JSON.parse(work?.authors_json || '[]'),
-    publisher: edition.publisher,
-    publicationYear: edition.publication_year,
-    language: edition.language,
-    binding: edition.binding,
   };
 }
 
