@@ -121,7 +121,7 @@ function closeBookPage({ fromHistory = false } = {}) {
 }
 
 function queryEmptyMarkup() {
-  const filtered=['#catalogSearch','#catalogLanguage','#catalogPublisher','#catalogYear','#catalogBinding'].some(id=>$(id)?.value.trim())||Boolean(state.catalogGap);
+  const filtered=['#catalogSearch','#catalogAuthor','#catalogLanguage','#catalogPublisher','#catalogYear','#catalogBinding'].some(id=>$(id)?.value.trim())||Boolean(state.catalogGap);
   return filtered ? '<div class="empty-detail"><h3>Brak pasujących książek</h3><p>Zmień frazę lub usuń filtry wydań.</p></div>' : '<div class="empty-detail"><h3>Katalog jest pusty</h3><p>Zeskanuj oferty lub dodaj pierwszą książkę.</p></div>';
 }
 // "Braki w katalogu": what the empty detail panel used to be. Counts come from SQL (/api/catalog/gaps);

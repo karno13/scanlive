@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { proxiedImage } from './offer-images.mjs';
 import { marketValuations } from './market-valuation.mjs';
 import { variantsOfWork } from './edition-variants.mjs';
+import { authorWorkIds } from './catalog-authors.mjs';
 
 export const json = (value, fallback = null) => {
   try {
@@ -181,6 +182,11 @@ export function listCatalogWorks(repository, options = {}) {
     params.push(String(options.person));
   }
   if (options.gap && WORK_GAP_SQL[options.gap]) conditions.push(WORK_GAP_SQL[options.gap]);
+  // Any spelling of the name ("Rowling, J. K." = "J. K. Rowling"), see catalog-authors.mjs.
+  if (String(options.author ?? '').trim()) {
+    conditions.push('w.id IN (SELECT value FROM json_each(?))');
+    params.push(JSON.stringify(authorWorkIds(repository, String(options.author))));
+  }
   const editionFilters = [];
   for (const [key, column] of [
     ['language', 'language'],

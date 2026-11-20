@@ -124,37 +124,38 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 
 ### Katalog: dzieła, wydania, serie
 
-| Plik                   | Rola                                                     |
-| ---------------------- | -------------------------------------------------------- |
-| `work-grouping.mjs`    | Grupowanie wydań w dzieła i kandydaci na duplikaty       |
-| `distinct-works.mjs`   | „To różne książki”: odwracalne rozdzielenie duplikatów   |
-| `edition-variants.mjs` | Warianty cenowe wydań i „Wydanie nieustalone”            |
-| `edition-gaps.mjs`     | Uzupełnianie wydawcy i roku wydań ze źródeł (odwracalne) |
-| `edition-series.mjs`   | Cykl i tom z ogłoszeń i e-ISBN                           |
-| `catalog-series.mjs`   | Widok serii: uniwersum → cykl → tom                      |
-| `universes.mjs`        | Uniwersa jako dane (tabela `universes`)                  |
-| `catalog-seeding.mjs`  | Zasilanie katalogu z BN po autorze, wydawcy lub tytule   |
-| `catalog-insights.mjs` | Kompletność danych i braki w katalogu                    |
-| `catalog-measures.mjs` | Cztery miary ekranu „Dziś” z trendem                     |
-| `today.mjs`            | Dane ekranu „Dziś” w jednym zapytaniu                    |
+| Plik                   | Rola                                                       |
+| ---------------------- | ---------------------------------------------------------- |
+| `work-grouping.mjs`    | Grupowanie wydań w dzieła i kandydaci na duplikaty         |
+| `distinct-works.mjs`   | „To różne książki”: odwracalne rozdzielenie duplikatów     |
+| `edition-variants.mjs` | Warianty cenowe wydań i „Wydanie nieustalone”              |
+| `edition-gaps.mjs`     | Uzupełnianie wydawcy i roku wydań ze źródeł (odwracalne)   |
+| `edition-series.mjs`   | Cykl i tom z ogłoszeń i e-ISBN                             |
+| `catalog-series.mjs`   | Widok serii: uniwersum → cykl → tom                        |
+| `universes.mjs`        | Uniwersa jako dane (tabela `universes`)                    |
+| `catalog-seeding.mjs`  | Zasilanie katalogu z BN po autorze, wydawcy lub tytule     |
+| `catalog-insights.mjs` | Kompletność danych i braki w katalogu                      |
+| `catalog-authors.mjs`  | Autorzy katalogu (jeden na osobę) i filtr dzieł po autorze |
+| `catalog-measures.mjs` | Cztery miary ekranu „Dziś” z trendem                       |
+| `today.mjs`            | Dane ekranu „Dziś” w jednym zapytaniu                      |
 
 ### Oferty, zestawy i sygnał sprzedaży
 
-| Plik                                            | Rola                                                                             |
-| ----------------------------------------------- | -------------------------------------------------------------------------------- |
-| `offer-observations.mjs`                        | Stan egzemplarza, sprzedawca, opłaty, zdjęcia, surowe dane ogłoszenia            |
-| `offer-kinds.mjs`                               | Rodzaj oferty: sklep / antykwariat / prywatna                                    |
-| `offer-availability.mjs`                        | Oznaczanie ofert, których pełny skan już nie zwraca                              |
-| `offer-status.mjs`                              | Historia stanów oferty, przedział sprzedaży, ponowne wystawienia                 |
-| `offer-lifecycle.mjs`                           | Sprawdzanie stron ofert, które zniknęły ze skanów                                |
-| `offer-images.mjs`                              | Walidacja i lokalne proxy zdjęć oraz okładek                                     |
-| `offer-sets.mjs`                                | Zestawy: jedna oferta z kilkoma wydaniami                                        |
-| `shipping-backfill.mjs`                         | Koszt dostawy zapisanych ofert Vinted ze strony ogłoszenia                       |
-| `set-descriptions.mjs`                          | Skład zestawu z opisu ogłoszenia                                                 |
-| `price-stats.mjs`                               | Statystyki cen w SQL, w groszach                                                 |
+| Plik                                            | Rola                                                                                                                                           |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `offer-observations.mjs`                        | Stan egzemplarza, sprzedawca, opłaty, zdjęcia, surowe dane ogłoszenia                                                                          |
+| `offer-kinds.mjs`                               | Rodzaj oferty: sklep / antykwariat / prywatna                                                                                                  |
+| `offer-availability.mjs`                        | Oznaczanie ofert, których pełny skan już nie zwraca                                                                                            |
+| `offer-status.mjs`                              | Historia stanów oferty, przedział sprzedaży, ponowne wystawienia                                                                               |
+| `offer-lifecycle.mjs`                           | Sprawdzanie stron ofert, które zniknęły ze skanów                                                                                              |
+| `offer-images.mjs`                              | Walidacja i lokalne proxy zdjęć oraz okładek                                                                                                   |
+| `offer-sets.mjs`                                | Zestawy: jedna oferta z kilkoma wydaniami                                                                                                      |
+| `shipping-backfill.mjs`                         | Koszt dostawy zapisanych ofert Vinted ze strony ogłoszenia                                                                                     |
+| `set-descriptions.mjs`                          | Skład zestawu z opisu ogłoszenia                                                                                                               |
+| `price-stats.mjs`                               | Statystyki cen w SQL, w groszach                                                                                                               |
 | `deals.mjs`                                     | „Okazje”: dostępne oferty wyraźnie poniżej wyceny swojego wydania (`/api/deals`) i ocena właściciela, czy okazja była trafna (`deal_verdicts`) |
-| `market-valuation.mjs`                          | Wycena rynkowa książki/wydania: przedział, wiarygodność, uzasadnienie            |
-| `buyback-quotes.mjs`, `buyback-skupksiazek.mjs` | Ceny skupu hurtowego (skupksiazek.pl)                                            |
+| `market-valuation.mjs`                          | Wycena rynkowa książki/wydania: przedział, wiarygodność, uzasadnienie                                                                          |
+| `buyback-quotes.mjs`, `buyback-skupksiazek.mjs` | Ceny skupu hurtowego (skupksiazek.pl)                                                                                                          |
 
 ### Frontend
 
@@ -209,7 +210,7 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `app/views/scan-insights.js`          | Diagnostyka lokalnego skanu                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `app/views/scan-profiles.js`          | Zapisane wyszukiwania (profile)                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `app/views/scan-series.js`            | „Szukaj po serii”: uzgodnione listy tytułów wstawiane jako frazy                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `app/views/scan-series-titles.js` | Listy tytułów „Szukaj po serii”: Świat Dysku, Herezja Horusa, Gotrek i Felix oraz całe uniwersa (Warhammer, Forgotten Realms, Dragonlance) |
+| `app/views/scan-series-titles.js`     | Listy tytułów „Szukaj po serii”: Świat Dysku, Herezja Horusa, Gotrek i Felix oraz całe uniwersa (Warhammer, Forgotten Realms, Dragonlance)                                                                                                                                                                                                                                                                                                                                     |
 | `app/views/scan-schedule.js`          | Automatyczny skan profilu co N godzin                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `app/views/trading-controls.js`       | Przyciski następnych kroków pod panelem przebiegu                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `app/views/settings.js`               | Ustawienia, skuteczność fraz, diagnostyka identyfikacji                                                                                                                                                                                                                                                                                                                                                                                                                        |

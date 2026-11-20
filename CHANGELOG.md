@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (107) — Katalog: filtr po autorze
+
+- Książki → „Filtry katalogu” → nowe pole **Autor**. Podpowiada wszystkich autorów z katalogu z liczbą książek, najwięcej książek najpierw. Po wybraniu autora lista pokazuje tylko jego książki.
+- Różne zapisy tej samej osoby są jednym autorem: „Rowling, J. K.”, „J. K. Rowling” i „Rowling, J.K” dają razem 45 książek (na kopii bazy). Daty życia z BN („Pratchett, Terry (1948-2015)”) nie przeszkadzają.
+- Autorzy pochodzą z dzieła i z danych BN jego wydań. Na kopii bazy jest 299 autorów: Terry Pratchett 99 książek, J. K. Rowling 45, Dan Abnett 39, Brandon Sanderson 38.
+- Ograniczenie: inne imię tej samej osoby („Joanne K. Rowling”) albo samo nazwisko („Pratchett”) to osobna pozycja.
+
 ## 2026-11-20 (106) — Okazje: polubienia i popyt na wydanie
 
 - Przy każdej okazji widać polubienia samej oferty (♥) i **popyt** na jej wydanie, czyli medianę polubień pozostałych ofert tego wydania na Vinted: wysoki (8+), średni (4–7), niski. Wysoki jest wyróżniony kolorem.

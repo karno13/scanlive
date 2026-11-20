@@ -29,6 +29,7 @@
     "app-styles.mjs",
     "bundle-detection.mjs",
     "buyback-quotes.mjs",
+    "catalog-authors.mjs",
     "catalog-bibliography.mjs",
     "catalog-data-location.mjs",
     "catalog-insights.mjs",

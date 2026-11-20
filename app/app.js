@@ -470,7 +470,7 @@ function catalogQuery(kind) {
 }
 function catalogFilters(kind) {
   const query = catalogQuery(kind);
-  if (kind === 'works') return { query, sort: $('#catalogSort').value, language:$('#catalogLanguage').value.trim(),publisher:$('#catalogPublisher').value.trim(),year:$('#catalogYear').value,binding:$('#catalogBinding').value.trim(),gap:state.catalogGap||'' };
+  if (kind === 'works') return { query, sort: $('#catalogSort').value, author:$('#catalogAuthor').value.trim(), language:$('#catalogLanguage').value.trim(),publisher:$('#catalogPublisher').value.trim(),year:$('#catalogYear').value,binding:$('#catalogBinding').value.trim(),gap:state.catalogGap||'' };
   if (kind === 'jobs')
     return {
       query,

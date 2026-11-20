@@ -7,7 +7,7 @@ export function installTradingControls({state,$,json,toast,showView,loadCatalogD
   const write=(path,body,method='PUT')=>json(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   let settingsLoaded=false;
   let savedDefaults=()=>{};
-  for(const input of ['#catalogLanguage','#catalogPublisher','#catalogYear','#catalogBinding']) $(input).addEventListener('input',onCatalogFilters);
+  for(const input of ['#catalogAuthor','#catalogLanguage','#catalogPublisher','#catalogYear','#catalogBinding']) $(input).addEventListener('input',onCatalogFilters);
   for(const input of ['#offerScan','#offerScanChange']) $(input).addEventListener('change',onOfferFilters);
   for(const input of ['#offerMinPrice','#offerMaxPrice']) $(input).addEventListener('input',onOfferFilters);
   $('#offerQuickViews').querySelectorAll('[data-purchase-view]').forEach(button=>button.addEventListener('click',()=>{

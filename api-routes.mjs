@@ -25,6 +25,7 @@ import { reviewQueueSummary } from './review-queue.mjs';
 import { getScanSchedule, saveScanSchedule, nextRunAt, nextQuickRunAt } from './scan-schedule.mjs';
 import { getPolishOnly, setPolishOnly } from './language-policy.mjs';
 import { listNames, mergeNames, removeNameAlias } from './name-aliases.mjs';
+import { catalogAuthors } from './catalog-authors.mjs';
 import { listRemovedWorks, removeCatalogWork, restoreCatalogWork } from './catalog-removal.mjs';
 function fail(code, statusCode = 400) {
   throw Object.assign(Error(code), { statusCode });
@@ -540,6 +541,7 @@ export const apiRoutes = createRouter()
   .add('GET', '/api/scan-queries/stats', ({ repo }) => scanQueryStats(repo))
   .add('GET', '/api/scan-queries/freshness', ({ repo }) => scanQueryFreshness(repo))
   .add('GET', '/api/catalog/names', ({ repo }) => listNames(repo))
+  .add('GET', '/api/catalog/authors', ({ repo }) => catalogAuthors(repo))
   .add('POST', '/api/catalog/names/merge', ({ repo, input }) => mergeNames(repo, input))
   .add('POST', '/api/catalog/names/unalias', ({ repo, input }) => removeNameAlias(repo, input))
   .add('GET', '/api/catalog/universes', ({ repo }) => listUniverses(repo))

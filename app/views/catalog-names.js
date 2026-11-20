@@ -136,6 +136,13 @@ export function mountCatalogNames({ $, json, escapeHtml, toast, loadCatalogData 
   panel.addEventListener('toggle', () => {
     if (panel.open) void refresh();
   });
+  // The author filter's suggestions: one name per author, most books first.
+  void json('/api/catalog/authors')
+    .then((data) => {
+      const list = $('#authorNames');
+      if (list) list.innerHTML = data.items.map((row) => `<option value="${escapeHtml(row.name)}">${row.works} ${row.works === 1 ? 'książka' : 'książek'}</option>`).join('');
+    })
+    .catch(() => {});
   // The publisher filter's suggestions, without opening the panel.
   void json('/api/catalog/names').then((data) => fillPublisherList(data.publishers)).catch(() => {});
   return { refresh };
