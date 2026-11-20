@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (105) — „Szukaj po serii”: tytuły-zwykłe słowa z autorem
+
+- Listy Świat Dysku, Herezja Horusa i Gotrek i Felix wstawiają tytuły, które same są zwykłym słowem, razem z autorem albo uniwersum: „Eryk Pratchett”, „Mort Pratchett”, „Piramidy Pratchett”, „Maskarada Pratchett”, „Legion Abnett”, „Zdrajca Dembski-Bowden”, „Stara Ziemia Warhammer”, „Zabójca Gotrek” i inne (17 fraz). Tak jak w listach uniwersów (wpis 100).
+- Dlaczego: na kopii bazy te frazy dały 1 822 oferty, czyli ok. 21% wszystkich. Rozpoznanych było 63, i prawie wszystkie to inne książki: kryminały z Empiku („Zabójca z sąsiedztwa”), „Upadłe anioły” Morgana, „Psi Patrol. Ruchome obrazki”. Prawdziwe tomy z serii to 3–4 oferty.
+- Skan zostawia teraz tylko ogłoszenia z obydwoma słowami w tytule. Tytuły, które same dobrze trafiają („Kolor magii”: 11 ofert, 11 rozpoznanych), zostają bez autora, podobnie „Kosiarz” i „Muzyka duszy”.
+- Zapisane wcześniej oferty zostają. Profile się nie zmieniają, bo żaden nie miał tych fraz.
+
 ## 2026-11-20 (104) — Anulowany automatyczny skan nie startuje od nowa
 
 - **Błąd:** po anulowaniu skanu z harmonogramu ten sam profil startował ponownie po minucie, i tak po każdym anulowaniu. Harmonogram brał odpowiedź „skan anulowany” za „trwa inny skan” i nie zapisywał próby. U Ciebie profil „Pomiar: szeroki rynek” startował 19.11 o 23:58 oraz 20.11 o 19:21, 19:28 i 19:30, a ostatni zapisany przebieg harmonogramu był z 18.11.

@@ -164,20 +164,44 @@ export const DRAGONLANCE_TITLES = [
   'Mord w Tarsis',
 ];
 
-// Horus Heresy titles that are common words on their own, with the author (phrase report on saved
-// results: "Legion" 617 offers / 188 identified, "Zdrajca" 406 / 104, "Nemezis" 201 / 17).
+// Titles that are common words on their own carry the author or the universe name, so the scan
+// keeps only listings that name both (phrase report on saved results, 2026-11-20, offers / identified:
+// "Eryk" 354 / 0, "Piramidy" 176 / 1, "Maskarada" 173 / 2, "Mort" 92 / 0, "Ruchome obrazki" 93 / 1,
+// "Legion" 577 / 184, "Zdrajca" 402 / 93, "Nemezis" 199 / 14, "Zabójca" 671 / 40). Titles that
+// identify well alone ("Kolor magii" 11 / 11) stay bare, so listings without the author still count;
+// so do "Kosiarz" and "Muzyka duszy": their few hits are real Pratchett copies whose title lacks him.
+// Most "identified" hits of the others were other books ("Zabójca z sąsiedztwa", Morgan's "Upadłe anioły").
+const DISCWORLD_WITH_AUTHOR = {
+  Mort: 'Mort Pratchett',
+  Piramidy: 'Piramidy Pratchett',
+  'Straż! Straż!': 'Straż! Straż! Pratchett',
+  Eryk: 'Eryk Pratchett',
+  'Ruchome obrazki': 'Ruchome obrazki Pratchett',
+  'Ciekawe czasy': 'Ciekawe czasy Pratchett',
+  Maskarada: 'Maskarada Pratchett',
+  'Na glinianych nogach': 'Na glinianych nogach Pratchett',
+};
 const HORUS_HERESY_WITH_AUTHOR = {
   Legion: 'Legion Abnett',
-  Zdrajca: 'Zdrajca Dembski-Bowden',
+  'Upadłe Anioły': 'Upadłe Anioły Warhammer',
   Nemezis: 'Nemezis Swallow',
-  Szramy: 'Szramy Wraight',
   Potępieńcy: 'Potępieńcy McNeill',
+  Zdrajca: 'Zdrajca Dembski-Bowden',
+  Szramy: 'Szramy Wraight',
+  'Ogień Śmierci': 'Ogień Śmierci Warhammer',
+  'Stara Ziemia': 'Stara Ziemia Warhammer',
 };
+const GOTREK_FELIX_WITH_NAME = { Zabójca: 'Zabójca Gotrek' };
+const phrases = (titles, map) => titles.map((title) => map[title] ?? title);
+/** Scan phrases for the single-series lists: the titles, common words with the author. */
+export const DISCWORLD_PHRASES = phrases(DISCWORLD_TITLES, DISCWORLD_WITH_AUTHOR);
+export const HORUS_HERESY_PHRASES = phrases(HORUS_HERESY_TITLES, HORUS_HERESY_WITH_AUTHOR);
+export const GOTREK_FELIX_PHRASES = phrases(GOTREK_FELIX_TITLES, GOTREK_FELIX_WITH_NAME);
 
 /** Every Warhammer list in one scan: the Horus Heresy, 40 000, Fantasy and Age of Sigmar. */
 export const WARHAMMER_ALL_TITLES = [
   ...new Set([
-    ...HORUS_HERESY_TITLES.map((title) => HORUS_HERESY_WITH_AUTHOR[title] ?? title),
+    ...HORUS_HERESY_PHRASES,
     ...WARHAMMER_40K_TITLES,
     ...WARHAMMER_FANTASY_TITLES,
   ]),

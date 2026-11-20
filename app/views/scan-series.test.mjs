@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DISCWORLD_TITLES, scanSeriesOptions, installScanSeries } from './scan-series.js';
+import { DISCWORLD_PHRASES, scanSeriesOptions, installScanSeries } from './scan-series.js';
 import { MAX_SCAN_QUERIES } from '../core/scan-limits.js';
 
 test('Discworld is available without catalogue data and contains every main novel', () => {
@@ -53,7 +53,7 @@ test('selecting a series fills the editable scanner form without network access'
   assert.equal(picker.children.length, scanSeriesOptions().length + 1);
   picker.value = 'discworld';
   picker.dispatchEvent(new Event('change'));
-  assert.deepEqual(input.value.split('\n'), DISCWORLD_TITLES);
+  assert.deepEqual(input.value.split('\n'), DISCWORLD_PHRASES);
   assert.equal(inputs, 1);
   assert.equal(picker.value, 'discworld');
   assert.match(elements.get('#scanSeriesNote').textContent, /Wstawiono 41 tytułów/);
@@ -81,4 +81,15 @@ test('whole universes: every list fits one scan, has no duplicates and no bare c
     for (const title of universes.find((series) => series.id === id).titles) assert.ok(all.titles.includes(title), title);
   assert.ok(all.titles.includes('Wywyższenie Horusa'), 'the Horus Heresy is part of the whole of Warhammer');
   assert.ok(all.titles.includes('Legion Abnett') && !all.titles.includes('Legion'));
+});
+
+test('single-series lists: common-word titles carry the author, well-identified titles stay bare', () => {
+  const [discworld, heresy, gotrek] = scanSeriesOptions();
+  const bare = new Set(['mort', 'piramidy', 'eryk', 'maskarada', 'ruchome obrazki', 'legion', 'zdrajca', 'nemezis', 'stara ziemia', 'zabójca']);
+  for (const series of [discworld, heresy, gotrek])
+    for (const title of series.titles) assert.ok(!bare.has(title.toLowerCase()), `${series.name}: bare "${title}"`);
+  assert.ok(discworld.titles.includes('Eryk Pratchett') && discworld.titles.includes('Kolor magii'));
+  assert.ok(heresy.titles.includes('Legion Abnett') && heresy.titles.includes('Fulgrim'));
+  assert.ok(gotrek.titles.includes('Zabójca Gotrek') && gotrek.titles.includes('Zabójca trolli'));
+  assert.equal(heresy.titles.length, 48);
 });

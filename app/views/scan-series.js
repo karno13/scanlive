@@ -1,17 +1,17 @@
 import { MAX_SCAN_QUERIES } from '../core/scan-limits.js';
-import { DISCWORLD_TITLES, GOTREK_FELIX_TITLES, HORUS_HERESY_TITLES, universeSeriesOptions } from './scan-series-titles.js';
+import { DISCWORLD_PHRASES, GOTREK_FELIX_PHRASES, HORUS_HERESY_PHRASES, universeSeriesOptions } from './scan-series-titles.js';
 
-export { DISCWORLD_TITLES, GOTREK_FELIX_TITLES, HORUS_HERESY_TITLES } from './scan-series-titles.js';
+export { DISCWORLD_PHRASES, DISCWORLD_TITLES, GOTREK_FELIX_TITLES, HORUS_HERESY_TITLES } from './scan-series-titles.js';
 
 /** Only series and title lists explicitly agreed with the user belong here. */
 export function scanSeriesOptions() {
   return [
-    { id: 'discworld', name: 'Świat Dysku', titles: [...DISCWORLD_TITLES] },
+    { id: 'discworld', name: 'Świat Dysku', titles: [...DISCWORLD_PHRASES] },
     {
-      id: 'horus-heresy', name: 'Herezja Horusa', titles: [...HORUS_HERESY_TITLES],
+      id: 'horus-heresy', name: 'Herezja Horusa', titles: [...HORUS_HERESY_PHRASES],
       scope: 'Polskie tytuły tomów 1–48, w tym zapowiedzi: Stara Ziemia i Brzemię lojalności.',
     },
-    { id: 'gotrek-felix', name: 'Gotrek i Felix', titles: [...GOTREK_FELIX_TITLES], scope: '17 głównych tomów Przygód Gotreka i Felixa.' },
+    { id: 'gotrek-felix', name: 'Gotrek i Felix', titles: [...GOTREK_FELIX_PHRASES], scope: '17 głównych tomów Przygód Gotreka i Felixa.' },
     ...universeSeriesOptions(),
   ];
 }
