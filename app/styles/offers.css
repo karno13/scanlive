@@ -515,6 +515,10 @@ body.density-compact .work-row .cover-md {
 .deal-copy small {
   color: var(--muted);
 }
+.deal-demand.is-high {
+  color: var(--good);
+  font-weight: 600;
+}
 .deal-title {
   justify-self: start;
   max-width: 100%;

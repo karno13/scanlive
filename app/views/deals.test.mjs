@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { dealMarkup, dealsCountLabel, visibleDeals } from './deals.js';
+import { dealMarkup, dealsCountLabel, demandLabel, visibleDeals } from './deals.js';
 
 const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const money = (grosze) => `${grosze / 100} zł`;
@@ -85,4 +85,14 @@ test('rated deals are hidden unless asked for or rated in this visit; the summar
     }),
     'Ocenione: 4 — trafna 3 (75%) · złe przypisanie 1. Przy wiarygodności wysokiej trafne 1 z 1; przy wiarygodności średniej trafne 2 z 3.',
   );
+});
+
+test('favourites and edition demand are shown and can order the list', () => {
+  assert.equal(demandLabel(deal()), '');
+  const hot = deal({ offerId: 'hot', favourites: 12, demand: { median: 9, offers: 5, level: 'high' } });
+  assert.equal(demandLabel(hot), '♥ 12 · popyt wysoki (mediana 9 polubień w 5 ofertach Vinted)');
+  assert.equal(demandLabel(deal({ favourites: 0 })), '♥ 0');
+  assert.match(dealMarkup(hot, { escapeHtml, money }), /class="deal-demand is-high"/);
+  const items = [deal({ offerId: 'none', saving: 5000 }), deal({ offerId: 'low', demand: { median: 1, offers: 2, level: 'low' } }), hot];
+  assert.deepEqual(visibleDeals(items, { sort: 'demand' }).map((item) => item.offerId), ['hot', 'low', 'none']);
 });

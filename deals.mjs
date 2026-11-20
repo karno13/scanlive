@@ -18,6 +18,24 @@ export const DEAL_MIN_SAVING = 500;
 /** This far below the worth is more often a wrong assignment than a bargain. */
 export const DEAL_SUSPICIOUS_DISCOUNT = 0.7;
 const BUYABLE = ['available', 'unconfirmed'];
+/**
+ * Demand for an edition: the median favourite count of its other Vinted listings, from this many.
+ * On saved data (2026-11-20) a listing sold 3.4% of the time when the other listings of its edition
+ * had a median of 0–1 favourites, 5.1% at 4–7 and 8.6% at 8 or more.
+ */
+export const DEMAND_MIN_OFFERS = 2;
+export const DEMAND_LEVELS = { high: 8, medium: 4 };
+
+/** @param {number[]} counts */
+export function editionDemand(counts) {
+  if (counts.length < DEMAND_MIN_OFFERS) return null;
+  const sorted = [...counts].sort((a, b) => a - b);
+  const median = sorted[Math.floor((sorted.length - 1) / 2)];
+  const level =
+    median >= DEMAND_LEVELS.high ? 'high' : median >= DEMAND_LEVELS.medium ? 'medium' : 'low';
+  return { median, offers: counts.length, level };
+}
+
 /** Owner's verdicts on a deal: real, wrong book or edition, other condition or a set, worth too high. */
 export const DEAL_VERDICTS = ['good', 'wrong_match', 'condition', 'overvalued'];
 
@@ -31,6 +49,7 @@ export function listDeals(repository, { at = Date.now() } = {}) {
     .prepare(
       `SELECT o.id, o.source, o.original_title AS title, o.normalized_url AS url, o.image_url AS image,
          o.current_price AS price, coalesce(o.condition_class,'unknown') AS condition,
+         o.favourite_count AS favourites,
          o.first_seen_at AS firstSeenAt, m.edition_id AS editionId, e.title AS editionTitle,
          e.work_id AS workId, w.title AS workTitle
        FROM offer_matches m JOIN offers o ON o.id=m.offer_id
@@ -44,6 +63,22 @@ export function listDeals(repository, { at = Date.now() } = {}) {
     ...new Set(rows.map((row) => String(row.editionId))),
   ]);
   const options = valuationOptions(database);
+  /** @type {Map<string, { offerId: string, favourites: number }[]>} */
+  const favourites = new Map();
+  for (const row of database
+    .prepare(
+      `SELECT m.edition_id AS editionId, o.id AS offerId, o.favourite_count AS favourites
+       FROM offer_matches m JOIN offers o ON o.id=m.offer_id
+       WHERE m.status='active' AND o.source='Vinted' AND o.favourite_count IS NOT NULL
+         AND m.edition_id IN (SELECT value FROM json_each(?))`,
+    )
+    .all(JSON.stringify([...observations.keys()]))) {
+    const key = String(row.editionId);
+    (favourites.get(key) ?? favourites.set(key, []).get(key))?.push({
+      offerId: String(row.offerId),
+      favourites: Number(row.favourites),
+    });
+  }
   const verdicts = new Map(
     database
       .prepare('SELECT offer_id, verdict FROM deal_verdicts')
@@ -90,6 +125,12 @@ export function listDeals(repository, { at = Date.now() } = {}) {
       sold: value.sold,
       live: value.live,
       reasons: value.reasons,
+      favourites: row.favourites == null ? null : Number(row.favourites),
+      demand: editionDemand(
+        (favourites.get(String(row.editionId)) ?? [])
+          .filter((item) => item.offerId !== row.id)
+          .map((item) => item.favourites),
+      ),
       verdict: verdicts.get(String(row.id)) ?? null,
     });
   }

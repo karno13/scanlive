@@ -4,7 +4,7 @@ import test from 'node:test';
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
 import { createLocalAppServer } from '../local-app.mjs';
 import { apiRoute } from '../api-routes.mjs';
-import { listDeals, removeDealVerdict, saveDealVerdict } from '../deals.mjs';
+import { editionDemand, listDeals, removeDealVerdict, saveDealVerdict } from '../deals.mjs';
 
 function catalogue() {
   const repository = new SqliteCatalogRepository(':memory:');
@@ -57,6 +57,29 @@ test('an offer clearly below the value of its edition is a deal; the rest is not
   } finally {
     repository.close();
   }
+});
+
+test('a deal carries its own favourites and the demand of the other Vinted listings of its edition', () => {
+  const { repository, add } = catalogue();
+  try {
+    add('s1', 4000, { availability: 'sold', favouriteCount: 9 });
+    add('a', 4400, { favouriteCount: 12 });
+    add('b', 4500, { favouriteCount: 3 });
+    add('cheap', 2000, { favouriteCount: 40 });
+    const [deal] = listDeals(repository).items;
+    assert.equal(deal.offerId, 'cheap');
+    assert.equal(deal.favourites, 40);
+    // Its own 40 favourites are left out of the edition's demand: median of 3, 9, 12.
+    assert.deepEqual(deal.demand, { median: 9, offers: 3, level: 'high' });
+  } finally {
+    repository.close();
+  }
+});
+
+test('edition demand needs two listings and is graded by the median', () => {
+  assert.equal(editionDemand([5]), null);
+  assert.deepEqual(editionDemand([1, 2]), { median: 1, offers: 2, level: 'low' });
+  assert.deepEqual(editionDemand([4, 5, 0]), { median: 4, offers: 3, level: 'medium' });
 });
 
 test('no deal without two other prices, and a far too cheap offer is flagged', () => {

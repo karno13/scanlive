@@ -2,6 +2,14 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (106) — Okazje: polubienia i popyt na wydanie
+
+- Przy każdej okazji widać polubienia samej oferty (♥) i **popyt** na jej wydanie, czyli medianę polubień pozostałych ofert tego wydania na Vinted: wysoki (8+), średni (4–7), niski. Wysoki jest wyróżniony kolorem.
+- Nowy porządek „Największy popyt” w polu „Sortuj”.
+- Dlaczego: na kopii bazy oferta Vinted bez polubień sprzedała się w 0,6% przypadków, a z 10+ polubieniami w 7,6%. Gdy pozostałe oferty wydania miały medianę 0–1 polubień, oferta sprzedawała się w 3,4% przypadków, a przy 8+ w 8,6%.
+- Na kopii bazy: 230 okazji, w domyślnym widoku 86. Z tych 86 popyt wysoki ma 9, średni 20, niski 42, a 15 nie ma danych (mniej niż 2 inne oferty Vinted z polubieniami).
+- Popyt to podpowiedź, nie wycena: wartość i oszczędność liczą się jak dotąd.
+
 ## 2026-11-20 (105) — „Szukaj po serii”: tytuły-zwykłe słowa z autorem
 
 - Listy Świat Dysku, Herezja Horusa i Gotrek i Felix wstawiają tytuły, które same są zwykłym słowem, razem z autorem albo uniwersum: „Eryk Pratchett”, „Mort Pratchett”, „Piramidy Pratchett”, „Maskarada Pratchett”, „Legion Abnett”, „Zdrajca Dembski-Bowden”, „Stara Ziemia Warhammer”, „Zabójca Gotrek” i inne (17 fraz). Tak jak w listach uniwersów (wpis 100).

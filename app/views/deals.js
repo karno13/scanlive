@@ -12,7 +12,18 @@ const SORTS = {
   discount: (a, b) => b.discount - a.discount || b.saving - a.saving,
   newest: (a, b) => String(b.firstSeenAt || '').localeCompare(String(a.firstSeenAt || '')),
   price: (a, b) => a.price - b.price,
+  demand: (a, b) => (b.demand?.median ?? -1) - (a.demand?.median ?? -1) || b.saving - a.saving,
 };
+const DEMAND_LABELS = { high: 'wysoki', medium: 'średni', low: 'niski' };
+
+/** "♥ 12 · popyt wysoki (mediana 9 polubień w 5 ofertach Vinted)"; empty without data. */
+export function demandLabel(item) {
+  const own = item.favourites == null ? '' : `♥ ${item.favourites}`;
+  const demand = item.demand
+    ? `popyt ${DEMAND_LABELS[item.demand.level] || item.demand.level} (mediana ${item.demand.median} ${plural(item.demand.median, 'polubienie', 'polubienia', 'polubień')} w ${item.demand.offers} ${plural(item.demand.offers, 'ofercie', 'ofertach', 'ofertach')} Vinted)`
+    : '';
+  return [own, demand].filter(Boolean).join(' · ');
+}
 export const VERDICT_LABELS = { good: 'Trafna', wrong_match: 'Złe przypisanie', condition: 'Inny stan / zestaw', overvalued: 'Wycena zawyżona' };
 const VERDICT_HINTS = {
   good: 'Naprawdę wyraźnie tańsza, niż jest warta — nadaje się do odsprzedaży',
@@ -64,8 +75,9 @@ function verdictMarkup(item, escapeHtml) {
 }
 
 export function dealMarkup(item, { escapeHtml, money, now = new Date() }) {
+  const demand = demandLabel(item);
   const basis = [item.sold ? `${item.sold} ${plural(item.sold, 'sprzedaż', 'sprzedaże', 'sprzedaży')}` : '', item.live ? `${item.live} ${plural(item.live, 'oferta', 'oferty', 'ofert')}` : ''].filter(Boolean).join(', ');
-  return `<article class="deal-row${item.suspicious ? ' is-suspicious' : ''}" data-deal-offer="${escapeHtml(item.offerId)}">${coverMarkup(item.image, item.title, { size: 'sm', escapeHtml })}<div class="deal-copy"><button type="button" class="link-button deal-title" data-deal-open="${escapeHtml(item.offerId)}" title="${escapeHtml(item.title)}">${escapeHtml(tidyOfferTitle(item.title))}</button><small>${escapeHtml(item.source)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)} · wykryta ${dateMarkup(item.firstSeenAt, now)} · <a href="${escapeHtml(safeOfferHref(item.url))}" target="_blank" rel="noopener noreferrer">ogłoszenie ↗</a></small><small>↳ <button type="button" class="link-button" data-deal-work="${escapeHtml(item.workId)}" title="Strona książki">${escapeHtml(item.workTitle)}</button></small>${item.suspicious ? '<small class="deal-warning">Bardzo daleko od wyceny — sprawdź, czy oferta jest przypisana do właściwej książki i czy to jeden egzemplarz.</small>' : ''}${verdictMarkup(item, escapeHtml)}</div><div class="deal-numbers" title="${escapeHtml((item.reasons || []).join(' '))}"><b>${money(item.price)}</b><span>warta ~${zl(item.worth)} <small>(${Math.round(item.worthLow / 100)}–${zl(item.worthHigh)})</small></span><strong class="deal-saving">−${zl(item.saving)} · −${item.discount}%</strong><small><span class="value-confidence is-${escapeHtml(item.confidence)}">wiarygodność ${escapeHtml(item.confidenceLabel)}</span> ${escapeHtml(basis)}</small></div></article>`;
+  return `<article class="deal-row${item.suspicious ? ' is-suspicious' : ''}" data-deal-offer="${escapeHtml(item.offerId)}">${coverMarkup(item.image, item.title, { size: 'sm', escapeHtml })}<div class="deal-copy"><button type="button" class="link-button deal-title" data-deal-open="${escapeHtml(item.offerId)}" title="${escapeHtml(item.title)}">${escapeHtml(tidyOfferTitle(item.title))}</button><small>${escapeHtml(item.source)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)} · wykryta ${dateMarkup(item.firstSeenAt, now)}${demand ? ` · <span class="deal-demand${item.demand ? ` is-${escapeHtml(item.demand.level)}` : ''}" title="Polubienia tej oferty i mediana polubień pozostałych ofert tego wydania na Vinted — im więcej, tym częściej oferty schodzą">${escapeHtml(demand)}</span>` : ''} · <a href="${escapeHtml(safeOfferHref(item.url))}" target="_blank" rel="noopener noreferrer">ogłoszenie ↗</a></small><small>↳ <button type="button" class="link-button" data-deal-work="${escapeHtml(item.workId)}" title="Strona książki">${escapeHtml(item.workTitle)}</button></small>${item.suspicious ? '<small class="deal-warning">Bardzo daleko od wyceny — sprawdź, czy oferta jest przypisana do właściwej książki i czy to jeden egzemplarz.</small>' : ''}${verdictMarkup(item, escapeHtml)}</div><div class="deal-numbers" title="${escapeHtml((item.reasons || []).join(' '))}"><b>${money(item.price)}</b><span>warta ~${zl(item.worth)} <small>(${Math.round(item.worthLow / 100)}–${zl(item.worthHigh)})</small></span><strong class="deal-saving">−${zl(item.saving)} · −${item.discount}%</strong><small><span class="value-confidence is-${escapeHtml(item.confidence)}">wiarygodność ${escapeHtml(item.confidenceLabel)}</span> ${escapeHtml(basis)}</small></div></article>`;
 }
 
 export function installDeals({ $, json, escapeHtml, money, openOfferDrawer, openWork }) {
