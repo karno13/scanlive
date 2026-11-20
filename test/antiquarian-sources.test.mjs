@@ -249,3 +249,62 @@ test('only complete category reads of recent scans count as fresh', () => {
   const fresh = freshCategoryTasks(repository, new Date('2026-11-14T20:00:00.000Z'));
   assert.deepEqual([...fresh], [JSON.stringify(['Antykwariat Conroy', 'Warhammer'])]);
 });
+
+test('Lagano and Vanaheim: ISBN, availability and the pager of their Warhammer categories', () => {
+  const lagano = fixture('lagano-category-captured.json');
+  const [alpharius, angron, ...rest] = parseMarketplace(lagano.html, task('Lagano'));
+  // The ISBN is the cover photo's file name; the sold-out omnibus („Niedostępny”) is no offer.
+  assert.equal(alpharius.title, 'Alpharius: Głowa Hydry');
+  assert.equal(alpharius.isbn, '9788382323634');
+  assert.equal(alpharius.binding, 'oprawa miękka');
+  assert.equal(angron.price, 4399, 'the shop price, not the publisher price');
+  assert.deepEqual(rest, []);
+  assert.match(lagano.html, /product-card--outofstock/);
+  const vanaheim = fixture('vanaheim-category-captured.json');
+  const [horus, galaxy, ...unorderable] = parseMarketplace(vanaheim.html, task('Vanaheim'));
+  // Gross price shown to the buyer; the schema.org price is net.
+  assert.equal(horus.price, 4590);
+  assert.equal(horus.isbn, '9788382321357');
+  assert.equal(horus.publisher, 'Copernicus Corporation');
+  assert.equal(galaxy.isbn, '9788382321371');
+  // schema.org says InStock, the disabled basket button says otherwise.
+  assert.deepEqual(unorderable, []);
+  assert.match(vanaheim.html, /Niedostępny do zamówienia/);
+  for (const [source, next] of [
+    ['Lagano', 'https://lagano.pl/ksiazki/warhammer/page/2/'],
+    ['Vanaheim', 'https://vanaheim.pl/pl/1125-black-library-pl?page=2'],
+  ]) {
+    const info = categoryPageInfo(
+      fixture(`${source.toLowerCase()}-category-captured.json`).html,
+      task(source),
+      [],
+    );
+    assert.equal(info.nextUrl, next, source);
+    assert.equal(categoryPageUrl(task(source, { page: 2 })), next, source);
+  }
+  assert.equal(offerKind({ source: 'Vanaheim' }), 'new_shop');
+});
+
+test('a Warhammer category matches the phrase "Warhammer" although titles do not name it', async () => {
+  const card = (slug, title) =>
+    `<div class="product-card"><h3 class="product-card__title"><a href="https://lagano.pl/ksiazki/warhammer/${slug}/">${title}</a></h3><span class="product-card__price-current">43,99&nbsp;zł</span></div>`;
+  const scanner = (current, options) =>
+    scanMarketplace(current, {
+      ...options,
+      gate: createMarketplaceGate({ intervalMs: 0 }),
+      pause: async () => {},
+      fetcher: async () =>
+        new Response(
+          card('anarch', 'Duchy Gaunta - Anarch') + card('corax', 'Corax: Władca Cieni'),
+          {
+            headers: { 'content-type': 'text/html' },
+          },
+        ),
+    });
+  const result = await searchOffers(
+    { queries: ['Warhammer', 'Duchy Gaunta', 'Terry Pratchett'], sources: ['Lagano'] },
+    { scanner, onProgress: () => {}, freshTasks: new Set() },
+  );
+  const count = Object.fromEntries(result.results.map((row) => [row.query, row.count]));
+  assert.deepEqual(count, { Warhammer: 2, 'Duchy Gaunta': 1, 'Terry Pratchett': 0 });
+});

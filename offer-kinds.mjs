@@ -30,7 +30,7 @@ const RULES = [
     kind: 'antiquarian',
   },
   { sources: ['Empik'], seller: 'antykw', kind: 'antiquarian' },
-  { sources: ['Empik', 'Dedalus.pl'], kind: 'new_shop' },
+  { sources: ['Empik', 'Dedalus.pl', 'Lagano', 'Vanaheim'], kind: 'new_shop' },
   { sources: ['Vinted', 'OLX', 'Allegro Lokalnie', 'Allegro'], kind: 'private' },
 ];
 

@@ -18,6 +18,8 @@ const allowedSources = new Set([
   'Kultura Wraca',
   'Bookway',
   'Antykwariat Gryf',
+  'Lagano',
+  'Vanaheim',
 ]);
 function fail(code, statusCode = 400) {
   throw Object.assign(Error(code), { statusCode });

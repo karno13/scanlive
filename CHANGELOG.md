@@ -2,6 +2,15 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (102) — Dwa nowe źródła: Lagano i Vanaheim (Warhammer)
+
+- **Lagano** i **Vanaheim** — księgarnie z nowymi książkami, czytane po kategorii Warhammer / Black Library jak antykwariaty (raz na 20 h, potem dopasowanie do fraz). Lagano: 124 książki na 6 stronach, Vanaheim: ok. 160 na 6 stronach. Oferty są liczone jako „Nowe w sklepie”.
+- Prawie każda oferta ma ISBN już na liście (Lagano 24 z 24 na stronie 1, Vanaheim 29 z 30), więc trafia do wydania bez kolejki decyzji.
+- Fraza „Warhammer” znajduje wszystkie książki z tych kategorii, także te, których tytuł nie nazywa uniwersum („Alpharius: Głowa Hydry”).
+- Książki niedostępne nie są ofertami: w Lagano „Niedostępny”, w Vanaheim „Niedostępny do zamówienia” (cała strona 6 z 12 pozycjami).
+- Adres `?gatunek=warhammer` z Lagano jest filtrem zakazanym w `robots.txt` — skan czyta zamiast niego kategorię `/ksiazki/warhammer/` z tymi samymi książkami.
+- Nowe źródła trzeba zaznaczyć w formularzu skanu albo w profilu — zapisane profile ich nie mają. Pełnego skanu nie uruchamiałem.
+
 ## 2026-11-20 (101) — Ostrzejsze sprawdzanie tytułu przy przypisaniu po ISBN
 
 - **Błąd:** oferta trafiała do wydania o swoim ISBN, jeśli z jego tytułem łączyło ją choćby jedno słowo, także samo „Warcraft”, „Pratchett” czy „Dragonlance”. Teraz wspólne uniwersum, cykl albo autor nie wystarczą: gdy reszta tytułu się różni („Kolor magii” kontra „Straż! Straż!”), oferta idzie do kolejki decyzji.

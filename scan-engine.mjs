@@ -405,7 +405,7 @@ async function scanAllPages(
 }
 // Antiquarian bookshops: a whole category is read once per scan (a few hundred listings, page by
 // page through the gate) and matched against each phrase afterwards. A phrase whose category read
-// finished within CATEGORY_READ_HOURS is not read again: small shops, ~500 pages for all nine.
+// finished within CATEGORY_READ_HOURS is not read again: small shops, ~510 pages for all eleven.
 export const CATEGORY_READ_HOURS = 20;
 const CATEGORY_LABEL = 'cała kategoria';
 const categoryTaskKey = (source, query) => JSON.stringify([source, query]);
@@ -476,9 +476,13 @@ async function readCategorySource(
   const listed = [...offers.values()],
     matched = new Set(),
     results = [];
+  // A shop's Warhammer category: its titles rarely name the universe (antiquarian-sources.mjs).
+  const universe = ANTIQUARIAN_SOURCES[source].topic;
   for (const query of due) {
     const topic = { mode: 'discovery', title: query, category: query, searchQuery: query };
-    const found = listed.filter((offer) => matchesTopic(topic, offer.title));
+    const found = listed.filter((offer) =>
+      matchesTopic(topic, universe ? `${offer.title} ${universe}` : offer.title),
+    );
     for (const offer of found) matched.add(offer.url);
     const status = diagnostic ? (found.length ? 'partial' : 'unavailable') : 'ok';
     results.push({

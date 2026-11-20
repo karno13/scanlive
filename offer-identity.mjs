@@ -34,6 +34,8 @@ const allowedMarketplaces = new Map([
   ['Kultura Wraca', ['kulturawraca.pl']],
   ['Bookway', ['bookway.pl']],
   ['Antykwariat Gryf', ['antykwariatgryf.pl']],
+  ['Lagano', ['lagano.pl']],
+  ['Vanaheim', ['vanaheim.pl']],
 ]);
 export function trustedOfferUrl(source, raw) {
   const normalized = normalizeOfferUrl(raw);

@@ -123,6 +123,12 @@ Wspólna cecha: wyszukiwarka bywa zakazana albo niepotrzebna, za to **strony kat
 - **Antykwariat Gryf** (Warszawa, Shopify): `/collections/ksiazki-fantasy-science-fiction-horror?page=N`, 16 na stronę, 46 stron; wyprzedane pozycje zostają z plakietką „Wyprzedane”. `robots.txt`: kolekcje dozwolone, zakazane sortowanie i filtry. Regulamin przeczytany, bez zakazu.
 - Stron produktów żadnego z tych sklepów skan nie czyta. ISBN na liście ma tylko Skupszop.
 
+**Wdrożone 20.11.2026 (wpis 102 w `CHANGELOG.md`):** Lagano i Vanaheim — księgarnie z nowymi książkami (rodzaj oferty „Nowe w sklepie”), czytane po kategorii Warhammer. Oba źródła mają w `antiquarian-sources.mjs` pole `topic: 'Warhammer'`: frazy dopasowuje się do tytułu z dopisanym „Warhammer”, bo tytuły rzadko nazywają uniwersum.
+
+- **Lagano** (WooCommerce): `/ksiazki/warhammer/`, strony `page/N/`, 24 na stronę, 124 pozycje (6 stron). `robots.txt` zakazuje filtrów listy, w tym `?gatunek=` (adres podany przez właściciela), sortowania i koszyka; ścieżki kategorii są dozwolone. ISBN jest w nazwie pliku okładki (zgodny z EAN Vanaheim dla 6 sprawdzonych tytułów; przyjmowany tylko z poprawną sumą kontrolną). Wyprzedane: klasa `product-card--outofstock`. Regulamin przeczytany, bez zakazu.
+- **Vanaheim** (PrestaShop): `/pl/1125-black-library-pl`, strony `?page=N`, 30 na stronę, ok. 162 pozycje. `robots.txt`: zakazane m.in. `?order=`, `?search_query=`, `?n=`; kategorie i `?page=` dozwolone. Na liście EAN (`gtin13`), wydawca, cena brutto; `schema.org/InStock` bywa nieprawdziwe — dostępność z przycisku koszyka (`data-status`). Regulamin przeczytany, bez zakazu.
+- Stron produktów skan nie czyta.
+
 ### Do wdrożenia (w tej kolejności)
 
 | #   | Serwis              | Miasto, platforma    | Adres listy                                                                                                               | Na liście                                                                             | robots.txt                                                                                     | Uwagi                                                                                                       |

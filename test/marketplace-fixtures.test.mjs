@@ -30,6 +30,8 @@ const hosts = {
   'Kultura Wraca': 'kulturawraca.pl',
   Bookway: 'bookway.pl',
   'Antykwariat Gryf': 'antykwariatgryf.pl',
+  Lagano: 'lagano.pl',
+  Vanaheim: 'vanaheim.pl',
 };
 for (const filename of files) {
   test('marketplace fixture: ' + filename, () => {

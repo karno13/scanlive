@@ -23,6 +23,8 @@ export const STARTER_SOURCES = [
   'Kultura Wraca',
   'Bookway',
   'Antykwariat Gryf',
+  'Lagano',
+  'Vanaheim',
 ];
 // Phrases chosen from saved scan results (2026-11-17): whole universes and their Polish names (the
 // universes defined in the catalogue), cycles that bring offers no other phrase finds, and authors.

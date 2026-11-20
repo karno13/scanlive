@@ -6,6 +6,7 @@
 // one request per phrase. Requests go through readSourceHtml and the marketplace gate like any other.
 import { createHash } from 'node:crypto';
 import { attribute, decodeHtml, textOnly } from './html-text.mjs';
+import { isbnValid } from './isbn-normalization.mjs';
 import { conditionClass } from './offer-observations.mjs';
 
 /**
@@ -36,6 +37,8 @@ import { conditionClass } from './offer-observations.mjs';
  * @property {(url: URL, category: string) => number | null} pageNumber   Page of `url` within `category`, null if not one.
  * @property {RegExp} card                Marks each listing on a page (counted for the "full page" rule).
  * @property {(html: string, book: BookFilter, origin: string) => AntiquarianRow[]} parse
+ * @property {string} [topic]             The universe every listing belongs to ("Warhammer"): the
+ *   phrases are matched against the title followed by it, since titles rarely name it.
  */
 
 const escapeRegExp = (/** @type {string} */ text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -415,6 +418,92 @@ function parseGryf(html, book, origin) {
   return rows;
 }
 
+/** A valid ISBN-13 in `text` (an EAN field, a file name), else ''. */
+function isbn13(/** @type {string} */ text) {
+  const found = String(text || '').match(/(?<!\d)97[89]\d{10}(?!\d)/)?.[0];
+  return found && isbnValid(found) ? found : '';
+}
+
+// Lagano (WooCommerce, new books): title, price, binding; the shop names each cover photo after the
+// book's ISBN ("alpharius-glowa-hydry-9788382323634-….jpg"), checked against Vanaheim's EAN fields
+// on 2026-11-20. A sold-out book stays on the list as "product-card--outofstock" („Niedostępny”).
+/** @type {CategorySource['parse']} */
+function parseLagano(html, book, origin) {
+  const cards = segments(html, /<div class="product-card[\s"]/);
+  if (!cards.length) throw unrecognized();
+  /** @type {AntiquarianRow[]} */
+  const rows = [];
+  for (const card of cards) {
+    const link = card.match(/<h3 class="product-card__title">\s*<a\b([^>]*)>([\s\S]*?)<\/a>/i);
+    const title = textOnly(link?.[2]);
+    const price = priceText(
+      card.match(/<span class="product-card__price-current">([\s\S]*?)<\/span>/i)?.[1] || '',
+    );
+    if (!link || !title || !price || !book.accept(title)) continue;
+    const soldOut = /^<div class="product-card[^"]*\bproduct-card--outofstock\b/.test(card);
+    const image = card.match(/<img\b[^>]*?\bsrc="([^"]+)"/i)?.[1];
+    const isbn = isbn13(image?.split('/').pop() || '');
+    const binding = textOnly(
+      card.match(/<span class="product-card__oprawa">([\s\S]*?)<\/span>/i)?.[1],
+    );
+    const id = card.match(/\bdata-product_id="(\d+)"/)?.[1];
+    rows.push({
+      title,
+      url: new URL(decodeHtml(attribute(link[1], 'href')), origin).href,
+      price,
+      available: !soldOut,
+      availabilityKnown: true,
+      sellerBusiness: true,
+      ...(image ? { image: new URL(decodeHtml(image), origin).href } : {}),
+      ...(isbn ? { isbn } : {}),
+      ...(binding ? { binding: binding.slice(0, 100) } : {}),
+      ...(id ? { externalOfferId: id } : {}),
+    });
+  }
+  return rows;
+}
+
+// Vanaheim (PrestaShop, new books): title, gross price, EAN and publisher in schema.org fields. The
+// schema.org availability says InStock even for books that cannot be ordered; the basket button
+// tells the truth (data-status="0", „Niedostępny do zamówienia”). The price in itemprop is net.
+/** @type {CategorySource['parse']} */
+function parseVanaheim(html, book, origin) {
+  const cards = segments(html, /<article\b[^>]*\bjs-product-miniature\b/);
+  if (!cards.length) throw unrecognized();
+  /** @type {AntiquarianRow[]} */
+  const rows = [];
+  for (const card of cards) {
+    const link = card.match(/<h3\b[^>]*product-title[^>]*>\s*<a\b([^>]*)>([\s\S]*?)<\/a>/i);
+    const title = textOnly(link?.[2]);
+    const price = priceText(card.match(/<span class="money"[^>]*>([\s\S]*?)<\/span>/i)?.[1] || '');
+    if (!link || !title || !price || !book.accept(title)) continue;
+    const status = card.match(/data-button-action="add-to-cart"[^>]*\bdata-status="(\d)"/)?.[1];
+    const isbn = isbn13(attribute(card.match(/<meta itemprop="gtin13"([^>]*)>/i)?.[1], 'content'));
+    const publisher = decodeHtml(
+      attribute(
+        card.match(/itemprop="brand"[\s\S]*?<meta itemprop="name"([^>]*)>/i)?.[1],
+        'content',
+      ),
+    ).trim();
+    const image = attribute(card.match(/<img\b([^>]*\bdata-src=[^>]*)>/i)?.[1], 'data-src').trim();
+    rows.push({
+      title,
+      url: new URL(decodeHtml(attribute(link[1], 'href')), origin).href,
+      price,
+      available: status !== '0',
+      ...(status ? { availabilityKnown: true } : {}),
+      sellerBusiness: true,
+      ...(/^https:\/\//.test(image) ? { image } : {}),
+      ...(isbn ? { isbn } : {}),
+      ...(publisher ? { publisher: publisher.slice(0, 500) } : {}),
+      ...(attribute(card, 'data-id-product')
+        ? { externalOfferId: attribute(card, 'data-id-product') }
+        : {}),
+    });
+  }
+  return rows;
+}
+
 /** @type {Record<string, CategorySource>} */
 export const ANTIQUARIAN_SOURCES = {
   'Antykwariat Toruń': {
@@ -518,6 +607,31 @@ export const ANTIQUARIAN_SOURCES = {
     },
     card: /<div class="product_boxnew"/gi,
     parse: parseNws,
+  },
+  // Bookshops with new books, read by their Warhammer category (docs/SOURCES-ACCESS-2026-11.md).
+  Lagano: {
+    host: 'lagano.pl',
+    // "?gatunek=warhammer" is a filter forbidden by robots.txt; the category path is allowed.
+    categories: ['/ksiazki/warhammer/'],
+    perPage: 24,
+    pageUrl: (category, page) => (page > 1 ? `${category}page/${page}/` : category),
+    pageNumber: (url, category) => {
+      if (url.pathname === category) return 1;
+      const match = url.pathname.match(new RegExp(`^${escapeRegExp(category)}page/(\\d+)/?$`));
+      return match ? Number(match[1]) : null;
+    },
+    card: /<div class="product-card[\s"]/gi,
+    parse: parseLagano,
+    topic: 'Warhammer',
+  },
+  Vanaheim: {
+    host: 'vanaheim.pl',
+    categories: ['/pl/1125-black-library-pl'],
+    perPage: 30,
+    ...queryPaging,
+    card: /<article\b[^>]*\bjs-product-miniature\b/gi,
+    parse: parseVanaheim,
+    topic: 'Warhammer',
   },
 };
 

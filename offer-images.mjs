@@ -24,6 +24,9 @@ const IMAGE_HOSTS = [
   /^kulturawraca\.pl$/,
   /^bookway\.pl$/,
   /^antykwariatgryf\.pl$/,
+  // Bookshops with new books (antiquarian-sources.mjs).
+  /^lagano\.pl$/,
+  /^vanaheim\.pl$/,
   /^covers\.openlibrary\.org$/,
 ];
 const MAX_BYTES = 4 * 1024 * 1024;
