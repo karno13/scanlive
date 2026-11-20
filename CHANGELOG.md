@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (112) — Spokojniejsza typografia
+
+- Tytuły z katalogu (wydania na stronie książki, kolumna „Przypisanie” w Ofertach) są pisane tym samym krojem książkowym co lista książek. Tytuły ogłoszeń zostają w zwykłym kroju, więc od razu widać, co pochodzi z katalogu, a co od sprzedającego.
+- Bez wersalików: nagłówki grup w Kolejce („Brandon Sanderson”), nagłówki tabel, podpisy sekcji, grupy palety poleceń i podpis w pasku bocznym („Skanowanie, katalog, weryfikacja”).
+- Przycisk skanu to „Skanuj”, bez strzałki.
+- Zaokrąglenia rogów mają trzy stopnie (małe przyciski, pola i kafle, panele) zamiast siedmiu różnych wartości; różnice to 1–2 px.
+
 ## 2026-11-20 (111) — Strona książki: wycena na górze
 
 - Szacowana wartość („~44 zł, przedział 31–55 zł”) jest teraz pierwsza pod przyciskami i największa na stronie. Kafle z cenami są pod nią i mniejsze.

@@ -159,7 +159,7 @@ async function startSearch(options = {}) {
     state.scan.running = false;
     $('#cancelSearch').hidden = true;
     $('#startSearch').disabled = false;
-    $('#startSearch').innerHTML = 'Skanuj <span aria-hidden="true">→</span>';
+    $('#startSearch').textContent = 'Skanuj';
     $('#progressElapsed').textContent = '';
     $('#scanGuardMessage').textContent = '';
   }

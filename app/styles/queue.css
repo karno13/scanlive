@@ -159,7 +159,7 @@
   height: 34px;
   padding: 6px 9px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-xs);
   min-height: 44px;
   flex: 1 1 150px;
   font-size: 15px;
@@ -343,7 +343,7 @@
 }
 @media (min-width: 901px) {
   .review-list {
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
   }
 }
 .review-item:hover {
@@ -364,7 +364,7 @@
 }
 .identification-dashboard {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--surface);
   border-color: var(--line);
   color: var(--text);
@@ -576,8 +576,6 @@
   border-bottom: 1px solid var(--line);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--muted);
 }
 .rv-skipped {
@@ -714,7 +712,7 @@
   width: 100%;
   padding: 10px 14px 10px 10px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
   text-align: left;
@@ -820,7 +818,7 @@
 .rv .lean-review-result:not(:empty) {
   margin-top: 8px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text);
   font-size: 13px;
@@ -919,7 +917,7 @@ body.density-compact .rv-item .cover-sm {
   margin: 0 0 12px;
   padding: 12px 14px;
   border: 1px solid var(--brand);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--surface);
   position: sticky;
   top: 0;
@@ -958,7 +956,7 @@ body.density-compact .rv-item .cover-sm {
   width: 20px;
   height: 20px;
   border: 2px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   font-size: 13px;
   font-weight: 700;
   color: var(--on-brand);
@@ -1013,7 +1011,7 @@ body.density-compact .rv-item .cover-sm {
   gap: 8px;
   padding: 10px 12px;
   border: 1px dashed var(--brand);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   margin: 0 0 10px;
 }
 .rv-offer-edition-form input {
@@ -1046,7 +1044,7 @@ body.density-compact .rv-item .cover-sm {
   list-style: none;
   padding: 8px 10px;
   border: 1px solid var(--control-line);
-  border-radius: 7px;
+  border-radius: var(--radius-xs);
   background: var(--surface);
 }
 .shortcut-help > summary::-webkit-details-marker {
@@ -1064,7 +1062,7 @@ body.density-compact .rv-item .cover-sm {
   padding: 12px;
   background: var(--surface);
   border: 1px solid var(--control-line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   box-shadow: var(--shadow-pop);
 }
 /* "Utwórz wydanie z ogłoszenia": publisher and year side by side. */
@@ -1379,7 +1377,7 @@ body.density-compact .rv-item .cover-sm {
   margin: 0;
   padding: 0 12px;
   border: 1px solid var(--control-line);
-  border-radius: 7px;
+  border-radius: var(--radius-xs);
   background: var(--surface);
   color: var(--text);
   font-weight: 650;
@@ -1536,7 +1534,7 @@ body.density-compact .rv-item .cover-sm {
   border: 0;
   background: none;
   cursor: zoom-in;
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 #reviewDetail .rv-photo.is-comparing > .rv-photo-zoom {
   display: none;
@@ -1836,7 +1834,7 @@ body.density-compact .rv-item .cover-sm {
   min-height: 42px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: var(--surface);
   cursor: pointer;
   font-weight: 600;
@@ -1873,7 +1871,7 @@ body.density-compact .rv-item .cover-sm {
   padding: 8px;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   box-shadow: var(--shadow-pop);
 }

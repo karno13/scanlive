@@ -18,7 +18,7 @@
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 18px;
   min-width: 0;
 }
@@ -34,7 +34,7 @@
   gap: 8px;
   min-height: 42px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--radius-xs);
   padding: 9px 14px;
   font-size: 13px;
   font-weight: 650;
@@ -67,7 +67,7 @@
   font-weight: 600;
   min-height: 40px;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   color: var(--brand);
 }
 .field {
@@ -287,7 +287,7 @@
   max-height: calc(100dvh - 24px);
   padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius);
   overflow: auto;
   background: var(--surface);
   color: var(--text);
@@ -419,7 +419,7 @@
   .history-status {
     padding: 8px 12px;
     background: var(--head-bg);
-    border-radius: 5px;
+    border-radius: var(--radius-xs);
     color: var(--muted);
   }
 }
@@ -493,8 +493,7 @@
 .section-eyebrow {
   display: none;
   color: var(--brand);
-  letter-spacing: 0.14em;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 @media (min-width: 901px) {
@@ -570,7 +569,7 @@
 }
 .fact {
   padding: 1px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: var(--surface-2);
   color: var(--text);
   font-size: 12px;
@@ -579,7 +578,7 @@
 .segmented {
   display: inline-flex;
   padding: 3px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   border: 1px solid var(--line);
 }
@@ -590,7 +589,7 @@
   min-height: 40px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   font-size: 13px;
   cursor: pointer;
@@ -636,8 +635,6 @@
   color: var(--faint);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 .palette-item {
   display: grid;
@@ -647,7 +644,7 @@
   width: 100%;
   padding: 8px 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   text-align: left;
@@ -661,7 +658,7 @@
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: var(--surface-2);
   color: var(--muted);
 }
@@ -705,8 +702,6 @@
 .edit-fold-label {
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--muted);
 }
 .edit-fold > summary small {

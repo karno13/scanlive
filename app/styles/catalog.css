@@ -13,7 +13,7 @@
   max-height: 240px;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   margin-top: 6px;
 }
 .book-options:empty {
@@ -123,7 +123,7 @@
   flex-wrap: wrap;
   gap: 10px 20px;
   justify-content: space-between;
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   padding: 12px;
   background: var(--surface-2);
   color: var(--text);
@@ -175,7 +175,7 @@
   place-items: center;
   width: 56px;
   height: 80px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--chip-bg);
   color: var(--green);
   font-size: 24px;
@@ -430,7 +430,7 @@
     min-height: 0;
     background: var(--surface);
     border: 1px solid var(--control-line);
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
     align-items: stretch;
   }
@@ -613,8 +613,6 @@
     grid-template-columns: minmax(0, 1fr) 90px;
     gap: 12px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     padding: 10px 16px;
     border-bottom: 1px solid var(--line);
     color: var(--muted);
@@ -954,7 +952,7 @@
 }
 .completeness div {
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
 .completeness dt {
@@ -990,7 +988,7 @@
 }
 .missing-facts span {
   padding: 0 6px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--warn-soft);
   color: var(--warn);
   font-size: 11px;
@@ -1108,6 +1106,12 @@
   align-items: center;
   gap: 12px;
   text-align: left;
+}
+/* A title from the catalogue is set in the book face everywhere; a listing's own title is not. */
+.edition-line strong,
+.offers-table .offer-book {
+  font-family: var(--font-book);
+  font-weight: 600;
 }
 /* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
 .segmented button[aria-pressed='true'] {
@@ -1472,7 +1476,7 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
   margin: 6px 0 12px;
   padding: 12px;
   border: 1px dashed var(--note-line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: var(--note-bg);
 }
 /* Catalogue tools (duplicates, suspicious assignments, BN seeding): clearly clickable cards. */
@@ -1480,7 +1484,7 @@ body[data-catalog-view='series'] #view-catalog#view-catalog #catalogDetail:has(>
   margin: 0 0 12px;
   background: var(--surface);
   border: 1px solid var(--card-line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   padding: 0 14px;
 }
 .catalog-duplicates > summary::-webkit-details-marker {

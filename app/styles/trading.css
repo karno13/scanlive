@@ -22,7 +22,7 @@
 }
 .scenario-result {
   display: block;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 12px;
   margin: 12px 0;
   font-size: 13px;
@@ -54,7 +54,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: var(--surface);
   padding: 9px;
   color: var(--text);
@@ -69,7 +69,7 @@
   font-size: 12px;
   padding: 10px 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -106,7 +106,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: var(--surface);
   padding: 9px;
   color: var(--text);
@@ -218,8 +218,6 @@ body.trading-mode section.trading-only {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 /* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */
 .rv-section-title h4 {
@@ -231,7 +229,7 @@ body.trading-mode section.trading-only {
   min-height: 42px;
   padding: 8px 12px;
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
   font-size: 15px;
@@ -240,7 +238,7 @@ body.trading-mode section.trading-only {
   min-height: 42px;
   padding: 8px 12px;
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
   font-size: 15px;
@@ -252,7 +250,7 @@ body.trading-mode section.trading-only {
   min-width: 140px;
   min-height: 38px;
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: var(--surface);
   color: var(--text);
 }

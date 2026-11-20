@@ -29,7 +29,7 @@
     position: sticky;
     overflow-y: auto;
     overscroll-behavior: contain;
-    border-radius: 12px;
+    border-radius: var(--radius);
     top: 90px;
     max-height: calc(100vh - 106px);
   }
@@ -133,11 +133,11 @@
     padding: 18px 20px;
     background: var(--tile);
     border: 1px solid var(--tile-line);
-    border-radius: 8px;
+    border-radius: var(--radius-xs);
     gap: 16px;
   }
   .sets-sidebar {
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
   }
 }
 /* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
@@ -296,7 +296,7 @@
 .sets-bulk-panel {
   margin: 4px 0 12px;
   border: 1px solid var(--card-line);
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   padding: 0 12px;
   background: var(--surface);
 }
