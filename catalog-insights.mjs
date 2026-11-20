@@ -106,9 +106,12 @@ export function catalogInsights(repository) {
   const phrases = new Map();
   for (const row of db
     .prepare(
+      // The review set is read once and joined: a per-offer EXISTS scanned every review job for
+      // each offer (no index on offer_id) and took ~28 s on 8.5k offers / 1k jobs.
       `SELECT o.matched_queries_json AS queries, m.offer_id IS NOT NULL AS matched,
-         EXISTS (SELECT 1 FROM identification_jobs j WHERE j.offer_id=o.id AND j.status='review_required') AS review
-       FROM offers o ${activeMatch}`,
+         r.offer_id IS NOT NULL AS review
+       FROM offers o ${activeMatch}
+         LEFT JOIN (SELECT DISTINCT offer_id FROM identification_jobs WHERE status='review_required') r ON r.offer_id=o.id`,
     )
     .all()) {
     let list = [];

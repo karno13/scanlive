@@ -13,6 +13,8 @@ process.env.BOOKFLIP_OFFER_LIFECYCLE ??= '0';
 process.env.BOOKFLIP_CATALOG_SEEDS ??= '0';
 process.env.BOOKFLIP_STARTER_PROFILES ??= '0';
 process.env.BOOKFLIP_AUTO_BACKUP ??= '0';
+// Scheduled scans read real shops; a run on a copy of the owner's data must not start one.
+process.env.BOOKFLIP_SCHEDULED_SCANS ??= '0';
 process.once('exit', () => {
   rmSync(directory, { recursive: true, force: true, maxRetries: 3 });
 });

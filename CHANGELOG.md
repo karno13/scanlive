@@ -2,6 +2,11 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (108) — Aplikacja otwiera się od razu, a nie po 26 s
+
+- **Błąd:** po uruchomieniu wszystkie zakładki pokazywały przez ok. 26 s „Wczytywanie…”. Panel „Stan katalogu, jakość źródeł i postęp serii” (na dole ekranu Dziś) liczył się na Twoich danych 28 s. Serwer liczy jedno naraz, więc Dziś, Kolejka i Okazje czekały na niego, choć same liczą się w 0,2 s.
+- Teraz panel liczy się w 0,7 s (kopia bazy: 8,5 tys. ofert, ok. 1 tys. w kolejce) i tylko wtedy, gdy jest rozwinięty. Zwinięty nie zajmuje serwera wcale.
+
 ## 2026-11-20 (107) — Katalog: filtr po autorze
 
 - Książki → „Filtry katalogu” → nowe pole **Autor**. Podpowiada wszystkich autorów z katalogu z liczbą książek, najwięcej książek najpierw. Po wybraniu autora lista pokazuje tylko jego książki.

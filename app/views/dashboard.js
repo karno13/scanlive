@@ -26,6 +26,7 @@ export function installDashboard({ state, showView }) {
     try {
       localStorage.setItem('bookflip.dashboardOpen', fold.open ? '1' : '0');
     } catch {}
+    if (fold.open && stale) void refresh({ force: true });
   });
   scanner.append(fold);
 
@@ -118,7 +119,14 @@ export function installDashboard({ state, showView }) {
   // within 3 s unless asked explicitly.
   let inflight = null;
   let loadedAt = 0;
+  // Folded away it is not computed at all: it is read when the fold opens.
+  let stale = true;
   function refresh({ force = false } = {}) {
+    if (!fold.open) {
+      stale = true;
+      return Promise.resolve();
+    }
+    stale = false;
     if (inflight) return inflight;
     if (!force && Date.now() - loadedAt < 3000) return Promise.resolve();
     inflight = load().finally(() => {
