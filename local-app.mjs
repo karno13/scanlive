@@ -4,6 +4,7 @@ import { createRouter } from './router.mjs';
 import { publicAssetPath } from './static-asset-path.mjs';
 import { sendStaticFile } from './static-files.mjs';
 import { createLiveEvents } from './live-events.mjs';
+import { unseenDealAlerts } from './deal-alerts.mjs';
 import { todaySummary } from './today.mjs';
 import { sourceStatus } from './source-status.mjs';
 import { getPolishOnly } from './language-policy.mjs';
@@ -92,6 +93,16 @@ export function createLocalAppServer({
           active: scheduler.active === true,
           paused: scheduler.paused === true,
         };
+      },
+      // New deals announced (deal-alerts.mjs): the page shows them and notifies.
+      deals: () => {
+        const catalog = getProductionCatalog();
+        if (!catalog) return null;
+        try {
+          return { unseen: unseenDealAlerts(catalog.repository) };
+        } catch {
+          return null;
+        }
       },
       source: () => {
         const catalog = getProductionCatalog();

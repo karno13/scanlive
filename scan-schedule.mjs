@@ -5,6 +5,7 @@ import { request as httpRequest } from 'node:http';
 import { listScanProfiles } from './scan-profiles-api.mjs';
 import { NEWEST_ORDER_SOURCES } from './marketplaces.mjs';
 import { hasNoLegalAccess, scannableSources } from './source-blocks.mjs';
+import { sniperTargets } from './market-index.mjs';
 
 const KEY = 'scan_schedule';
 // Schedule value meaning "every saved profile in turn": one profile per run, alphabetical.
@@ -22,6 +23,23 @@ function quickSchedule(saved = {}) {
     lastRunAt: saved.lastRunAt ?? null,
     lastResult: saved.lastResult ?? null,
     lastProfile: typeof saved.lastProfile === 'string' ? saved.lastProfile : null,
+  };
+}
+
+// Snajper: the newest Vinted listings for the works the market index rates best (market-index.mjs),
+// a few phrases per run, every few minutes, so a deal is seen while it is still for sale. Off until
+// the owner turns it on in „Okazje”. Same scan endpoint, gate and limits as every other scan.
+export const SNIPER_BATCH = 10;
+export const SNIPER_MINUTES = [15, 20, 30, 60];
+const SNIPER_SOURCE = 'Vinted';
+function sniperSchedule(saved = {}) {
+  return {
+    enabled: saved.enabled === true,
+    everyMinutes: SNIPER_MINUTES.includes(saved.everyMinutes) ? saved.everyMinutes : 20,
+    lastRunAt: saved.lastRunAt ?? null,
+    lastResult: saved.lastResult ?? null,
+    cursor: Number.isInteger(saved.cursor) && saved.cursor >= 0 ? saved.cursor : 0,
+    lastPhrases: Array.isArray(saved.lastPhrases) ? saved.lastPhrases.map(String) : [],
   };
 }
 
@@ -45,6 +63,7 @@ export function getScanSchedule(repository) {
     lastSkipped: Array.isArray(saved.lastSkipped) ? saved.lastSkipped : [],
     lastProblems: Array.isArray(saved.lastProblems) ? saved.lastProblems : [],
     quick: quickSchedule(saved.quick),
+    sniper: sniperSchedule(saved.sniper),
   };
 }
 
@@ -131,6 +150,26 @@ export function saveScanSchedule(repository, input, now = Date.now()) {
   return getScanSchedule(repository);
 }
 
+/** Turns the sniper on or off and sets its interval; the rest of the schedule stays. */
+export function saveSniper(repository, input, now = Date.now()) {
+  const current = getScanSchedule(repository);
+  const everyMinutes = Number(input?.everyMinutes ?? current.sniper.everyMinutes);
+  if (!SNIPER_MINUTES.includes(everyMinutes)) fail('INVALID_SNIPER_INTERVAL');
+  store(
+    repository,
+    { ...current, sniper: { ...current.sniper, enabled: input?.enabled === true, everyMinutes } },
+    now,
+  );
+  return getScanSchedule(repository).sniper;
+}
+
+/** When the next sniper run is due, or null when it is off. */
+export function nextSniperRunAt(schedule) {
+  if (!schedule.sniper?.enabled) return null;
+  const last = schedule.sniper.lastRunAt ? Date.parse(schedule.sniper.lastRunAt) : 0;
+  return last + schedule.sniper.everyMinutes * 60_000;
+}
+
 /** The profile after `last` in name order (wrapping), for the rotating schedule. */
 export function nextProfile(profiles, last) {
   if (!profiles.length) return null;
@@ -162,6 +201,7 @@ function scanReply(reply) {
 export function createScanScheduler({
   getRepository,
   runScan,
+  getTargets = (repository) => sniperTargets(repository),
   now = Date.now,
   checkEveryMs = 60_000,
   onEvent = () => {},
@@ -177,11 +217,15 @@ export function createScanScheduler({
     if (!repository) return { skipped: 'no-catalog' };
     const schedule = getScanSchedule(repository);
     const due = nextRunAt(schedule);
-    // The full scan has priority; the quick one runs in between, when it is due itself.
+    // The full scan has priority; the quick one runs in between, the sniper in the gaps left.
     if (due === null || now() < due) {
       const quickDue = nextQuickRunAt(schedule);
       if (quickDue !== null && now() >= quickDue) return quickTick(repository, schedule);
-      return { skipped: due === null && quickDue === null ? 'off' : 'not-due' };
+      const sniperDue = nextSniperRunAt(schedule);
+      if (sniperDue !== null && now() >= sniperDue) return sniperTick(repository, schedule);
+      return {
+        skipped: due === null && quickDue === null && sniperDue === null ? 'off' : 'not-due',
+      };
     }
     const profiles = listScanProfiles(repository);
     const profile =
@@ -290,6 +334,52 @@ export function createScanScheduler({
     );
     onEvent({ type: 'scheduled_quick_scan', profile: profile?.name ?? schedule.profile, result });
     return { ran: true, quick: true, result };
+  }
+
+  async function sniperTick(repository, schedule) {
+    running = true;
+    let result;
+    let phrases = [];
+    let cursor = schedule.sniper.cursor;
+    try {
+      const targets = getTargets(repository);
+      const plan = sourcesToScan(repository, [SNIPER_SOURCE], now());
+      if (!targets.length) result = 'no-targets';
+      else if (!plan.sources.length) result = 'source-down';
+      else {
+        const start = cursor % targets.length;
+        phrases = [...targets.slice(start), ...targets.slice(0, start)]
+          .slice(0, SNIPER_BATCH)
+          .map((target) => target.phrase);
+        cursor = (start + phrases.length) % targets.length;
+        const { status, cancelled } = scanReply(
+          await runScan({ queries: phrases, sources: plan.sources, mode: 'newest' }),
+        );
+        if (status === 409 && !cancelled) return { skipped: 'scan-running' };
+        result = cancelled ? 'cancelled' : status >= 200 && status < 300 ? 'ok' : `http-${status}`;
+      }
+    } catch (error) {
+      result = `error:${String(error?.message ?? error).slice(0, 60)}`;
+    } finally {
+      running = false;
+    }
+    const fresh = getScanSchedule(repository);
+    store(
+      repository,
+      {
+        ...fresh,
+        sniper: {
+          ...fresh.sniper,
+          lastRunAt: new Date(now()).toISOString(),
+          lastResult: result,
+          cursor,
+          lastPhrases: phrases,
+        },
+      },
+      now(),
+    );
+    onEvent({ type: 'sniper_scan', phrases: phrases.length, result });
+    return { ran: true, sniper: true, result, phrases };
   }
 
   return {

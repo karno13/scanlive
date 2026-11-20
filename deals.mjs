@@ -11,6 +11,27 @@ import {
   valuationOptions,
 } from './market-valuation.mjs';
 import { proxiedImage } from './offer-images.mjs';
+import { editionLiquidity, liquidityModel } from './market-index.mjs';
+
+/**
+ * How fast the deal's edition sells (market-index.mjs) and the expected gain: the saving times
+ * the chance that a listed copy sells within 30 days. A big saving on a book nobody buys ranks
+ * below a smaller one on a book that sells.
+ * @param {import('./market-index.mjs').LiquidityModel} model
+ */
+function dealLiquidity(model, editionId, saving) {
+  const liquidity = editionLiquidity(model, editionId);
+  return {
+    liquidity: {
+      chance: liquidity.chance,
+      medianDays: liquidity.medianDays,
+      level: liquidity.level,
+      sales: liquidity.sales,
+      listings: liquidity.listings,
+    },
+    expected: Math.round((saving * liquidity.chance) / 100) * 100,
+  };
+}
 
 /** An offer is a deal from this share below its worth, and at least this many grosze. */
 export const DEAL_MIN_DISCOUNT = 0.2;
@@ -63,6 +84,7 @@ export function listDeals(repository, { at = Date.now() } = {}) {
     ...new Set(rows.map((row) => String(row.editionId))),
   ]);
   const options = valuationOptions(database);
+  const liquidity = liquidityModel(database, at);
   /** @type {Map<string, { offerId: string, favourites: number }[]>} */
   const favourites = new Map();
   for (const row of database
@@ -132,9 +154,10 @@ export function listDeals(repository, { at = Date.now() } = {}) {
           .map((item) => item.favourites),
       ),
       verdict: verdicts.get(String(row.id)) ?? null,
+      ...dealLiquidity(liquidity, String(row.editionId), saving),
     });
   }
-  items.sort((a, b) => b.saving - a.saving);
+  items.sort((a, b) => b.expected - a.expected || b.saving - a.saving);
   return { items, verdicts: dealVerdictSummary(repository) };
 }
 

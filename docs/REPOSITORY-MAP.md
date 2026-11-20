@@ -155,6 +155,8 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `price-stats.mjs`                               | Statystyki cen w SQL, w groszach                                                                                                               |
 | `deals.mjs`                                     | „Okazje”: dostępne oferty wyraźnie poniżej wyceny swojego wydania (`/api/deals`) i ocena właściciela, czy okazja była trafna (`deal_verdicts`) |
 | `market-valuation.mjs`                          | Wycena rynkowa książki/wydania: przedział, wiarygodność, uzasadnienie                                                                          |
+| `market-index.mjs`                              | Indeks rynku: wycena, szansa sprzedaży w 30 dni i obrót każdego wydania (`/api/market/index`); cele snajpera                                   |
+| `deal-alerts.mjs`                               | „Nowe okazje”: okazja na świeżej ofercie ogłaszana raz (`deal_alerts`), sonda `deals` w `/api/events`                                          |
 | `buyback-quotes.mjs`, `buyback-skupksiazek.mjs` | Ceny skupu hurtowego (skupksiazek.pl)                                                                                                          |
 
 ### Frontend

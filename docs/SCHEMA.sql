@@ -1,5 +1,5 @@
 -- BookFlip: current SQLite schema (generated, do not edit).
--- All migrations up to 137_deal_verdicts.sql applied to an empty database.
+-- All migrations up to 138_deal_alerts.sql applied to an empty database.
 -- Regenerate after adding a migration: node scripts/dump-schema.mjs
 
 -- app_preferences
@@ -56,6 +56,18 @@ CREATE TABLE catalog_work_merges (
   created_at TEXT NOT NULL,
   CHECK(source_id<>target_id)
 ) STRICT;
+
+-- deal_alerts
+CREATE TABLE deal_alerts (
+  offer_id TEXT PRIMARY KEY REFERENCES offers(id) ON DELETE CASCADE,
+  price INTEGER NOT NULL CHECK (price > 0),
+  worth INTEGER NOT NULL CHECK (worth > 0),
+  saving INTEGER NOT NULL,
+  chance REAL CHECK (chance IS NULL OR chance BETWEEN 0 AND 1),
+  alerted_at TEXT NOT NULL,
+  seen_at TEXT
+) STRICT;
+CREATE INDEX idx_deal_alerts_unseen ON deal_alerts(alerted_at) WHERE seen_at IS NULL;
 
 -- deal_verdicts
 CREATE TABLE deal_verdicts (

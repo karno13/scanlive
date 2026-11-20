@@ -5,6 +5,8 @@ import { recentRelistDecisions, undoRelist } from './offer-status.mjs';
 import { listScanProfiles } from './scan-profiles-api.mjs';
 import { groupedPriceStats } from './price-stats.mjs';
 import { listDeals, removeDealVerdict, saveDealVerdict } from './deals.mjs';
+import { listDealAlerts, markDealAlertsSeen } from './deal-alerts.mjs';
+import { sniperTargets } from './market-index.mjs';
 import { readdir, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { backupCatalog } from './scripts/backup-catalog.mjs';
@@ -22,7 +24,15 @@ import {
 } from './rejection-rules.mjs';
 import { dismissOfferSet } from './offer-sets.mjs';
 import { reviewQueueSummary } from './review-queue.mjs';
-import { getScanSchedule, saveScanSchedule, nextRunAt, nextQuickRunAt } from './scan-schedule.mjs';
+import {
+  getScanSchedule,
+  saveScanSchedule,
+  saveSniper,
+  nextRunAt,
+  nextQuickRunAt,
+  nextSniperRunAt,
+  SNIPER_BATCH,
+} from './scan-schedule.mjs';
 import { getPolishOnly, setPolishOnly } from './language-policy.mjs';
 import { listNames, mergeNames, removeNameAlias } from './name-aliases.mjs';
 import { catalogAuthors } from './catalog-authors.mjs';
@@ -510,6 +520,14 @@ export const apiRoutes = createRouter()
   .add('DELETE', '/api/deals/:offerId/verdict', ({ repo, params }) =>
     removeDealVerdict(repo, params.offerId),
   )
+  // "Nowe okazje" (deal-alerts.mjs) and the sniper that looks for them (scan-schedule.mjs).
+  .add('GET', '/api/deals/alerts', ({ repo }) => listDealAlerts(repo))
+  .add('POST', '/api/deals/alerts/seen', ({ repo }) => markDealAlertsSeen(repo))
+  .add('GET', '/api/sniper', ({ repo }) => sniperStatus(repo))
+  .add('PUT', '/api/sniper', ({ repo, input }) => {
+    saveSniper(repo, input);
+    return sniperStatus(repo);
+  })
   // offers_seen: listings this source returned in its last checked scan, so a source whose
   // health row predates per-phrase success tracking is not shown as dead while it delivers offers.
   .add('GET', '/api/source-health', ({ repo }) => ({
@@ -664,6 +682,21 @@ export function queueSummary(repo) {
     setsEmpty: Number(sets.empty || 0),
     conflicts: findTitleConflicts(repo).length,
     duplicates: listWorkDuplicates(repo).groups.length,
+  };
+}
+
+/** The sniper's state for „Okazje”: on/off, interval, last and next run, what it watches. */
+function sniperStatus(repo) {
+  const schedule = getScanSchedule(repo);
+  const targets = sniperTargets(repo);
+  return {
+    ...schedule.sniper,
+    nextRunAt: nextSniperRunAt(schedule),
+    batch: SNIPER_BATCH,
+    targets: targets.length,
+    phrases: targets.map((target) => target.phrase),
+    // Scheduled scans are switched off for this process (BOOKFLIP_SCHEDULED_SCANS=0).
+    schedulerOff: String(process.env.BOOKFLIP_SCHEDULED_SCANS ?? '1') === '0',
   };
 }
 

@@ -16,6 +16,7 @@ import { offerEditionDraft, recheckOfferEditions } from './offer-editions.mjs';
 import { fillEditionGaps } from './edition-gaps.mjs';
 import { inferListingSeries } from './edition-series.mjs';
 import { recordProgress } from './app-runtime.mjs';
+import { recordDealAlerts } from './deal-alerts.mjs';
 
 // Reads detail pages of shops that publish the ISBN in structured data, in small paced batches,
 // before the resolver runs so that new evidence is used in the same pass.
@@ -293,6 +294,13 @@ export function scheduleCatalogResolution(catalogStore) {
         // New offers of a work the operator removed from the catalogue leave at once.
         rejectOffersOfRemovedWorks(catalogStore.repository);
         assignEmpikReferences(catalogStore.repository);
+        // Offers identified by this pass that are deals: announced once ("Nowe okazje").
+        if (result?.processed) {
+          try {
+            const fresh = recordDealAlerts(catalogStore.repository);
+            if (fresh.length) recordProgress({ type: 'deal_alerts', count: fresh.length });
+          } catch {}
+        }
       }
       return result;
     })

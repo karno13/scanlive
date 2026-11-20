@@ -16,6 +16,7 @@ import {
   saveSeriesDefinition,
 } from '../catalog-series.mjs';
 import { catalogPersons, personWorks } from '../catalog-bibliography.mjs';
+import { marketIndex } from '../market-index.mjs';
 import { buyback, getBuyback, readJson, send, catalogHistorySnapshot } from '../app-runtime.mjs';
 
 export function addCatalogRoutes(routes, { getProductionCatalog, identificationControl }) {
@@ -88,6 +89,22 @@ export function addCatalogRoutes(routes, { getProductionCatalog, identificationC
         JSON.stringify(catalog.seeds.setStatus(params.id, (await readJson(request))?.status)),
       );
     })
+    // „Okazje” → „Rynek”: every edition's resale value, sale chance in 30 days and turnover.
+    .add('GET', '/api/market/index', async ({ catalog, response, url }) =>
+      send(
+        response,
+        200,
+        JSON.stringify(
+          marketIndex(catalog.repository, {
+            sort: url.searchParams.get('sort') ?? undefined,
+            limit: url.searchParams.get('limit') ?? undefined,
+            offset: url.searchParams.get('offset') ?? undefined,
+            query: url.searchParams.get('q') ?? undefined,
+            confidence: url.searchParams.get('confidence') ?? undefined,
+          }),
+        ),
+      ),
+    )
     .add('GET', '/api/catalog/persons', async ({ catalog, request, response, url, params }) => {
       return send(
         response,
