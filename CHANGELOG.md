@@ -2,6 +2,13 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (110) — Dziś: na górze to, co czeka na Ciebie
+
+- Ekran zaczyna się od jednej dużej liczby: ile decyzji czeka w kolejce i od ilu dni najstarsza („694 decyzje czekają · najstarsza czeka 9 dni”), z przyciskiem „Weryfikuj”. Zastępuje kafel „Do decyzji” i przycisk „Weryfikacja” w nagłówku.
+- Pozostałe kafle (nowe oferty, zmiany cen, źródła, skany) są mniejsze. Cztery miary są w jednym panelu zamiast czterech osobnych kart.
+- Źródła bez legalnego dostępu (Allegro, Dedalus, OLX) są zwinięte w „3 bez legalnego dostępu”, obok „16 działa”. Na wierzchu zostają tylko źródła, które przestały działać.
+- Na telefonie „Nowy skan” jest zwykłym przyciskiem, a nie paskiem na całą szerokość nad kolejką.
+
 ## 2026-11-20 (109) — Okazje: najpierw oszczędność, oceny ciszej
 
 - W każdej okazji największą liczbą jest teraz oszczędność („−184 zł”). Pod nią rabat i cena („−65% · za 100,00 zł”), dalej wycena i wiarygodność.

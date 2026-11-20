@@ -430,9 +430,8 @@ body.trading-mode section.trading-only {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  min-height: 112px;
-  padding: 14px 16px;
+  gap: 2px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -443,8 +442,7 @@ body.trading-mode section.trading-only {
 }
 @media (max-width: 900px) {
   .today-tile {
-    min-height: 96px;
-    padding: 12px;
+    padding: 10px 12px;
   }
 }
 .today-sources {
@@ -516,7 +514,5 @@ body.trading-mode section.trading-only {
   flex-direction: column;
   gap: 2px;
   padding: 12px 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
   background: var(--surface);
 }

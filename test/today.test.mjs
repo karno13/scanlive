@@ -196,16 +196,15 @@ test('tiles: each opens a filtered list; non-working sources are named and marke
   const tiles = todayTiles(data, now);
   assert.deepEqual(
     tiles.map((tile) => tile.id),
-    ['new', 'price', 'queue', 'sources', 'last-scan', 'next-scan'],
+    ['new', 'price', 'sources', 'last-scan', 'next-scan'],
   );
   assert.deepEqual(tiles[0].go, { offers: data.newOffers.filters });
   assert.deepEqual(tiles[1].go, { offers: data.priceChanges.filters });
-  assert.deepEqual(tiles[2].go, { view: 'review' });
-  assert.equal(tiles[3].value, '1/3');
-  assert.equal(tiles[3].warn, true);
-  assert.match(tiles[3].note, /Allegro, Dedalus\.pl/);
-  assert.deepEqual(tiles[4].go, { offers: { scan: '2026-11-11T19:10:00.000Z' } });
-  assert.equal(tiles[5].value, whenLabel('2026-11-12T07:16:00.000Z', now));
+  assert.equal(tiles[2].value, '1/3');
+  assert.equal(tiles[2].warn, true);
+  assert.match(tiles[2].note, /Allegro, Dedalus\.pl/);
+  assert.deepEqual(tiles[3].go, { offers: { scan: '2026-11-11T19:10:00.000Z' } });
+  assert.equal(tiles[4].value, whenLabel('2026-11-12T07:16:00.000Z', now));
   assert.match(
     sourceLine(data.sources[1], now),
     /^nie działa od dziś \d\d:\d\d — serwis żąda CAPTCHA/,
@@ -232,9 +231,41 @@ test('the source list shows failing and no-access sources, and folds the working
     escape,
   );
   assert.match(html, /<summary>2 działa<\/summary>/);
+  assert.match(html, /<summary>1 bez legalnego dostępu<\/summary>/);
   assert.ok(html.indexOf('data-source="B"') < html.indexOf('<summary>'));
-  assert.ok(html.indexOf('data-source="D"') < html.indexOf('<summary>'));
   assert.ok(html.indexOf('data-source="A"') > html.indexOf('<summary>'));
+  assert.ok(
+    html.indexOf('data-source="D"') > html.indexOf('bez legalnego'),
+    'no access is folded too',
+  );
+});
+
+test('the view leads with the decisions waiting and the age of the oldest', async () => {
+  const { todayLead } = await import('../app/views/today.js');
+  const measures = [{ id: 'oldestDecisionDays', value: 9 }];
+  assert.deepEqual(todayLead({ queue: { decisions: 739, offers: 851 }, measures }), {
+    count: 739,
+    label: 'decyzji czeka',
+    note: 'najstarsza czeka 9 dni · 851 ofert w kolejce',
+    attention: true,
+  });
+  assert.equal(
+    todayLead({ queue: { decisions: 2, offers: 3 }, measures: [] }).label,
+    'decyzje czekają',
+  );
+  assert.equal(
+    todayLead({
+      queue: { decisions: 1, offers: 1 },
+      measures: [{ id: 'oldestDecisionDays', value: 1 }],
+    }).note,
+    'najstarsza czeka 1 dzień · 1 oferta w kolejce',
+  );
+  assert.deepEqual(todayLead({ queue: { decisions: 0, offers: 0 } }), {
+    count: 0,
+    label: 'Kolejka pusta',
+    note: 'nic nie czeka na decyzję',
+    attention: false,
+  });
 });
 
 test('the command palette says "oferta / oferty / ofert" correctly', async () => {

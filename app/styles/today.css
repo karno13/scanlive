@@ -22,6 +22,79 @@
     gap: 8px;
   }
 }
+/* The lead: the decisions waiting, the one figure of the view that asks for action. */
+.today-lead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'count label action' 'count note action';
+  align-items: baseline;
+  column-gap: 16px;
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.today-lead.is-attention {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+.today-lead:hover {
+  border-color: var(--brand);
+}
+.today-lead strong {
+  grid-area: count;
+  align-self: center;
+  color: var(--brand);
+  font-family: var(--font-display);
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.today-lead span {
+  grid-area: label;
+  align-self: end;
+  font-size: 20px;
+  font-weight: 650;
+}
+.today-lead small {
+  grid-area: note;
+  align-self: start;
+  color: var(--muted);
+  font-size: 14px;
+}
+.today-lead em {
+  grid-area: action;
+  align-self: center;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-fill);
+  color: var(--on-brand);
+  font-style: normal;
+  font-weight: 650;
+}
+@media (max-width: 900px) {
+  .today-lead {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'count label' 'count note' 'action action';
+    row-gap: 4px;
+    padding: 14px 16px;
+  }
+  .today-lead strong {
+    font-size: 40px;
+  }
+  .today-lead span {
+    font-size: 17px;
+  }
+  .today-lead em {
+    margin-top: 8px;
+    text-align: center;
+  }
+}
 .today-tile-label {
   color: var(--muted);
   font-size: 13px;
@@ -115,11 +188,16 @@
   margin-bottom: 2px;
 }
 /* Dziś: four measures with a trend, under the tiles. */
+/* One panel: the 1px gaps over the line colour draw the dividers between the measures. */
 .today-measures {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  margin: 12px 0;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--line);
 }
 .today-measure .today-trend {
   font-weight: 600;

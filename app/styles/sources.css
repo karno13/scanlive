@@ -2160,14 +2160,14 @@ input:focus {
   gap: 16px;
 }
 .today-tile strong {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 650;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 900px) {
   .today-tile strong {
-    font-size: 22px;
+    font-size: 18px;
   }
 }
 .today-tile small {
@@ -2177,7 +2177,7 @@ input:focus {
 }
 @media (max-width: 900px) {
   #view-today > .today-heading .button {
-    flex: 1;
+    flex: 0 1 auto;
   }
 }
 /* Z obszaru „Kolejka”, po regułach tego pliku (kaskada). */

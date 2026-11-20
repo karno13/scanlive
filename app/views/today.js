@@ -65,6 +65,24 @@ export function measureCards(measures = []) {
 }
 
 /**
+ * The one thing the view leads with: the decisions waiting in the queue and how old the oldest is
+ * (from the measures). Pure (tested).
+ */
+export function todayLead(data) {
+  const decisions = data.queue?.decisions ?? 0;
+  const offers = data.queue?.offers ?? 0;
+  const oldest = (data.measures || []).find((m) => m.id === 'oldestDecisionDays')?.value;
+  if (!decisions) return { count: 0, label: 'Kolejka pusta', note: 'nic nie czeka na decyzję', attention: false };
+  const age = typeof oldest === 'number' && oldest > 0 ? `najstarsza czeka ${oldest} ${plural(oldest, 'dzień', 'dni', 'dni')}` : 'najstarsza z dziś';
+  return {
+    count: decisions,
+    label: plural(decisions, 'decyzja czeka', 'decyzje czekają', 'decyzji czeka'),
+    note: `${age} · ${offers} ${plural(offers, 'oferta', 'oferty', 'ofert')} w kolejce`,
+    attention: true,
+  };
+}
+
+/**
  * Tiles of the view from the /api/today answer. Pure (tested); `go` names what a tile opens:
  * { offers: filters } | { view: name }.
  */
@@ -87,14 +105,7 @@ export function todayTiles(data, now = new Date()) {
       note: scopeNote,
       go: { offers: data.priceChanges.filters },
     });
-  tiles.push({
-    id: 'queue',
-    label: 'Do decyzji',
-    value: data.queue?.decisions ?? 0,
-    note: `${data.queue?.offers ?? 0} ${plural(data.queue?.offers ?? 0, 'oferta', 'oferty', 'ofert')} w kolejce`,
-    go: { view: 'review' },
-    attention: (data.queue?.decisions ?? 0) > 0,
-  });
+  // The queue is not a tile: it leads the view (todayLead).
   // Sources without legal access (Allegro, OLX) are neither working nor failing: not counted.
   const counted = (data.sources || []).filter((row) => row.state !== 'no_access');
   const down = counted.filter((row) => row.state === 'down' || row.state === 'never');
@@ -126,18 +137,19 @@ export function todayTiles(data, now = new Date()) {
 }
 
 /**
- * Rows of the source list: sources that do not work or have no legal access stand out one by one;
- * the working ones fold into one "N działa" line. Pure (tested).
+ * Rows of the source list: sources that do not work stand out one by one; the working ones fold into
+ * one "N działa" line and those without legal access (a settled fact, not news) into another.
+ * Pure (tested).
  */
 export function sourceRows(sources, now, escapeHtml) {
   const row = (item) =>
     `<li class="is-${escapeHtml(item.state)}"><button type="button" data-source="${escapeHtml(item.source)}" title="Oferty z tego źródła"><i class="source-dot-state" aria-hidden="true"></i><b>${escapeHtml(item.source)}</b><span>${escapeHtml(sourceLine(item, now))}</span></button></li>`;
   const working = sources.filter((item) => item.state === 'ok');
-  const rest = sources.filter((item) => item.state !== 'ok');
-  const folded = working.length
-    ? `<li class="today-sources-ok"><details><summary>${working.length} działa</summary><ul>${working.map(row).join('')}</ul></details></li>`
-    : '';
-  return rest.map(row).join('') + folded;
+  const closed = sources.filter((item) => item.state === 'no_access');
+  const rest = sources.filter((item) => item.state !== 'ok' && item.state !== 'no_access');
+  const fold = (list, summary) =>
+    list.length ? `<li class="today-sources-ok"><details><summary>${summary}</summary><ul>${list.map(row).join('')}</ul></details></li>` : '';
+  return rest.map(row).join('') + fold(working, `${working.length} działa`) + fold(closed, `${closed.length} bez legalnego dostępu`);
 }
 
 export function installTodayView({ $, json, escapeHtml, showView, openOffers }) {
@@ -156,12 +168,13 @@ export function installTodayView({ $, json, escapeHtml, showView, openOffers }) 
     $('#todaySince').textContent = data.scope === 'visit'
       ? 'od ostatniej wizyty: ' + whenLabel(data.since, now)
       : data.lastScan ? 'liczby z ostatniego skanu' : 'jeszcze nie było skanu';
-    const reviewButton = $('#todayReview');
-    reviewButton.textContent = data.queue?.decisions ? `Weryfikuj (${data.queue.decisions})` : 'Weryfikacja';
+    // The lead opens the queue: the heading button would say the same again.
+    $('#todayReview').hidden = true;
+    const lead = todayLead(data);
     const measures = measureCards(data.measures)
       .map((card) => `<div class="today-measure is-${card.tone}" data-measure="${escapeHtml(card.id)}"><span class="today-tile-label">${escapeHtml(card.label)}</span><strong>${escapeHtml(card.value)}</strong><small>${escapeHtml(card.note)}</small><small class="today-trend">${escapeHtml(card.trend)}</small></div>`)
       .join('');
-    root.innerHTML = `${scan}<div class="today-tiles">${tiles
+    root.innerHTML = `${scan}<button type="button" class="today-lead${lead.attention ? ' is-attention' : ''}" data-lead><strong>${lead.count || ''}</strong><span>${escapeHtml(lead.label)}</span><small>${escapeHtml(lead.note)}</small>${lead.attention ? '<em>Weryfikuj</em>' : ''}</button><div class="today-tiles">${tiles
       .map(
         (tile, index) =>
           `<button type="button" class="today-tile${tile.attention ? ' is-attention' : ''}${tile.warn ? ' is-warn' : ''}" data-tile="${index}"><span class="today-tile-label">${escapeHtml(tile.label)}</span><strong>${escapeHtml(String(tile.value))}</strong><small>${escapeHtml(tile.note)}</small></button>`,
@@ -184,6 +197,7 @@ export function installTodayView({ $, json, escapeHtml, showView, openOffers }) 
       button.addEventListener('click', () => openOffers({ source: button.dataset.source, sort: 'newest' })),
     );
     root.querySelector('[data-go-view]')?.addEventListener('click', () => showView('scanner'));
+    root.querySelector('[data-lead]')?.addEventListener('click', () => showView('review'));
   }
 
   async function refresh() {
