@@ -591,6 +591,10 @@ body.density-compact .work-row .cover-md {
   margin: 14px;
 }
 @media (max-width: 900px) {
+  /* On a phone the deals come first; the rule of the list is a static note the desktop shows. */
+  .deals-note {
+    display: none;
+  }
   .deal-row {
     grid-template-columns: auto minmax(0, 1fr);
   }

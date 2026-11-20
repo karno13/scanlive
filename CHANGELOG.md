@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (113) — Okazje: czytelna ikona, na telefonie od razu lista
+
+- Ikona Okazji w nawigacji to znak procentu zamiast zakręconej strzałki, która nic nie mówiła.
+- Na telefonie opis zasad listy („co najmniej 20% i 5 zł poniżej…”) jest ukryty, więc pierwsza okazja jest wyżej. Na komputerze opis zostaje.
+- Sprawdzone i odrzucone: pełny pasek boczny z nazwami od 1280 px. Kolejka jest wtedy za ciasna (karta kandydata łamie się po literze, zakładki grup są ucięte), więc do 1440 px pasek zostaje rzędem ikon z podpowiedziami.
+
 ## 2026-11-20 (112) — Spokojniejsza typografia
 
 - Tytuły z katalogu (wydania na stronie książki, kolumna „Przypisanie” w Ofertach) są pisane tym samym krojem książkowym co lista książek. Tytuły ogłoszeń zostają w zwykłym kroju, więc od razu widać, co pochodzi z katalogu, a co od sprzedającego.
