@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (104) — Anulowany automatyczny skan nie startuje od nowa
+
+- **Błąd:** po anulowaniu skanu z harmonogramu ten sam profil startował ponownie po minucie, i tak po każdym anulowaniu. Harmonogram brał odpowiedź „skan anulowany” za „trwa inny skan” i nie zapisywał próby. U Ciebie profil „Pomiar: szeroki rynek” startował 19.11 o 23:58 oraz 20.11 o 19:21, 19:28 i 19:30, a ostatni zapisany przebieg harmonogramu był z 18.11.
+- Teraz anulowanie liczy się jako przebieg („anulowany”, bez ostrzeżenia „ostatni nieudany”). Następny skan rusza w kolejnym terminie (co 12 h, następny profil po kolei).
+- Automatyczny skan wyłączysz w Skanerze, w sekcji „Automatyczny skan”.
+
 ## 2026-11-20 (103) — Dostawa Vinted: znacznik „bezpłatna” ze strony już się nie liczy
 
 - **Błąd:** filtr „Dostawa: bezpłatna” pokazywał oferty Vinted, które po zalogowaniu mają płatną dostawę. Były to oferty ze znacznikiem `isFree` na stronie widzianej bez logowania (dostawa tylko do punktu, np. 8,85 zł → 0 zł). Teraz liczy się cena regularna także przy nich.

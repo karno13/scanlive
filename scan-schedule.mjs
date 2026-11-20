@@ -152,6 +152,13 @@ export function nextRunAt(schedule) {
   return last + schedule.everyHours * 3_600_000;
 }
 
+// The runner answers with the HTTP status, or { status, error } when it read the body: a 409 is
+// either another scan in progress (try again next minute) or this scan cancelled by the owner.
+function scanReply(reply) {
+  const { status, error = null } = typeof reply === 'number' ? { status: reply } : reply;
+  return { status, cancelled: status === 409 && error === 'SCAN_CANCELLED' };
+}
+
 export function createScanScheduler({
   getRepository,
   runScan,
@@ -193,12 +200,21 @@ export function createScanScheduler({
         if (!plan.sources.length) result = 'all-sources-down';
         else {
           const startedAt = new Date(now()).toISOString();
-          const status = await runScan({ queries: profile.queries, sources: plan.sources });
-          // 409: a manual scan is already running. Try again on the next check instead of doubling up.
-          if (status === 409) return { skipped: 'scan-running' };
+          const { status, cancelled } = scanReply(
+            await runScan({ queries: profile.queries, sources: plan.sources }),
+          );
+          // A cancelled scan counts as this run: starting it again a minute later would make
+          // "Anuluj" useless (2026-11-20: the same profile restarted after every cancel).
+          if (status === 409 && !cancelled) return { skipped: 'scan-running' };
           const success = status >= 200 && status < 300;
           problems = success ? scanProblems(repository, startedAt) : [];
-          result = success ? (problems.length ? 'partial' : 'ok') : `http-${status}`;
+          result = cancelled
+            ? 'cancelled'
+            : success
+              ? problems.length
+                ? 'partial'
+                : 'ok'
+              : `http-${status}`;
         }
       }
     } catch (error) {
@@ -247,13 +263,11 @@ export function createScanScheduler({
       else if (!sortable.length) result = 'no-sortable-source';
       else if (!plan.sources.length) result = 'all-sources-down';
       else {
-        const status = await runScan({
-          queries: profile.queries,
-          sources: plan.sources,
-          mode: 'newest',
-        });
-        if (status === 409) return { skipped: 'scan-running' };
-        result = status >= 200 && status < 300 ? 'ok' : `http-${status}`;
+        const { status, cancelled } = scanReply(
+          await runScan({ queries: profile.queries, sources: plan.sources, mode: 'newest' }),
+        );
+        if (status === 409 && !cancelled) return { skipped: 'scan-running' };
+        result = cancelled ? 'cancelled' : status >= 200 && status < 300 ? 'ok' : `http-${status}`;
       }
     } catch (error) {
       result = `error:${String(error?.message ?? error).slice(0, 60)}`;
@@ -291,7 +305,7 @@ export function createScanScheduler({
   };
 }
 
-/** POSTs to this server's own scan endpoint exactly like the browser does. */
+/** POSTs to this server's own scan endpoint exactly like the browser does; resolves { status, error }. */
 export function localScanRunner(port) {
   return (input) =>
     new Promise((resolve, reject) => {
@@ -309,8 +323,16 @@ export function localScanRunner(port) {
           },
         },
         (res) => {
-          res.resume();
-          res.on('end', () => resolve(res.statusCode));
+          let text = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => (text += chunk));
+          res.on('end', () => {
+            let error = null;
+            try {
+              error = JSON.parse(text)?.error ?? null;
+            } catch {}
+            resolve({ status: res.statusCode, error });
+          });
         },
       );
       req.on('error', reject);

@@ -4,10 +4,14 @@ import { putScanProfile } from '../scan-profiles-api.mjs';
 import {
   createScanScheduler,
   getScanSchedule,
+  localScanRunner,
   nextRunAt,
   saveScanSchedule,
 } from '../scan-schedule.mjs';
 import { SqliteCatalogRepository } from '../sqlite-catalog-repository.mjs';
+import { createLocalAppServer } from '../local-app.mjs';
+import { createProductionCatalog } from '../catalog-production.mjs';
+import { awaitScan } from '../scan-cancellation.mjs';
 
 function setup() {
   const repo = new SqliteCatalogRepository(':memory:');
@@ -68,6 +72,70 @@ test('a manual scan in progress (409) is retried later without recording a run',
   const scheduler = createScanScheduler({
     getRepository: () => repo,
     runScan: async () => 409,
+    now: () => Date.now(),
+  });
+  assert.deepEqual(await scheduler.tick(), { skipped: 'scan-running' });
+  assert.equal(getScanSchedule(repo).lastRunAt, null);
+});
+
+test('a scheduled scan the owner cancels is recorded and not started again a minute later', async () => {
+  const catalog = createProductionCatalog({
+    databasePath: ':memory:',
+    fetcher: async () => {
+      throw Error('NETWORK_NOT_ALLOWED');
+    },
+  });
+  const repo = catalog.repository;
+  putScanProfile(repo, 'Fantasy', { queries: ['Warcraft'], sources: ['Empik'] });
+  saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 12 });
+  let started;
+  const startedPromise = new Promise((resolve) => (started = resolve));
+  let scans = 0;
+  // The scan waits until it is cancelled, like a long category read.
+  const search = async (input, options) => {
+    scans += 1;
+    started();
+    await awaitScan(new Promise(() => {}), options.signal);
+  };
+  const server = createLocalAppServer({ catalogProvider: () => catalog, search });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const port = server.address().port;
+  const base = 'http://127.0.0.1:' + port;
+  const clock = Date.parse('2026-11-20T18:00:00Z');
+  const scheduler = createScanScheduler({
+    getRepository: () => repo,
+    runScan: localScanRunner(port),
+    now: () => clock,
+  });
+  try {
+    const run = scheduler.tick();
+    await startedPromise;
+    const stop = await fetch(base + '/api/search/cancel', {
+      method: 'POST',
+      headers: { Origin: base, 'Content-Type': 'application/json' },
+    });
+    assert.equal(stop.status, 202);
+    assert.equal((await run).result, 'cancelled');
+    assert.equal(getScanSchedule(repo).lastRunAt, '2026-11-20T18:00:00.000Z');
+    assert.deepEqual(await scheduler.tick(), { skipped: 'not-due' });
+    assert.equal(scans, 1);
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+    catalog.close();
+  }
+});
+
+test('a scan already in progress is told apart from a cancelled one by the answer', async () => {
+  const repo = setup();
+  saveScanSchedule(repo, { enabled: true, profile: 'Fantasy', everyHours: 1 });
+  const scheduler = createScanScheduler({
+    getRepository: () => repo,
+    runScan: async () => ({ status: 409, error: 'SCAN_ALREADY_RUNNING' }),
     now: () => Date.now(),
   });
   assert.deepEqual(await scheduler.tick(), { skipped: 'scan-running' });

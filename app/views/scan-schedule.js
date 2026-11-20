@@ -2,6 +2,9 @@
 // while the app is open, using the same endpoint and limits as a manual scan.
 const when = (value) => new Date(value).toLocaleString('pl-PL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+// A run the owner cancelled is not a failure: no warning flag for it.
+const isFailed = (result) => Boolean(result) && result !== 'ok' && result !== 'cancelled';
+
 /** What the last automatic run did, in words. */
 export function describeResult(schedule) {
   const result = schedule.lastResult;
@@ -9,6 +12,7 @@ export function describeResult(schedule) {
   const skipped = schedule.lastSkipped || [];
   const label =
     result === 'ok' ? 'udany'
+      : result === 'cancelled' ? 'anulowany — następny w kolejnym terminie'
       : result === 'partial' ? 'częściowo udany — błędy: ' + problems.join(', ')
         : result === 'all-sources-down' ? 'pominięty — żadne źródło profilu nie działało'
           : result === 'profile-missing' ? 'nie odbył się — profil nie istnieje'
@@ -16,7 +20,7 @@ export function describeResult(schedule) {
   return label + (skipped.length ? '; pominięto niedziałające: ' + skipped.join(', ') : '');
 }
 
-const QUICK_RESULTS = { ok: 'udany', 'no-sortable-source': 'pominięty — profil nie ma źródła sortowanego od najnowszych (Vinted)', 'all-sources-down': 'pominięty — źródło nie działało', 'profile-missing': 'nie odbył się — profil nie istnieje' };
+const QUICK_RESULTS = { ok: 'udany', cancelled: 'anulowany', 'no-sortable-source': 'pominięty — profil nie ma źródła sortowanego od najnowszych (Vinted)', 'all-sources-down': 'pominięty — źródło nie działało', 'profile-missing': 'nie odbył się — profil nie istnieje' };
 /** The quick scan of the newest listings, in words. */
 export function describeQuick(schedule) {
   const quick = schedule.quick;
@@ -31,7 +35,7 @@ export function scheduleHeadline(schedule) {
   if (!schedule.enabled) return 'Automatyczny skan: wyłączony';
   const profile = schedule.profile === '__all__' ? 'wszystkie profile po kolei' : schedule.profile;
   const next = schedule.nextRunAt ? ' · następny ' + when(Math.max(schedule.nextRunAt, Date.now())) : '';
-  const warn = schedule.lastResult && schedule.lastResult !== 'ok' ? ' · ostatni: ' + (schedule.lastResult === 'partial' ? 'z błędami' : 'nieudany') : '';
+  const warn = isFailed(schedule.lastResult) ? ' · ostatni: ' + (schedule.lastResult === 'partial' ? 'z błędami' : 'nieudany') : '';
   return `Automatyczny skan: co ${schedule.everyHours} h (${profile})${next}${warn}`;
 }
 
@@ -72,13 +76,13 @@ export async function mountScanSchedule({ panel, json, toast, escapeHtml, profil
     ].filter(Boolean).join(' · ');
     const flag = !schedule.enabled && !schedule.quick?.enabled
       ? '<span class="schedule-flag is-off">wyłączony</span>'
-      : schedule.lastResult && schedule.lastResult !== 'ok'
+      : isFailed(schedule.lastResult)
         ? '<span class="schedule-flag">' + (schedule.lastResult === 'partial' ? 'ostatni z błędami' : 'ostatni nieudany') + '</span>'
         : '';
     $('#scheduleHeadline').innerHTML = 'Automatyczny skan' + (meta ? ' <span class="schedule-meta">' + escapeHtml(meta) + '</span>' : '') + flag;
     $('#scheduleHeadline').title = scheduleHeadline(schedule);
     root.classList.toggle('is-on', schedule.enabled);
-    root.classList.toggle('is-warn', schedule.enabled && Boolean(schedule.lastResult) && schedule.lastResult !== 'ok');
+    root.classList.toggle('is-warn', schedule.enabled && isFailed(schedule.lastResult));
   };
 
   async function load(knownProfiles = null) {
