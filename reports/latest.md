@@ -1,10 +1,10 @@
 # Najnowszy raport BookFlip
 
-**Data:** 2026-11-19
+**Data:** 2026-11-20
 
-Raport wskazuje pilną potrzebę wyłączenia automatycznych wyszukiwarek Tezeusza i Dedalusa oraz dalszego zaostrzenia weryfikacji kontekstu ISBN. Jako nowy kandydat źródła ofert wskazano Bookway, ale przed adapterem wymagany jest ręczny audyt danych i potwierdzenie warunków automatycznego dostępu. Wersja uzupełniona zawiera 10 zweryfikowanych tropów książkowych i poprawione odnośniki bibliograficzne.
+Najpilniejszym ustaleniem jest nieudany test SQLite na Node 22.16 w GitHub Actions (764/765 testów zaliczonych); joby Windows zostały anulowane, więc zgodność tej wersji na docelowym systemie wymaga sprawdzenia. Nowa kontrola zgodności tytułu wykryła 42 podejrzane przypisania na kopii bazy z 2605 automatycznych. Raport koryguje też błędy poprzedniego audytu: Tezeusz działa przez strony autorów, Dedalus jest już wyłączony, a Bookway jest już wdrożony. Nie znaleziono nowego źródła, które można dziś bezpiecznie zintegrować.
 
-[Otwórz pełny raport z 2026-11-19](archive/2026-11-19-0902.md).
+[Otwórz pełny raport z 2026-11-20](archive/2026-11-20.md).
 
 Raport jest materiałem analitycznym dla właściciela i Claude Code, nie zgodą na wdrożenie zmian.
 
