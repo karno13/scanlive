@@ -130,7 +130,9 @@ function sectionValue(data, code) {
 // "discountPercentage":100,"isFree":false}}}).
 // The regular price (originalPrice) is the one that counts: a signed-out visitor is shown a
 // promotional finalPrice of 0 on nearly every listing (2371 of 2385 read pages, 11.2026), which
-// the owner does not get. Delivery is free only when the page says so (isFree) or the regular
+// the owner does not get. isFree does not count either: listings with isFree true (point delivery
+// only) showed a delivery price to the signed-in owner (11.2026), and a listing the owner sees as
+// „od 0 zł” looks like any paid one to a signed-out visitor. Delivery is free only when the regular
 // price is 0.
 // Only the selected item has this block (the page repeats it for the buy and the offer button); copies
 // that disagree make the page ambiguous and nothing is read.
@@ -151,7 +153,7 @@ function shippingPrice(data) {
   const final = amount(shipping?.finalPrice);
   const original = amount(shipping?.originalPrice);
   const isFree = shipping?.isFree === true;
-  const cost = isFree ? 0 : (original ?? final);
+  const cost = original ?? final;
   if (cost == null) return null;
   return { cost, original, final, isFree };
 }

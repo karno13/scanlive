@@ -265,10 +265,19 @@ test('Vinted delivery price comes from the selected item price block only', () =
   const url = 'https://www.vinted.pl/items/9000000002-faust-erik-terry-pratchett';
   // A 100% discount shown to a signed-out visitor (finalPrice 0, isFree false) is not free delivery.
   assert.equal(parseVintedDetail(detailPage, url).shippingCost, 705);
-  const free = parseVintedDetail(
+  // isFree true is not free delivery for the signed-in owner either: the regular price counts.
+  const flagged = parseVintedDetail(
     detailPage.replace(
       '\\"isFree\\":false,\\"areMultipleShippingOptionsAvailable',
       '\\"isFree\\":true,\\"areMultipleShippingOptionsAvailable',
+    ),
+    url,
+  );
+  assert.equal(flagged.shippingCost, 705);
+  const free = parseVintedDetail(
+    detailPage.replace(
+      '\\"originalPrice\\":{\\"amount\\":\\"7.05\\"',
+      '\\"originalPrice\\":{\\"amount\\":\\"0\\"',
     ),
     url,
   );

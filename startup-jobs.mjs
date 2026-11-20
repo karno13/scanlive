@@ -107,10 +107,11 @@ export function runStartupJobs(repository, { now = () => new Date(), env = proce
     clearImplausiblePrices(repository),
   );
   // Once: Vinted delivery prices saved as 0 zł from the signed-out promotion, and the foreign
-  // editions that got in because of it.
+  // editions that got in because of it. v2 (20.11.2026): also the 0 zł saved from the page's isFree
+  // flag, which is not free delivery for the owner.
   report.shipping = runOnce(
     repository,
-    'vinted_promo_shipping_v1',
+    'vinted_promo_shipping_v2',
     () => repairPromotionalShippingCosts(repository, { now }),
     { now },
   );

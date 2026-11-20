@@ -34,7 +34,7 @@ export function saveShippingCost(repository, offerId, cost, at) {
 /**
  * One-time repair: until 16.11.2026 the promotional price shown to a signed-out visitor (0 zł) was
  * saved as the delivery price, so nearly every Vinted offer looked like free delivery and foreign
- * editions were let in. Each such offer gets the regular price kept in its page snapshot, or goes
+ * editions were let in; until 20.11.2026 the page's isFree flag was saved as 0 zł too (run again). Each such offer gets the regular price kept in its page snapshot, or goes
  * back to the backfill queue. Foreign-language offers lose their automatic assignment and are
  * identified again (they end in „Gry / obce” or are rejected by "Tylko polskie wydania"); manual
  * assignments, sets and offers with a decision stay.

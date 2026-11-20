@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (103) — Dostawa Vinted: znacznik „bezpłatna” ze strony już się nie liczy
+
+- **Błąd:** filtr „Dostawa: bezpłatna” pokazywał oferty Vinted, które po zalogowaniu mają płatną dostawę. Były to oferty ze znacznikiem `isFree` na stronie widzianej bez logowania (dostawa tylko do punktu, np. 8,85 zł → 0 zł). Teraz liczy się cena regularna także przy nich.
+- Naprawa zapisanych danych, raz przy starcie: na kopii bazy 23 oferty „bezpłatne” → 4 dostają cenę regularną z zapisanej strony, 19 wraca do „nieznana” i uzupełni się w tle. Wszystkie 23 były po polsku, więc rozpoznanie się nie zmienia. Po naprawie: 0 bezpłatnych, 3176 płatnych, 1662 nieznane.
+- Ograniczenie: prawdziwej darmowej dostawy (u Ciebie po zalogowaniu „od 0 zł”, np. Angelfall tom 2) nie da się odczytać. Bez logowania Vinted pokazuje każdą ofertę jako „od 0 zł”, a strona takiej oferty niczym nie różni się od płatnych (sprawdzone na 10 losowych). Aplikacja nie loguje się na Vinted, więc filtr „bezpłatna” będzie dla Vinted pusty, a wyjątek „obcojęzyczne z darmową dostawą zostają” (wpis 90) przestaje działać.
+
 ## 2026-11-20 (102) — Dwa nowe źródła: Lagano i Vanaheim (Warhammer)
 
 - **Lagano** i **Vanaheim** — księgarnie z nowymi książkami, czytane po kategorii Warhammer / Black Library jak antykwariaty (raz na 20 h, potem dopasowanie do fraz). Lagano: 124 książki na 6 stronach, Vanaheim: ok. 160 na 6 stronach. Oferty są liczone jako „Nowe w sklepie”.
