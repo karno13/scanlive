@@ -8,6 +8,7 @@ import { plural, zl } from '../core/valuation.js';
 
 const CONDITION_LABELS = { new: 'nowa', very_good: 'bardzo dobra', good: 'dobra', satisfactory: 'zadowalająca', unknown: 'stan nieznany' };
 const SORTS = {
+  expected: (a, b) => (b.expected ?? 0) - (a.expected ?? 0) || b.saving - a.saving,
   saving: (a, b) => b.saving - a.saving,
   discount: (a, b) => b.discount - a.discount || b.saving - a.saving,
   newest: (a, b) => String(b.firstSeenAt || '').localeCompare(String(a.firstSeenAt || '')),
@@ -15,6 +16,14 @@ const SORTS = {
   demand: (a, b) => (b.demand?.median ?? -1) - (a.demand?.median ?? -1) || b.saving - a.saving,
 };
 const DEMAND_LABELS = { high: 'wysoki', medium: 'średni', low: 'niski' };
+const LIQUIDITY_LABELS = { fast: 'schodzi szybko', normal: 'schodzi przeciętnie', slow: 'schodzi wolno' };
+
+/** "schodzi szybko · 31% szans na sprzedaż w 30 dni · zwykle ~57 dni"; empty without data. */
+export function liquidityLabel(liquidity) {
+  if (!liquidity) return '';
+  const days = liquidity.medianDays == null ? '' : liquidity.medianDays >= 365 ? ' · zwykle ponad rok' : ` · zwykle ~${liquidity.medianDays} dni`;
+  return `${LIQUIDITY_LABELS[liquidity.level] || ''} · ${Math.round(liquidity.chance * 100)}% szans na sprzedaż w 30 dni${days}`;
+}
 
 /** "♥ 12 · popyt wysoki (mediana 9 polubień w 5 ofertach Vinted)"; empty without data. */
 export function demandLabel(item) {
@@ -37,10 +46,10 @@ const LEVELS = { high: 'wysokiej', medium: 'średniej', low: 'niskiej' };
  * The deals to show: without low-confidence valuations and without rated ones unless asked,
  * in the chosen order. `keep`: offers rated during this visit stay visible, with their undo.
  */
-export function visibleDeals(items, { includeLow = false, showRated = false, sort = 'saving', keep = new Set() } = {}) {
+export function visibleDeals(items, { includeLow = false, showRated = false, sort = 'expected', keep = new Set() } = {}) {
   return items
     .filter((item) => keep.has(item.offerId) || ((includeLow || item.confidence !== 'low') && (showRated || !item.verdict)))
-    .sort(SORTS[sort] || SORTS.saving);
+    .sort(SORTS[sort] || SORTS.expected);
 }
 
 /** "12 okazji · 94 ukryte (niska wiarygodność wyceny) · 5 ocenionych ukrytych". */
@@ -85,7 +94,7 @@ function workLinkMarkup(item, escapeHtml) {
 export function dealMarkup(item, { escapeHtml, money, now = new Date() }) {
   const demand = demandLabel(item);
   const basis = [item.sold ? `${item.sold} ${plural(item.sold, 'sprzedaż', 'sprzedaże', 'sprzedaży')}` : '', item.live ? `${item.live} ${plural(item.live, 'oferta', 'oferty', 'ofert')}` : ''].filter(Boolean).join(', ');
-  return `<article class="deal-row${item.suspicious ? ' is-suspicious' : ''}" data-deal-offer="${escapeHtml(item.offerId)}">${coverMarkup(item.image, item.title, { size: 'sm', escapeHtml })}<div class="deal-copy"><button type="button" class="link-button deal-title" data-deal-open="${escapeHtml(item.offerId)}" title="${escapeHtml(item.title)}">${escapeHtml(tidyOfferTitle(item.title))}</button><small>${escapeHtml(item.source)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)} · wykryta ${dateMarkup(item.firstSeenAt, now)}${demand ? ` · <span class="deal-demand${item.demand ? ` is-${escapeHtml(item.demand.level)}` : ''}" title="Polubienia tej oferty i mediana polubień pozostałych ofert tego wydania na Vinted — im więcej, tym częściej oferty schodzą">${escapeHtml(demand)}</span>` : ''} · <a href="${escapeHtml(safeOfferHref(item.url))}" target="_blank" rel="noopener noreferrer">ogłoszenie ↗</a></small>${workLinkMarkup(item, escapeHtml)}${item.suspicious ? '<small class="deal-warning">Bardzo daleko od wyceny — sprawdź, czy oferta jest przypisana do właściwej książki i czy to jeden egzemplarz.</small>' : ''}${verdictMarkup(item, escapeHtml)}</div><div class="deal-numbers" title="${escapeHtml((item.reasons || []).join(' '))}"><strong class="deal-saving">−${zl(item.saving)}</strong><span class="deal-price">−${item.discount}% · za <b>${money(item.price)}</b></span><span>warta ~${zl(item.worth)} <small>(${Math.round(item.worthLow / 100)}–${zl(item.worthHigh)})</small></span><small><span class="value-confidence is-${escapeHtml(item.confidence)}">wiarygodność ${escapeHtml(item.confidenceLabel)}</span> ${escapeHtml(basis)}</small></div></article>`;
+  return `<article class="deal-row${item.suspicious ? ' is-suspicious' : ''}" data-deal-offer="${escapeHtml(item.offerId)}">${coverMarkup(item.image, item.title, { size: 'sm', escapeHtml })}<div class="deal-copy"><button type="button" class="link-button deal-title" data-deal-open="${escapeHtml(item.offerId)}" title="${escapeHtml(item.title)}">${escapeHtml(tidyOfferTitle(item.title))}</button><small>${escapeHtml(item.source)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)} · wykryta ${dateMarkup(item.firstSeenAt, now)}${demand ? ` · <span class="deal-demand${item.demand ? ` is-${escapeHtml(item.demand.level)}` : ''}" title="Polubienia tej oferty i mediana polubień pozostałych ofert tego wydania na Vinted — im więcej, tym częściej oferty schodzą">${escapeHtml(demand)}</span>` : ''} · <a href="${escapeHtml(safeOfferHref(item.url))}" target="_blank" rel="noopener noreferrer">ogłoszenie ↗</a></small>${workLinkMarkup(item, escapeHtml)}${item.suspicious ? '<small class="deal-warning">Bardzo daleko od wyceny — sprawdź, czy oferta jest przypisana do właściwej książki i czy to jeden egzemplarz.</small>' : ''}${item.liquidity ? `<small class="deal-liquidity is-${escapeHtml(item.liquidity.level)}" title="Z czasu wystawienia i sprzedaży ofert tego wydania na Vinted">${escapeHtml(liquidityLabel(item.liquidity))}</small>` : ''}${verdictMarkup(item, escapeHtml)}</div><div class="deal-numbers" title="${escapeHtml((item.reasons || []).join(' '))}"><strong class="deal-saving">−${zl(item.saving)}</strong>${item.expected != null ? `<span class="deal-expected" title="Oszczędność × szansa sprzedaży w 30 dni">oczekiwany zysk ~${zl(item.expected)}</span>` : ''}<span class="deal-price">−${item.discount}% · za <b>${money(item.price)}</b></span><span>warta ~${zl(item.worth)} <small>(${Math.round(item.worthLow / 100)}–${zl(item.worthHigh)})</small></span><small><span class="value-confidence is-${escapeHtml(item.confidence)}">wiarygodność ${escapeHtml(item.confidenceLabel)}</span> ${escapeHtml(basis)}</small></div></article>`;
 }
 
 export function installDeals({ $, json, escapeHtml, money, openOfferDrawer, openWork }) {

@@ -10,6 +10,8 @@ import { installQueue, QUEUE_TYPES, QUEUE_VIEWS } from './views/queue.js';
 import { mountRuleSettings } from './views/reject-rule.js';
 import { installSources } from './views/sources.js';
 import { installDeals } from './views/deals.js';
+import { installSniper } from './views/sniper.js';
+import { installMarket } from './views/market.js';
 import { createScanRun } from './views/scan-run.js';
 import { installScanProfiles } from './views/scan-profiles.js';
 import { installScanSeries } from './views/scan-series.js';
@@ -212,7 +214,10 @@ function showView(name, options = {}) {
   if (name === 'review') { renderReview(); void tradingControls?.refreshDecisions(); }
   if (name === 'catalog') renderCatalog();
   if (name === 'offers') renderOffers();
-  if (name === 'deals') void dealsView?.refresh();
+  if (name === 'deals') {
+    void dealsView?.refresh();
+    void sniperView?.refresh();
+  }
   if (name === 'settings') { renderSettings(); void tradingControls?.refreshSettings(); void ruleSettings?.refresh(); }
   if (name === 'sets') void setsView.refreshSets().catch(error => toast(error.message));
   return true;
@@ -1085,7 +1090,24 @@ for (const id of ['catalogConflicts', 'catalogDuplicates']) {
 const queue = installQueue({ $, json, escapeHtml, showView, state });
 const ruleSettings = mountRuleSettings({ $, json, toast, escapeHtml });
 const sourcesView = installSources({ $, json, escapeHtml, openOffers });
-const dealsView = installDeals({ $, json, escapeHtml, money, openOfferDrawer, openWork: (id) => { if (showView('catalog')) void catalogView.openCatalogDetail(id); } });
+const openWorkPage = (id) => { if (showView('catalog')) void catalogView.openCatalogDetail(id); };
+const dealsView = installDeals({ $, json, escapeHtml, money, openOfferDrawer, openWork: openWorkPage });
+const sniperView = installSniper({ $, json, escapeHtml, money, toast, openOfferDrawer, isVisible: () => !$('#view-deals').hidden && !$('#dealsPane').hidden });
+const marketView = installMarket({ $, json, escapeHtml, openWork: openWorkPage });
+// „Okazje” and „Rynek” share the view; the market is read when first shown.
+let marketLoaded = false;
+$$('[data-deals-pane]').forEach((button) =>
+  button.addEventListener('click', () => {
+    const market = button.dataset.dealsPane === 'market';
+    $$('[data-deals-pane]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+    $('#dealsPane').hidden = market;
+    $('#marketPane').hidden = !market;
+    if (market && !marketLoaded) {
+      marketLoaded = true;
+      void marketView.refresh();
+    }
+  }),
+);
 // The catalogue tools read their data when Katalog is first opened.
 let catalogToolsMounted = false;
 function mountCatalogTools() {
@@ -1159,7 +1181,7 @@ function setConnection(online) {
   $('#connectionLabel').textContent = online ? 'Aplikacja online' : 'Łączenie ponownie…';
 }
 connectLive({
-  onEvent: (kind) => (kind === 'queue' ? onQueueChange() : kind === 'scan' ? onScanChange() : onSourceChange()),
+  onEvent: (kind, data) => (kind === 'queue' ? onQueueChange() : kind === 'scan' ? onScanChange() : kind === 'deals' ? void sniperView.onLive(data) : onSourceChange()),
   onState: (value) => setConnection(value === 'online'),
   // Back after a break (server restart, sleep, network): read everything again.
   onReconnect: () => {

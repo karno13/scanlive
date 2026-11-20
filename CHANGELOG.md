@@ -2,6 +2,14 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (114) — Rynek i Snajper: która książka się sprzeda i okazja w kilka minut
+
+- **Rynek** (Okazje → „Rynek”): każde wydanie z wyceną ma trzy liczby: ile jest wart używany egzemplarz, jaka jest szansa sprzedaży wystawionego egzemplarza w 30 dni i ile to zwykle trwa. Do tego **obrót** (wartość × szansa), sprzedane i dostępne egzemplarze na Vinted. Sortowanie: obrót, najszybciej schodzi, najwyższa wartość, najwięcej w sprzedaży; wyszukiwarka po tytule i autorze.
+- Skąd szansa: z czasu wystawienia i sprzedaży wszystkich ofert danego wydania na Vinted. Wydanie z małą liczbą ofert dostaje średnią wydań o podobnym popycie (polubieniach). Na kopii bazy: 2 364 oferty, 151 sprzedanych, a przeciętny egzemplarz ma **18% szans na sprzedaż w 30 dni**. Wydań szybkich jest 105, przeciętnych 609, wolnych 184.
+- **Okazje** układają się według **oczekiwanego zysku**: oszczędność × szansa sprzedaży w 30 dni, nadal bez kosztów wysyłki i prowizji. Duża różnica na książce, której nikt nie kupuje, spada pod mniejszą na takiej, która schodzi. Przy każdej okazji widać „schodzi szybko · 32% szans na sprzedaż w 30 dni · zwykle ~54 dni”.
+- **Snajper** (na górze Okazji, domyślnie **wyłączony**): po włączeniu co 15, 20, 30 albo 60 min sprawdza najnowsze ogłoszenia Vinted dla 40 książek z najlepszym obrotem, po 10 na przebieg, przez ten sam skan i te same limity co zwykle. Nowa okazja (oferta sprzed najwyżej 2 dni, wiarygodna wycena) jest ogłaszana raz: lista „Nowa” w Okazjach, kropka przy ikonie w nawigacji, komunikat w aplikacji, a gdy karta jest w tle i pozwolisz — powiadomienie systemowe. Na kopii bazy byłoby od razu 21 takich okazji.
+- Ograniczenia: dane Vinted są dopiero od 1.11, więc szanse dla pojedynczych wydań to szacunek, który z każdym tygodniem będzie dokładniejszy. Powiadomienia działają tylko przy otwartej aplikacji (na komputerze albo w telefonie przez Tailscale); bez otwartej karty nic nie przyjdzie. Każdy przebieg snajpera to zwykły skan, więc pojawia się jako „Ostatni skan” na ekranie Dziś.
+
 ## 2026-11-20 (113) — Okazje: czytelna ikona, na telefonie od razu lista
 
 - Ikona Okazji w nawigacji to znak procentu zamiast zakręconej strzałki, która nic nie mówiła.

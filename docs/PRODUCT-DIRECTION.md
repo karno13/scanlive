@@ -10,6 +10,8 @@ Każda planowana funkcja powinna mieć jasne uzasadnienie w procesie handlowym: 
 
 Właściciel projektu nie handluje w tej chwili. Rozwój koncentruje się na **skanerze, katalogu i weryfikacji**: pokrycie i niezawodność źródeł, struktura dzieł/wydań/serii oraz szybkość i trafność rozpoznawania książek. Funkcje stricte handlowe (zysk, koszty, rejestr transakcji, alerty zakupowe) są odłożone do czasu zmiany tej decyzji.
 
+**Zmiana 2026-11-20:** na prośbę właściciela Okazje stały się silnikiem rynku. Każde wydanie ma szansę sprzedaży w 30 dni liczoną z czasu wystawienia ofert na Vinted (indeks „Rynek”), okazje są ułożone według oczekiwanej korzyści (oszczędność × ta szansa, nadal bez kosztów i prowizji), a snajper — wyłączony, dopóki właściciel go nie włączy — co kilkanaście minut sprawdza najnowsze ogłoszenia Vinted dla książek z najlepszym obrotem i ogłasza nowe okazje. Rozstrzygnięcie nisza / szeroki rynek ma czytać się z indeksu.
+
 **Zmiana 2026-11-15:** na prośbę właściciela wróciła ocena okazji w wąskiej postaci — zakładka „Okazje” pokazuje dostępne oferty wyraźnie poniżej wyceny rynkowej swojego wydania. To porównanie ceny z wyceną, bez kosztów, zysku i statusów zakupu; te pozostają odłożone.
 
 ## Założenia właściciela (ustalone, nie pytać ponownie)

@@ -475,6 +475,166 @@ body.density-compact .work-row .cover-md {
   text-underline-offset: 3px;
 }
 /* „Okazje” (deals.mjs): offers clearly below the value of their edition */
+.deals-panes {
+  margin-bottom: 14px;
+}
+.sniper-panel {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.sniper-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+.sniper-head h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.sniper-head .sniper-every {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.sniper-panel > .inline-note {
+  margin: 6px 0 0;
+}
+.sniper-alerts {
+  display: grid;
+  gap: 2px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sniper-alert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'badge title numbers' 'badge meta numbers';
+  align-items: baseline;
+  column-gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+}
+.sniper-alert.is-new {
+  background: var(--brand-soft);
+}
+.sniper-alert.is-gone {
+  opacity: 0.6;
+}
+.sniper-alert > .sniper-new {
+  grid-area: badge;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--brand-fill);
+  color: var(--on-brand);
+  font-size: 12px;
+  font-weight: 650;
+}
+.sniper-alert > .link-button {
+  min-height: 0;
+  padding: 0;
+  grid-area: title;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: 600;
+}
+.sniper-alert > small {
+  grid-area: meta;
+  color: var(--muted);
+}
+.sniper-alert-numbers {
+  grid-area: numbers;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.sniper-alert-numbers strong {
+  color: var(--good);
+  font-size: 1.1rem;
+}
+.sniper-gone {
+  color: var(--warn);
+}
+.market-search {
+  flex: 1 1 260px;
+}
+.market-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.market-open {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.market-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.market-copy small {
+  color: var(--muted);
+}
+.market-title {
+  font-family: var(--font-book);
+  font-weight: 600;
+}
+.market-numbers {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  white-space: nowrap;
+}
+.market-numbers strong {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+.market-numbers small {
+  color: var(--muted);
+}
+.market-turnover {
+  color: var(--good);
+  font-weight: 650;
+}
+.market-more {
+  margin: 12px auto;
+  display: block;
+}
+/* Something new for the owner in „Okazje”: a dot on its navigation icon. */
+.has-news .nav-glyph,
+.has-news .mobile-nav-icon {
+  position: relative;
+}
+.has-news .nav-glyph::after,
+.has-news .mobile-nav-icon::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--side-bg);
+  border-radius: 50%;
+  background: var(--pulse);
+}
 .deals-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -557,6 +717,17 @@ body.density-compact .work-row .cover-md {
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
+.deal-numbers .deal-expected {
+  color: var(--text);
+  font-weight: 600;
+}
+.deal-copy .deal-liquidity.is-fast {
+  color: var(--good);
+  font-weight: 600;
+}
+.deal-copy .deal-liquidity.is-slow {
+  color: var(--warn);
+}
 .deal-row.is-suspicious .deal-saving {
   color: var(--warn);
 }
@@ -597,6 +768,19 @@ body.density-compact .work-row .cover-md {
   }
   .deal-row {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+  .sniper-alert {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'badge title' 'badge meta' 'badge numbers';
+  }
+  .sniper-alert-numbers {
+    white-space: normal;
+  }
+  .market-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .market-numbers {
+    justify-items: start;
   }
   .deal-numbers {
     grid-column: 1 / -1;

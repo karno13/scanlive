@@ -1,8 +1,8 @@
 // One live channel from the server (/api/events, server-sent events) instead of timers. Events:
 // scan (scan state or progress), queue (review queue / identification), source (a source started
-// or stopped working). EventSource reconnects by itself; after every reconnection the page reads
+// or stopped working), deals (a new deal was announced: deal-alerts.mjs). EventSource reconnects by itself; after every reconnection the page reads
 // its state again (onReconnect), because events sent while it was away are lost.
-export const LIVE_EVENTS = ['scan', 'queue', 'source'];
+export const LIVE_EVENTS = ['scan', 'queue', 'source', 'deals'];
 
 export function connectLive({ onEvent, onReconnect = () => {}, onState = () => {}, url = '/api/events', EventSourceImpl = globalThis.EventSource } = {}) {
   if (typeof EventSourceImpl !== 'function') return { close() {} };
