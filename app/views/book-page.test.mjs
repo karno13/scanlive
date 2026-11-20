@@ -5,14 +5,17 @@ import { bestBuyback, bookTilesMarkup, bookOffersMarkup } from './book-page.js';
 const money = (grosze) => (grosze / 100).toFixed(2) + ' zł';
 const escapeHtml = (value) => String(value).replace(/[<>&"]/g, '');
 
-test('book tiles show lowest, median, Vinted sold, buyback and offer count', () => {
+test('book tiles show lowest, median, Vinted sold and buyback', () => {
   const overview = {
     overall: { offers: 12, live: 9, min: 2000, median: 4000, sold: 3 },
     vintedSold: { count: 2, median: 3000, min: 2500, max: 3500 },
   };
   const html = bookTilesMarkup(overview, { status: 'priced', price: 16.55, checkedAt: '2026-11-14T10:00:00Z' }, { money, escapeHtml, isbns: 1 });
-  for (const text of ['Najniższa cena', '20.00 zł', 'Mediana ofert', '40.00 zł', '9 ofert', 'Sprzedane na Vinted', '30.00 zł', '2 sprzedaże', 'Cena skupu', '16,55', 'Oferty', '>12<'])
+  for (const text of ['Najniższa cena', '20.00 zł', 'Mediana ofert', '40.00 zł', '9 ofert', 'Sprzedane na Vinted', '30.00 zł', '2 sprzedaże', 'Cena skupu', '16,55'])
     assert.ok(html.includes(text), text);
+  // One offer on sale: its price is the lowest and the median at once, so no median tile.
+  const one = bookTilesMarkup({ overall: { offers: 1, live: 1, min: 5742, median: 5742 } }, null, { money, escapeHtml, isbns: 1 });
+  assert.ok(one.includes('Najniższa cena') && !one.includes('Mediana ofert'));
 });
 
 test('book tiles without data say so instead of showing zeros', () => {

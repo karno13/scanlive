@@ -135,9 +135,7 @@
 /* Z obszaru „Komponenty”, po regułach tego pliku (kaskada). */
 @media (min-width: 901px) {
   .detail-section h4 {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-size: 13px;
     color: var(--muted);
     margin-bottom: 12px;
   }

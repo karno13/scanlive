@@ -2017,7 +2017,7 @@ body.density-compact #view-catalog#view-catalog #catalogList:not(.is-grid):not(.
   font-size: 12px;
 }
 .bp-tile strong {
-  font-size: 22px;
+  font-size: 18px;
   font-variant-numeric: tabular-nums;
 }
 .bp-tile.is-key {
@@ -2027,8 +2027,9 @@ body.density-compact #view-catalog#view-catalog #catalogList:not(.is-grid):not(.
   color: var(--good);
 }
 .work-offers h4 small,
-.bp-editions h4 small {
-  color: var(--muted);
+.bp-editions h4 small,
+.bp-value h4 small {
+  color: var(--faint);
   font-weight: 400;
 }
 .bp-offer-list {
@@ -2156,7 +2157,10 @@ body.density-compact #view-catalog#view-catalog #catalogList:not(.is-grid):not(.
   display: none;
 }
 .value-head strong {
-  font-size: 1.4em;
+  font-family: var(--font-display);
+  font-size: 2.2em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 .value-confidence {
   padding: 1px 8px;

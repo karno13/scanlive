@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (111) — Strona książki: wycena na górze
+
+- Szacowana wartość („~44 zł, przedział 31–55 zł”) jest teraz pierwsza pod przyciskami i największa na stronie. Kafle z cenami są pod nią i mniejsze.
+- Kafel „Mediana ofert” pojawia się dopiero przy dwóch ofertach (przy jednej powtarzał najniższą cenę). Kafel „Oferty” zniknął: liczbę ofert podaje lista tuż niżej.
+- Nagłówki sekcji nie są już pisane wersalikami w jednym ciągu z podpowiedzią („SZACOWANA WARTOŚĆ RYNKOWA UŻYWANY EGZEMPLARZ…”). Teraz: „Szacowana wartość rynkowa” i jaśniej „używany egzemplarz w dobrym stanie”. Dotyczy to nagłówków sekcji w całej aplikacji na komputerze.
+
 ## 2026-11-20 (110) — Dziś: na górze to, co czeka na Ciebie
 
 - Ekran zaczyna się od jednej dużej liczby: ile decyzji czeka w kolejce i od ilu dni najstarsza („694 decyzje czekają · najstarsza czeka 9 dni”), z przyciskiem „Weryfikuj”. Zastępuje kafel „Do decyzji” i przycisk „Weryfikacja” w nagłówku.

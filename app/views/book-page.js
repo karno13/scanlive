@@ -22,8 +22,8 @@ function tile(label, value, note, tone = '') {
 }
 
 /**
- * Tiles: lowest and median asking price of the offers still on sale, Vinted sold median,
- * wholesale buyback and the number of offers. `overview` is /api/catalog/works/:id/prices
+ * Tiles: lowest and (from two offers) median asking price of the offers still on sale, Vinted sold
+ * median and wholesale buyback. The number of offers heads the offer list right below. `overview` is /api/catalog/works/:id/prices
  * (grosze), `buyback` the best quote (złoty) or null, `isbns` how many editions can be quoted.
  */
 export function bookTilesMarkup(overview, buyback, { money, escapeHtml, isbns = 0, buybackBusy = false }) {
@@ -49,10 +49,9 @@ export function bookTilesMarkup(overview, buyback, { money, escapeHtml, isbns = 
       : 'nie sprawdzono';
   return [
     tile('Najniższa cena', live ? money(overall.min) : dash, live ? 'wśród dostępnych ofert' : 'brak dostępnych ofert', 'is-key'),
-    tile('Mediana ofert', live ? money(overall.median) : dash, live ? `${live} ${plural(live, 'oferta', 'oferty', 'ofert')}${live < 3 ? ' · mało danych' : ''}` : dash),
+    live > 1 ? tile('Mediana ofert', money(overall.median), `${live} ${plural(live, 'oferta', 'oferty', 'ofert')}${live < 3 ? ' · mało danych' : ''}`) : '',
     tile('Sprzedane na Vinted', sold.count ? money(sold.median) : dash, sold.count ? `${sold.count} ${plural(sold.count, 'sprzedaż', 'sprzedaże', 'sprzedaży')}${sold.count > 1 ? ` · ${money(sold.min)}–${money(sold.max)}` : ''}` : 'brak sprzedaży'),
     tile('Cena skupu', escapeHtml(buybackValue), escapeHtml(buybackNote), buyback?.status === 'priced' ? 'is-good' : ''),
-    tile('Oferty', String(overall.offers || 0), overall.sold ? `${overall.sold} ${plural(overall.sold, 'sprzedana', 'sprzedane', 'sprzedanych')}` : 'zapisane w katalogu'),
   ].join('');
 }
 
