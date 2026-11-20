@@ -515,6 +515,9 @@ body.density-compact .work-row .cover-md {
 .deal-copy small {
   color: var(--muted);
 }
+.deal-copy small .link-button {
+  font-weight: 400;
+}
 .deal-demand.is-high {
   color: var(--good);
   font-weight: 600;
@@ -539,14 +542,20 @@ body.density-compact .work-row .cover-md {
   white-space: nowrap;
 }
 .deal-numbers b {
-  font-size: 1.15em;
+  color: var(--text);
 }
 .deal-numbers span,
 .deal-numbers small {
   color: var(--muted);
 }
+/* The saving is what the row is about: the largest figure, the price follows it. */
 .deal-saving {
   color: var(--good);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 .deal-row.is-suspicious .deal-saving {
   color: var(--warn);
@@ -559,8 +568,24 @@ body.density-compact .work-row .cover-md {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 4px;
+}
+/* Rating is secondary to the deal itself: quiet chips, full contrast on hover and focus. */
+.deal-verdict-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.deal-verdict-chip:hover,
+.deal-verdict-chip:focus-visible {
+  border-color: var(--line-strong);
+  color: var(--text);
 }
 .deals-list > .inline-note {
   margin: 14px;

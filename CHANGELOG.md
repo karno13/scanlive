@@ -2,6 +2,12 @@
 
 Zmiany widoczne dla użytkownika. Wpisy są numerowane, najnowszy na górze; liczby pochodzą z danych użytkownika (kopia bazy), gdy są dostępne. Poprawki błędów zaczynają się od „**Błąd:**”.
 
+## 2026-11-20 (109) — Okazje: najpierw oszczędność, oceny ciszej
+
+- W każdej okazji największą liczbą jest teraz oszczędność („−184 zł”). Pod nią rabat i cena („−65% · za 100,00 zł”), dalej wycena i wiarygodność.
+- Cztery przyciski oceny („Trafna”, „Złe przypisanie”…) są małe i ciche; wyraźne robią się po najechaniu albo zaznaczeniu klawiaturą. Działają jak dotąd.
+- Odnośnik do książki nie powtarza tytułu, który już widać w ogłoszeniu („Mort - Terry Pratchett” → „↳ strona książki”). Gdy ogłoszenie nazywa książkę inaczej, odnośnik pokazuje jej tytuł z katalogu.
+
 ## 2026-11-20 (108) — Aplikacja otwiera się od razu, a nie po 26 s
 
 - **Błąd:** po uruchomieniu wszystkie zakładki pokazywały przez ok. 26 s „Wczytywanie…”. Panel „Stan katalogu, jakość źródeł i postęp serii” (na dole ekranu Dziś) liczył się na Twoich danych 28 s. Serwer liczy jedno naraz, więc Dziś, Kolejka i Okazje czekały na niego, choć same liczą się w 0,2 s.

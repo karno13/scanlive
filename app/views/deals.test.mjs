@@ -48,12 +48,16 @@ test('low-confidence deals are hidden unless asked for, and the order follows th
 test('a deal row shows price, worth, saving and the links; a suspicious one warns', () => {
   const row = dealMarkup(deal(), { escapeHtml, money });
   assert.match(row, /warta ~40 zł/);
-  assert.match(row, /−20 zł · −50%/);
+  assert.match(row, /class="deal-saving">−20 zł</);
+  assert.match(row, /−50% · za <b>20 zł<\/b>/);
   assert.match(row, /wiarygodność średnia/);
   assert.match(row, /2 sprzedaże, 3 oferty/);
   assert.match(dealMarkup(deal({ sold: 0, live: 1 }), { escapeHtml, money }), /1 oferta</);
   assert.match(row, /data-deal-open="o1"/);
   assert.match(row, /data-deal-work="w"/);
+  // The book link does not repeat a title the listing already names; another title is shown.
+  assert.match(row, />strona książki</);
+  assert.match(dealMarkup(deal({ workTitle: 'Straż nocna' }), { escapeHtml, money }), />Straż nocna</);
   assert.match(row, /href="https:\/\/example.test\/o1"/);
   assert.doesNotMatch(row, /<Pratchett>/);
   assert.doesNotMatch(row, /sprawdź, czy oferta/);
