@@ -85,13 +85,17 @@ Następnie polecenie dla koordynatora:
 
 ```text
 Pracuj w trybie ciągłego zespołu BookFlip zgodnie z docs/AGENT-TEAM.md.
-Zrób jeden pełny cykl: odczytaj stan, wybierz jedno zadanie o najwyższym priorytecie,
-zaplanuj, zaimplementuj, uruchom właściwe testy i npm run verify, zleć niezależny review
-agentowi QA, popraw ewentualne błędy, zaktualizuj dokumentację i wykonaj lokalny commit.
-Nie pushuj, nie scalaj i nie dotykaj danych użytkownika. Po raporcie zatrzymaj się.
+Pracuj w powtarzalnej pętli aż wpiszę STOP: w każdym cyklu odczytaj aktualny stan,
+wybierz dokładnie jedno zadanie o najwyższym priorytecie, zaplanuj, zaimplementuj,
+uruchom właściwe testy i npm run verify, zleć niezależny review agentowi QA,
+popraw ewentualne błędy, zaktualizuj dokumentację i wykonaj lokalny commit.
+Po każdym cyklu podaj krótki raport i przejdź do następnego zadania bez pytania o zgodę,
+o ile nie wystąpi jedna z sytuacji wymagających zgody opisanych wyżej. Nie pushuj,
+nie scalaj i nie dotykaj danych użytkownika. Zatrzymaj się, gdy wpiszę STOP, zabraknie
+bezpiecznych zadań, skończy się limit lub pojawi się blokada wymagająca mojej decyzji.
 ```
 
-Aby wykonać kolejny cykl, ponów polecenie. Na tym etapie nie konfigurujemy automatycznego Harmonogramu Windows: najpierw trzeba ocenić jakość kilku cykli i rzeczywiste zużycie limitu Pro. Automatyzacja bez nadzoru może utrwalać błędne priorytety i zużywać limit bez wartości.
+Pozostaw tę interaktywną sesję otwartą, aby agent wykonywał kolejne cykle. Zatrzymaj go, wpisując `STOP` lub przerywając sesję. Na tym etapie nie konfigurujemy automatycznego Harmonogramu Windows ani nie uruchamiamy Claude w trybie bezobsługowym: najpierw trzeba ocenić jakość kilku cykli i rzeczywiste zużycie limitu Pro. Automatyzacja bez nadzoru może utrwalać błędne priorytety i zużywać limit bez wartości.
 
 ## Kryteria powodzenia pilotażu
 
