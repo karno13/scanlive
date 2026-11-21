@@ -14,6 +14,7 @@ UI text, docs and changelog are **Polish**; code, comments and commit messages a
 
 ## How to work
 
+- Local continuous agent-team workflow: `docs/AGENT-TEAM.md`; specialist subagents live in `.claude/agents/`. The coordinator remains the main Claude Code session; keep delegation bounded and preserve all safety rules below.
 - Work autonomously: choose sensible defaults, implement, verify, report at the end. Do not stop for confirmation between steps of an agreed task.
 - Ask first only before: deleting or overwriting the owner's data, touching the live database, anything outside this repository, removing a feature.
 - Stay on the current branch; commit each finished, verified step (short English message).
