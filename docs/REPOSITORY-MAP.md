@@ -247,6 +247,16 @@ Jedna linijka na plik: do czego służy. Szczegóły zachowań (trasy, parametry
 | `scripts/measure-network.mjs`                                        | Zapytania i bajty interfejsu przy starcie i po przejściu widoków              |
 | `scripts/page-settle.mjs`                                            | Czekanie na ciszę w sieci z pominięciem `/api/events`                         |
 
+### Zespół agentów (lokalnie)
+
+| Plik | Rola |
+| --- | --- |
+| `docs/AGENT-TEAM.md` | Architektura lokalnego, ciągłego cyklu pracy agentów, granice autonomii i uruchomienie |
+| `.claude/agents/product-triage.md` | Triage produktu i priorytetyzacja backlogu |
+| `.claude/agents/scanner-specialist.md` | Specjalista skanera i źródeł |
+| `.claude/agents/catalog-specialist.md` | Specjalista katalogu, ISBN i weryfikacji |
+| `.claude/agents/qa-reviewer.md` | Niezależny przegląd zmian, domyślnie tylko do odczytu |
+
 ### Dokumentacja
 
 | Plik                             | Rola                                                                                                     |
