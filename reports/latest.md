@@ -1,9 +1,9 @@
 # Najnowszy raport BookFlip
 
-**Data:** 21.11.2026
+**Data:** 22.11.2026
 
-Najważniejsze ustalenia: zlokalizowano test SQLite padający na Node 22.16.0 w `shipping-backfill.mjs`; 42 podejrzane przypisania ISBN nadal wymagają ręcznej oceny; nie znaleziono nowego źródła ofert gotowego do legalnej integracji. Raport zawiera audyt Bookbot i Antykwariat.pl, 10 zweryfikowanych ISBN-ów/wydań oraz plan kontrolowanego skanu dokładnych fraz.
+Najważniejsze ustalenia: od poprzedniego raportu nie zmienił się kod aplikacji; dodano lokalny zespół agentów Claude Code, który wymaga pilotażu 5–10 cykli. Problem testu Node 22.16 pozostaje nierozstrzygnięty, a 42 podejrzane przypisania nadal wymagają ręcznej klasyfikacji na kopii bazy. Nowym kandydatem do ręcznej oceny jest Antykwariat Authentic, ale nie potwierdzono zgody na automatyczny odczyt. Raport zawiera 5 nowych polskich ISBN-ów/wydań.
 
-[Otwórz pełny raport z 21.11.2026](archive/2026-11-21.md)
+[Otwórz pełny raport z 22.11.2026](archive/2026-11-22.md)
 
 [Archiwum raportów](archive/)
