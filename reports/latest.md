@@ -1,9 +1,9 @@
 # Najnowszy raport BookFlip
 
-**Data:** 22.11.2026
+**Data:** 23.11.2026
 
-Najważniejsze ustalenia: od poprzedniego raportu nie zmienił się kod aplikacji; dodano lokalny zespół agentów Claude Code, który wymaga pilotażu 5–10 cykli. Problem testu Node 22.16 pozostaje nierozstrzygnięty, a 42 podejrzane przypisania nadal wymagają ręcznej klasyfikacji na kopii bazy. Nowym kandydatem do ręcznej oceny jest Antykwariat Authentic, ale nie potwierdzono zgody na automatyczny odczyt. Raport zawiera 5 nowych polskich ISBN-ów/wydań.
+Najważniejsze ustalenia: nie było zmian kodu od ostatniej analizy; ostatni zweryfikowany przebieg testów nadal pokazuje błąd na Node 22.16.0 w teście 634, a zadania Windows zostały anulowane. 42 podejrzane przypisania nadal wymagają ręcznej klasyfikacji na świeżej kopii bazy. Nowym kandydatem do oceny jest Antykwariat Hobbit, lecz automatyczny odczyt wymaga wcześniejszego potwierdzenia warunków i zgody. Raport zawiera 6 zweryfikowanych ISBN-ów nowych lub nadchodzących wydań oraz ostrzeżenie, by nie przenosić ISBN eBooka do wydania drukowanego.
 
-[Otwórz pełny raport z 22.11.2026](archive/2026-11-22.md)
+[Otwórz pełny raport z 23.11.2026](archive/2026-11-23.md)
 
 [Archiwum raportów](archive/)
