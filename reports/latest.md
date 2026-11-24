@@ -1,9 +1,9 @@
 # Najnowszy raport BookFlip
 
-**Data:** 23.11.2026
+**Data:** 24.11.2026
 
-Najważniejsze ustalenia: nie było zmian kodu od ostatniej analizy; ostatni zweryfikowany przebieg testów nadal pokazuje błąd na Node 22.16.0 w teście 634, a zadania Windows zostały anulowane. 42 podejrzane przypisania nadal wymagają ręcznej klasyfikacji na świeżej kopii bazy. Nowym kandydatem do oceny jest Antykwariat Hobbit, lecz automatyczny odczyt wymaga wcześniejszego potwierdzenia warunków i zgody. Raport zawiera 6 zweryfikowanych ISBN-ów nowych lub nadchodzących wydań oraz ostrzeżenie, by nie przenosić ISBN eBooka do wydania drukowanego.
+Najważniejsze ustalenia: błąd testu na Node 22.16.0 najpewniej wynika z użycia numerowanego parametru SQLite `?1`; upstream naprawił ten sposób wiązania w Node 22.20.0. Macierz CI anuluje pozostałe zadania po pierwszym błędzie, więc nadal brak wiarygodnego wyniku Windows. 42 podejrzane przypisania wymagają ręcznej klasyfikacji na świeżej kopii bazy. Nie znaleziono nowego źródła ofert gotowego do bezpiecznej integracji. Raport zawiera 8 zweryfikowanych ISBN-ów, w tym polskie wydanie powieści ze świata Baldur’s Gate 3.
 
-[Otwórz pełny raport z 23.11.2026](archive/2026-11-23.md)
+[Otwórz pełny raport z 24.11.2026](archive/2026-11-24.md)
 
 [Archiwum raportów](archive/)
