@@ -1,9 +1,11 @@
 # Najnowszy raport BookFlip
 
-**Data:** 27.11.2026
+**Data:** 28.11.2026
 
-Najważniejsze ustalenia: publiczny snapshot bookflip/main zawiera 114 śledzonych plików w data/image-cache, co wymaga audytu prywatności i pochodzenia obrazów. Główna ścieżka skanowania filtruje Allegro/OLX/Dedalus, ale local-scan i ręczny workflow mogą ominąć NO_LEGAL_ACCESS. CI przechodzi 4 kombinacje Windows/Linux × Node 22.16/24, lecz nie uruchamia istniejącego typecheck. Repozytoria bookflip i scanlive różnią się stanem kodu. Nie znaleziono nowego źródła gotowego do integracji; Vivarium wymaga kontaktu i zgody. Raport zawiera 11 ISBN-ów do deduplikacji, w tym nowe wydania Warhammer 40K, Warcraft, Diablo i Cyberpunk.
+Najważniejsze ustalenia: bookflip/main nie zmienił się od importu 24.11, a scanlive pozostaje starszym drzewem kodu — raporty są publikowane w scanlive, lecz kod należy weryfikować w bookflip. Korekta audytu wykazała 275 ścieżek data/image-cache (136 payloadów), nie 114 jak podano 27.11. Nadal otwarte są ryzyka image-cache i obejścia NO_LEGAL_ACCESS przez local-scan/ręczny workflow. Nowe kandydatury: Antykwariat Authentic (tylko po uzyskaniu zgody), AbeBooks przez oficjalne API oraz BN /networks jako test metadanych. Raport zawiera 10 zweryfikowanych ISBN-ów i plan audytu cache jako następny krok.
 
-[Pełny raport z 27.11.2026](archive/2026-11-27.md)
+[Pełny raport z 28.11.2026](archive/2026-11-28.md)
+
+[Poprzedni raport z 27.11.2026](archive/2026-11-27.md)
 
 [Archiwum raportów](archive/)
